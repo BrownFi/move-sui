@@ -3,8 +3,11 @@ module brownfi_amm::pool_test {
     use sui::test_scenario::{Self, next_tx, ctx, take_shared, return_shared, take_from_sender, return_to_sender};
     use sui::balance;
     use sui::coin::{Self, Coin};
+    use sui::clock::Clock;
     use brownfi_amm::swap;
     use brownfi_amm::pool::{Pool, LP};
+    use brownfi_amm::factory::Factory;
+    use brownfi_oracle::oracle::OracleAdapter;
     use brownfi_amm::helpers_test::{Self as test_helpers, A, B};
 
     const ADDR1: address = @0xA;
@@ -22,7 +25,13 @@ module brownfi_amm::pool_test {
 
             let input_a = balance::zero<A>();
             let input_b = balance::create_for_testing<B>(10);
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 0);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 0);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
 
             balance::destroy_for_testing(remaining_a);
             balance::destroy_for_testing(remaining_b);
@@ -46,7 +55,13 @@ module brownfi_amm::pool_test {
 
             let input_a = balance::create_for_testing<A>(10);
             let input_b = balance::zero<B>();
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 0);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 0);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
 
             balance::destroy_for_testing(remaining_a);
             balance::destroy_for_testing(remaining_b);
@@ -68,7 +83,9 @@ module brownfi_amm::pool_test {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
 
             let lp_coin = take_from_sender<Coin<LP<A,B>>>(&scenario);
-            let (a_out, b_out) = swap::remove_liquidity(&mut pool, coin::into_balance(lp_coin), 0, 0);
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&factory, &mut pool, coin::into_balance(lp_coin), 0, 0);
+            return_shared(factory);
 
             balance::destroy_for_testing(a_out);
             balance::destroy_for_testing(b_out);
@@ -83,9 +100,12 @@ module brownfi_amm::pool_test {
         {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
 
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let input_a = balance::create_for_testing<A>(200);
             let input_b = balance::create_for_testing<B>(100);
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 141);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 141);
 
             assert!(balance::value(&remaining_a) == 0, 0);
             assert!(balance::value(&remaining_b) == 0, 0);
@@ -98,6 +118,9 @@ module brownfi_amm::pool_test {
             let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
             assert!(amount_a == 200 && amount_b == 100 && lp_supply == 141, 0);
 
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(pool);
         };
 
@@ -113,9 +136,12 @@ module brownfi_amm::pool_test {
         {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
 
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let input_a = balance::create_for_testing<A>(200);
             let input_b = balance::create_for_testing<B>(100);
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 140);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 140);
 
             assert!(balance::value(&remaining_a) == 0, 0);
             assert!(balance::value(&remaining_b) == 0, 0);
@@ -128,6 +154,9 @@ module brownfi_amm::pool_test {
             let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
             assert!(amount_a == 300 && amount_b == 150 && lp_supply == 210, 0);
 
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(pool);
         };
 
@@ -135,9 +164,12 @@ module brownfi_amm::pool_test {
         {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
 
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let input_a = balance::create_for_testing<A>(110);
             let input_b = balance::create_for_testing<B>(50);
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 70);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 70);
 
             assert!(balance::value(&remaining_a) == 10, 0);
             assert!(balance::value(&remaining_b) == 0, 0);
@@ -150,6 +182,9 @@ module brownfi_amm::pool_test {
             let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
             assert!(amount_a == 400 && amount_b == 200 && lp_supply == 280, 0);
 
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(pool);
         };
 
@@ -157,9 +192,12 @@ module brownfi_amm::pool_test {
         {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
 
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let input_a = balance::create_for_testing<A>(100);
             let input_b = balance::create_for_testing<B>(60);
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 70);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 70);
 
             assert!(balance::value(&remaining_a) == 0, 0);
             assert!(balance::value(&remaining_b) == 10, 0);
@@ -172,6 +210,9 @@ module brownfi_amm::pool_test {
             let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
             assert!(amount_a == 500 && amount_b == 250 && lp_supply == 350, 0);
 
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(pool);
         };
 
@@ -181,7 +222,10 @@ module brownfi_amm::pool_test {
 
             let input_a = balance::create_for_testing<A>(1);
             let input_b = balance::create_for_testing<B>(1);
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 0);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 0);
 
             assert!(balance::value(&remaining_a) == 0, 0);
             assert!(balance::value(&remaining_b) == 0, 0);
@@ -194,6 +238,9 @@ module brownfi_amm::pool_test {
             let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
             assert!(amount_a == 501 && amount_b == 251 && lp_supply == 350, 0);
 
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(pool);
         };
 
@@ -210,9 +257,15 @@ module brownfi_amm::pool_test {
         {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
 
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let input_a = balance::create_for_testing<A>(200);
             let input_b = balance::create_for_testing<B>(200);
-            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&mut pool, input_a, input_b, 201);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity(&factory, &oracle, &clock, &mut pool, input_a, input_b, 201);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
 
             balance::destroy_for_testing(remaining_a);
             balance::destroy_for_testing(remaining_b);
@@ -235,7 +288,9 @@ module brownfi_amm::pool_test {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
 
             let lp = balance::zero();
-            let (a_out, b_out) = swap::remove_liquidity(&mut pool, lp, 0, 0);
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&factory, &mut pool, lp, 0, 0);
+            return_shared(factory);
 
             balance::destroy_for_testing(a_out);
             balance::destroy_for_testing(b_out);
@@ -259,7 +314,9 @@ module brownfi_amm::pool_test {
 
             let ctx = ctx(&mut scenario);
             let lp_in = coin::into_balance(coin::split(&mut lp_coin, 13, ctx));
-            let (a_out, b_out) = swap::remove_liquidity(&mut pool, lp_in, 36, 4);
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&factory, &mut pool, lp_in, 36, 4);
+            return_shared(factory);
 
             assert!(balance::value(&a_out) == 36, 0);
             assert!(balance::value(&b_out) == 4, 0);
@@ -282,7 +339,9 @@ module brownfi_amm::pool_test {
 
             let ctx = ctx(&mut scenario);
             let lp_in = coin::into_balance(coin::split(&mut lp_coin, 1, ctx));
-            let (a_out, b_out) = swap::remove_liquidity(&mut pool, lp_in, 2, 0);
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&factory, &mut pool, lp_in, 2, 0);
+            return_shared(factory);
 
             assert!(balance::value(&a_out) == 2, 0);
             assert!(balance::value(&b_out) == 0, 0);
@@ -304,7 +363,9 @@ module brownfi_amm::pool_test {
             assert!(coin::value(&lp_coin) == 22, 0);
 
             let lp_in = coin::into_balance(lp_coin);
-            let (a_out, b_out) = swap::remove_liquidity(&mut pool, lp_in, 62, 9);
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&factory, &mut pool, lp_in, 62, 9);
+            return_shared(factory);
 
             assert!(balance::value(&a_out) == 62, 0);
             assert!(balance::value(&b_out) == 9, 0);
@@ -334,7 +395,9 @@ module brownfi_amm::pool_test {
             let ctx = ctx(&mut scenario);
 
             let lp_in = coin::into_balance(coin::split(&mut lp_coin, 50, ctx));
-            let (a_out, b_out) = swap::remove_liquidity(&mut pool, lp_in, 51, 50);
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&factory, &mut pool, lp_in, 51, 50);
+            return_shared(factory);
 
             balance::destroy_for_testing(a_out);
             balance::destroy_for_testing(b_out);
@@ -359,7 +422,9 @@ module brownfi_amm::pool_test {
             let ctx = ctx(&mut scenario);
 
             let lp_in = coin::into_balance(coin::split(&mut lp_coin, 50, ctx));
-            let (a_out, b_out) = swap::remove_liquidity(&mut pool, lp_in, 50, 51);
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&factory, &mut pool, lp_in, 50, 51);
+            return_shared(factory);
 
             balance::destroy_for_testing(a_out);
             balance::destroy_for_testing(b_out);

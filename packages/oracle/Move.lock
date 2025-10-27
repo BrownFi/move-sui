@@ -2,11 +2,10 @@
 
 [move]
 version = 3
-manifest_digest = "E87B57A2D37CA65EB137D7C901A77C00B6F14F89864146B2E70C2A1A25B9C909"
-deps_digest = "3C4103934B1E040BB6B23F1D610B4EF9F2F1166A50A104EADCF77467C004C600"
+manifest_digest = "336A23D8CFACCA86DEBCC5359CF99BD8BB0CDD956E6DA5F42980C888EDF7536D"
+deps_digest = "F8BBB0CCB2491CA29A3DF03D6F92277A4F3574266507ACD77214D37ECA3F3082"
 dependencies = [
   { id = "Sui", name = "Sui" },
-  { id = "brownfi_oracle", name = "brownfi_oracle" },
 ]
 
 [[move.package]]
@@ -19,14 +18,6 @@ source = { git = "https://github.com/MystenLabs/sui.git", rev = "framework/mainn
 
 dependencies = [
   { id = "MoveStdlib", name = "MoveStdlib" },
-]
-
-[[move.package]]
-id = "brownfi_oracle"
-source = { local = "packages/oracle" }
-
-dependencies = [
-  { id = "Sui", name = "Sui" },
 ]
 
 [move.toolchain-version]

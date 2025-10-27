@@ -35,6 +35,28 @@ public struct Swap has copy, drop {
     amount_in: u64,
     token_out: TypeName,
     amount_out: u64,
+    /// Skewness-adjusted price for token A (Q64 format)
+    price_a: u64,
+    /// Skewness-adjusted price for token B (Q64 format)
+    price_b: u64,
+}
+
+public struct PoolParametersUpdated has copy, drop {
+    pool_id: ID,
+    parameter: vector<u8>, // "fee", "k", "lambda", "protocol_fee"
+    new_value: u64,
+}
+
+public struct PauseStateChanged has copy, drop {
+    paused: bool,
+}
+
+public struct FeeToUpdated has copy, drop {
+    new_fee_to: address,
+}
+
+public struct OracleUpdated has copy, drop {
+    new_oracle: ID,
 }
 
 public fun emit_pool_created(
@@ -96,13 +118,41 @@ public fun emit_swap(
     token_in: TypeName,
     amount_in: u64,
     token_out: TypeName,
-    amount_out: u64
+    amount_out: u64,
+    price_a: u64,
+    price_b: u64
 ) {
     sui::event::emit(Swap {
         pool_id,
         token_in,
         amount_in,
         token_out,
-        amount_out
+        amount_out,
+        price_a,
+        price_b
     });
+}
+
+public fun emit_pool_parameters_updated(
+    pool_id: ID,
+    parameter: vector<u8>,
+    new_value: u64
+) {
+    sui::event::emit(PoolParametersUpdated {
+        pool_id,
+        parameter,
+        new_value
+    });
+}
+
+public fun emit_pause_state_changed(paused: bool) {
+    sui::event::emit(PauseStateChanged { paused });
+}
+
+public fun emit_fee_to_updated(new_fee_to: address) {
+    sui::event::emit(FeeToUpdated { new_fee_to });
+}
+
+public fun emit_oracle_updated(new_oracle: ID) {
+    sui::event::emit(OracleUpdated { new_oracle });
 }

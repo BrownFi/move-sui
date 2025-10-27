@@ -4,10 +4,12 @@ module brownfi_amm::factory_test {
     use sui::tx_context::sender;
     use sui::balance;
     use sui::coin;
+    use sui::clock::Clock;
     use brownfi_amm::swap;
     use brownfi_amm::pool::Pool;
     use brownfi_amm::factory::Factory;
     use brownfi_amm::helpers_test::{Self as test_helpers, A, B, C};
+    use brownfi_oracle::oracle::OracleAdapter;
 
     const ADDR1: address = @0xA;
 
@@ -17,12 +19,16 @@ module brownfi_amm::factory_test {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::zero<A>();
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            return_shared(oracle);
+            return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -37,12 +43,16 @@ module brownfi_amm::factory_test {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(100);
             let init_b = balance::zero<B>();
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            return_shared(oracle);
+            return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -57,26 +67,34 @@ module brownfi_amm::factory_test {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(factory);
         };
 
         next_tx(&mut scenario, ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            return_shared(oracle);
+            return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -91,12 +109,16 @@ module brownfi_amm::factory_test {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<A>(100);
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            return_shared(oracle);
+            return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -111,12 +133,16 @@ module brownfi_amm::factory_test {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<B>(200);
             let init_b = balance::create_for_testing<A>(100);
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            return_shared(oracle);
+            return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -128,22 +154,22 @@ module brownfi_amm::factory_test {
     #[test]
     fun test_create_pool() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
-        {
-            let ctx = ctx(&mut scenario);
-            swap::test_init(ctx);
-        };
 
         next_tx(&mut scenario, ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(factory);
         };
 
@@ -156,23 +182,24 @@ module brownfi_amm::factory_test {
             assert!(amount_b == 100, 0);
             assert!(lp_supply == 141, 0);
 
-            let fee_points = swap::pool_fees(&pool);
-            assert!(fee_points == 30, 0);
-
             return_shared(pool);
         };
 
         next_tx(&mut scenario, ADDR1);
         {
             let mut factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<C>(100);
 
-            let lp = swap::create_pool(&mut factory, init_a, init_b, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
+            return_shared(oracle);
+            return_shared(clock);
             return_shared(factory);
         };
 
