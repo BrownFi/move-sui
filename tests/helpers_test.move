@@ -1,5 +1,5 @@
 #[test_only]
-module brownfi_amm::test_helpers {
+module brownfi_amm::helpers_test {
     use sui::test_scenario::{Self, Scenario, next_tx, ctx};
     use sui::tx_context::sender;
     use sui::balance;

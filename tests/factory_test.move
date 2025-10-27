@@ -1,5 +1,5 @@
 #[test_only]
-module brownfi_amm::pool_creation_tests {
+module brownfi_amm::factory_test {
     use sui::test_scenario::{Self, next_tx, ctx, take_shared, return_shared};
     use sui::tx_context::sender;
     use sui::balance;
@@ -7,7 +7,7 @@ module brownfi_amm::pool_creation_tests {
     use brownfi_amm::swap;
     use brownfi_amm::pool::Pool;
     use brownfi_amm::factory::Factory;
-    use brownfi_amm::test_helpers::{Self, A, B, C};
+    use brownfi_amm::helpers_test::{Self as test_helpers, A, B, C};
 
     const ADDR1: address = @0xA;
 

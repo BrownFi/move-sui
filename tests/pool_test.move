@@ -1,11 +1,11 @@
 #[test_only]
-module brownfi_amm::liquidity_tests {
+module brownfi_amm::pool_test {
     use sui::test_scenario::{Self, next_tx, ctx, take_shared, return_shared, take_from_sender, return_to_sender};
     use sui::balance;
     use sui::coin::{Self, Coin};
     use brownfi_amm::swap;
     use brownfi_amm::pool::{Pool, LP};
-    use brownfi_amm::test_helpers::{Self, A, B};
+    use brownfi_amm::helpers_test::{Self as test_helpers, A, B};
 
     const ADDR1: address = @0xA;
     const ADDR2: address = @0xB;
