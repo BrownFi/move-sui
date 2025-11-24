@@ -1,0 +1,568 @@
+/// Advanced test scenarios from v2-core
+/// Tests inventory-based AMM, skewness pricing, protocol fees, and oracle integration
+#[test_only]
+module brownfi_amm::v2_advanced_test {
+    use sui::test_scenario::{Self, Scenario, next_tx, take_shared, return_shared, take_from_sender, ctx};
+    use sui::balance;
+    use sui::coin::{Self, Coin};
+    use sui::clock::{Self, Clock};
+    use brownfi_amm::swap;
+    use brownfi_amm::pool::{Self, Pool, LP};
+    use brownfi_amm::factory::{Self, Factory, AdminCap};
+    use brownfi_amm::admin;
+    use brownfi_oracle::oracle::{Self, OracleAdapter};
+    use brownfi_amm::math;
+
+    // Test token types
+    public struct ETH has drop {}
+    public struct USDC has drop {}
+    public struct BTC has drop {}
+
+    const ADDR_ADMIN: address = @0xADMIN;
+    const ADDR_USER: address = @0xUSER;
+    const ADDR_FEE_TO: address = @0xFEE;
+
+    const Q64: u128 = 18446744073709551616; // 2^64
+    const MINIMUM_LIQUIDITY: u64 = 1000;
+
+    // Helper: Initialize test environment with factory, oracle, and clock
+    fun setup_test_environment(scenario: &mut Scenario) {
+        // Create factory
+        next_tx(scenario, ADDR_ADMIN);
+        {
+            factory::create_and_share(ctx(scenario));
+        };
+
+        // Create oracle
+        next_tx(scenario, ADDR_ADMIN);
+        {
+            oracle::create_and_share(15, ctx(scenario)); // 15 seconds max staleness
+        };
+
+        // Create clock
+        next_tx(scenario, ADDR_ADMIN);
+        {
+            let clock = clock::create_for_testing(ctx(scenario));
+            clock::share_for_testing(clock);
+        };
+    }
+
+    // Helper: Create pool with oracle prices
+    fun create_pool_with_oracle<A, B>(
+        scenario: &mut Scenario,
+        amount_a: u64,
+        amount_b: u64,
+        decimals_a: u8,
+        decimals_b: u8
+    ) {
+        next_tx(scenario, ADDR_ADMIN);
+        {
+            let mut factory = take_shared<Factory>(scenario);
+            let oracle = take_shared<OracleAdapter>(scenario);
+            let clock = take_shared<Clock>(scenario);
+
+            let balance_a = balance::create_for_testing<A>(amount_a);
+            let balance_b = balance::create_for_testing<B>(amount_b);
+
+            let lp_balance = swap::create_pool(
+                &mut factory,
+                &oracle,
+                &clock,
+                balance_a,
+                balance_b,
+                decimals_a,
+                decimals_b,
+                ctx(scenario)
+            );
+
+            let lp_coin = coin::from_balance(lp_balance, ctx(scenario));
+            sui::transfer::public_transfer(lp_coin, ADDR_ADMIN);
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+        };
+    }
+
+    // Test 1: Inventory-Based AMM - Swap with k parameter
+    #[test]
+    fun test_inventory_based_swap_with_k() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+        
+        // Configure oracle (tokens will use default 1.0 price)
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let admin_cap = take_from_sender<AdminCap>(&scenario);
+            
+            // Set k = 0.001 (Q64 / 1000)
+            // k controls inventory sensitivity
+            let pool_k = ((Q64 as u64) / 1000);
+            // Note: Will be applied after pool creation
+            
+            return_shared(factory);
+            sui::transfer::public_transfer(admin_cap, ADDR_ADMIN);
+        };
+
+        // Create pool: 200 ETH, 400 USDC
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 200_000_000_000, 400_000_000_000, 9, 9);
+
+        // Set pool parameters
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+            let admin_cap = take_from_sender<AdminCap>(&scenario);
+            
+            // Set k = 0.001
+            admin::set_pool_k(&mut pool, &admin_cap, (Q64 as u64) / 1000);
+            // Set fee = 0.3%
+            admin::set_pool_fee(&mut pool, &admin_cap, 300_000);
+            
+            return_shared(pool);
+            sui::transfer::public_transfer(admin_cap, ADDR_ADMIN);
+        };
+
+        // Swap 150 ETH for USDC
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            let input_eth = balance::create_for_testing<ETH>(150_000_000_000);
+            let usdc_out = swap::swap_a_for_b(
+                &factory,
+                &oracle,
+                &clock,
+                &mut pool,
+                input_eth,
+                0 // No min_out for testing
+            );
+
+            // Expected output: ~149.33 USDC (inventory-based pricing)
+            // Exact value from v2-core: 149331290678739573996 (18 decimals)
+            // Scaled to 9 decimals: ~149331290678
+            let output_amount = balance::value(&usdc_out);
+            
+            // Check output is in expected range (accounting for precision differences)
+            assert!(output_amount > 149_000_000_000 && output_amount < 150_000_000_000, 0);
+
+            balance::destroy_for_testing(usdc_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 2: Skewness Pricing with Lambda Parameter
+    #[test]
+    fun test_skewness_pricing() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create pool
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 1_000_000_000_000, 2_400_000_000_000, 18, 18);
+
+        // Set pool parameters with lambda (skewness)
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+            let admin_cap = take_from_sender<AdminCap>(&scenario);
+            
+            // Set k = 0.001
+            admin::set_pool_k(&mut pool, &admin_cap, (Q64 as u64) / 1000);
+            // Set fee = 0.3%
+            admin::set_pool_fee(&mut pool, &admin_cap, 300_000);
+            // Set lambda = 0.01 (1% skewness adjustment)
+            admin::set_pool_lambda(&mut pool, &admin_cap, 10_000_000);
+            
+            return_shared(pool);
+            sui::transfer::public_transfer(admin_cap, ADDR_ADMIN);
+        };
+
+        // Perform swap with skewness
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            let input_usdc = balance::create_for_testing<USDC>(100_000_000_000_000_000); // 0.1 USDC
+            let eth_out = swap::swap_b_for_a(
+                &factory,
+                &oracle,
+                &clock,
+                &mut pool,
+                input_usdc,
+                0
+            );
+
+            // With skewness, output should be adjusted based on inventory imbalance
+            let output_amount = balance::value(&eth_out);
+            assert!(output_amount > 0, 0);
+
+            balance::destroy_for_testing(eth_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 3: Protocol Fee Collection
+    #[test]
+    fun test_protocol_fee_collection() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Set fee recipient
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let mut factory = take_shared<Factory>(&scenario);
+            let admin_cap = take_from_sender<AdminCap>(&scenario);
+            
+            admin::set_factory_fee_to(&mut factory, &admin_cap, ADDR_FEE_TO);
+            
+            return_shared(factory);
+            sui::transfer::public_transfer(admin_cap, ADDR_ADMIN);
+        };
+
+        // Create pool
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 1_000_000_000, 1_000_000_000, 9, 9);
+
+        // Set protocol fee
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+            let admin_cap = take_from_sender<AdminCap>(&scenario);
+            
+            // Set protocol fee = 10% (of trading fees)
+            admin::set_pool_protocol_fee(&mut pool, &admin_cap, 10_000_000);
+            // Set trading fee = 0.3%
+            admin::set_pool_fee(&mut pool, &admin_cap, 300_000);
+            
+            return_shared(pool);
+            sui::transfer::public_transfer(admin_cap, ADDR_ADMIN);
+        };
+
+        // Perform multiple swaps to generate fees
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            let lp_supply_before = pool::lp_supply(&pool);
+
+            // Swap 1
+            let input_eth = balance::create_for_testing<ETH>(100_000_000);
+            let usdc_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_eth, 0);
+            balance::destroy_for_testing(usdc_out);
+
+            // Swap 2 (reverse direction)
+            let input_usdc = balance::create_for_testing<USDC>(50_000_000);
+            let eth_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, input_usdc, 0);
+            balance::destroy_for_testing(eth_out);
+
+            let lp_supply_after = pool::lp_supply(&pool);
+
+            // Protocol fees are collected as LP tokens, so supply should increase
+            assert!(lp_supply_after > lp_supply_before, 0);
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 4: Maximum Swap Size Limit (80% of reserves)
+    #[test]
+    #[expected_failure(abort_code = swap::EInsufficientLiquidity)]
+    fun test_max_swap_size_exceeds_limit() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create pool with 1000 tokens each
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 1_000_000_000, 1_000_000_000, 9, 9);
+
+        // Try to swap 85% of reserves (should fail, max is 80%)
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            let input_eth = balance::create_for_testing<ETH>(850_000_000); // 85%
+            let usdc_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_eth, 0);
+
+            balance::destroy_for_testing(usdc_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 5: Inventory Constraint Validation
+    #[test]
+    #[expected_failure(abort_code = swap::EInvalidInventory)]
+    fun test_inventory_constraint_violation() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create pool
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 1_000_000_000, 1_000_000_000, 9, 9);
+
+        // Set k parameter
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+            let admin_cap = take_from_sender<AdminCap>(&scenario);
+            
+            admin::set_pool_k(&mut pool, &admin_cap, (Q64 as u64) / 1000);
+            
+            return_shared(pool);
+            sui::transfer::public_transfer(admin_cap, ADDR_ADMIN);
+        };
+
+        // Try swap that would violate inventory constraints
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            // Large swap attempting to extract too much
+            let input_eth = balance::create_for_testing<ETH>(700_000_000);
+            let usdc_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_eth, 0);
+
+            balance::destroy_for_testing(usdc_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 6: Factory Pause Mechanism
+    #[test]
+    #[expected_failure(abort_code = swap::EFactoryPaused)]
+    fun test_factory_pause() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create pool
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 1_000_000_000, 1_000_000_000, 9, 9);
+
+        // Pause factory
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let mut factory = take_shared<Factory>(&scenario);
+            let admin_cap = take_from_sender<AdminCap>(&scenario);
+            
+            admin::set_factory_paused(&mut factory, &admin_cap, true);
+            
+            return_shared(factory);
+            sui::transfer::public_transfer(admin_cap, ADDR_ADMIN);
+        };
+
+        // Try to swap while paused (should fail)
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            let input_eth = balance::create_for_testing<ETH>(100_000_000);
+            let usdc_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_eth, 0);
+
+            balance::destroy_for_testing(usdc_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 7: Add Liquidity with Oracle Prices
+    #[test]
+    fun test_add_liquidity_with_oracle() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create initial pool
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 1_000_000_000, 2_000_000_000, 9, 9);
+
+        // Add more liquidity
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            let lp_supply_before = pool::lp_supply(&pool);
+
+            let input_a = balance::create_for_testing<ETH>(500_000_000);
+            let input_b = balance::create_for_testing<USDC>(1_000_000_000);
+
+            let (remaining_a, remaining_b, lp_balance) = swap::add_liquidity(
+                &factory,
+                &oracle,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                0 // min_lp_out
+            );
+
+            let lp_amount = balance::value(&lp_balance);
+            let lp_supply_after = pool::lp_supply(&pool);
+
+            // LP supply should increase
+            assert!(lp_supply_after > lp_supply_before, 0);
+            // Should receive LP tokens
+            assert!(lp_amount > 0, 0);
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(remaining_b);
+            balance::destroy_for_testing(lp_balance);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 8: Value-Based LP Minting
+    #[test]
+    fun test_value_based_lp_minting() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create pool with different token amounts but equal value (at 1:1 price)
+        // 1 ETH + 1 USDC (both valued at 1.0 in oracle)
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 1_000_000_000, 1_000_000_000, 9, 9);
+
+        next_tx(&mut scenario, ADDR_ADMIN);
+        {
+            let pool = take_shared<Pool<ETH, USDC>>(&scenario);
+            let lp_coin = take_from_sender<Coin<LP<ETH, USDC>>>(&scenario);
+
+            let lp_amount = coin::value(&lp_coin);
+            
+            // LP tokens should be based on total value
+            // min_value = min(1 ETH * 1.0, 1 USDC * 1.0) = 1.0
+            // Expected LP = (minValue * 2 / Q64) - MINIMUM_LIQUIDITY
+            // Note: Actual calculation uses Q64 scaling
+            assert!(lp_amount > 0, 0);
+
+            sui::transfer::public_transfer(lp_coin, ADDR_ADMIN);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 9: Multiple Swaps - Price Impact
+    #[test]
+    fun test_consecutive_swaps_price_impact() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create pool
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 10_000_000_000, 10_000_000_000, 9, 9);
+
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            // First swap
+            let input_eth_1 = balance::create_for_testing<ETH>(1_000_000_000);
+            let usdc_out_1 = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_eth_1, 0);
+            let output_1 = balance::value(&usdc_out_1);
+
+            // Second swap (same amount)
+            let input_eth_2 = balance::create_for_testing<ETH>(1_000_000_000);
+            let usdc_out_2 = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_eth_2, 0);
+            let output_2 = balance::value(&usdc_out_2);
+
+            // Second swap should yield less due to price impact
+            assert!(output_2 < output_1, 0);
+
+            balance::destroy_for_testing(usdc_out_1);
+            balance::destroy_for_testing(usdc_out_2);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    // Test 10: Swap Back and Forth (Arbitrage Loss)
+    #[test]
+    fun test_swap_back_and_forth_arbitrage_loss() {
+        let mut scenario = test_scenario::begin(ADDR_ADMIN);
+        setup_test_environment(&mut scenario);
+
+        // Create balanced pool
+        create_pool_with_oracle<ETH, USDC>(&mut scenario, 100_000_000_000, 100_000_000_000, 9, 9);
+
+        next_tx(&mut scenario, ADDR_USER);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<ETH, USDC>>(&scenario);
+
+            let initial_amount = 10_000_000_000;
+
+            // Swap ETH -> USDC
+            let input_eth = balance::create_for_testing<ETH>(initial_amount);
+            let usdc_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_eth, 0);
+
+            // Swap USDC -> ETH (reverse)
+            let eth_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, usdc_out, 0);
+            let final_amount = balance::value(&eth_out);
+
+            // Due to fees, should get less than initial amount
+            assert!(final_amount < initial_amount, 0);
+
+            balance::destroy_for_testing(eth_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+}
