@@ -26,7 +26,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::zero<A>();
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
@@ -50,7 +50,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::create_for_testing<A>(100);
             let init_b = balance::zero<B>();
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
@@ -74,7 +74,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(oracle);
@@ -92,7 +92,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
@@ -116,7 +116,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<A>(100);
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
@@ -140,7 +140,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::create_for_testing<B>(200);
             let init_b = balance::create_for_testing<A>(100);
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
@@ -165,7 +165,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(oracle);
@@ -195,7 +195,7 @@ module brownfi_amm::factory_test {
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<C>(100);
 
-            let lp = swap::create_pool(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(oracle);

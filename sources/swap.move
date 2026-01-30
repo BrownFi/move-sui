@@ -5,6 +5,7 @@ use sui::balance::{Self, Balance};
 use sui::coin::{Self, Coin};
 use sui::clock::Clock;
 use sui::tx_context::sender;
+use pyth::price_info::PriceInfoObject;
 
 use brownfi_amm::library;
 use brownfi_amm::math;
@@ -19,7 +20,7 @@ const ENoLiquidity: u64 = 4;
 const EPoolBalanceTooLarge: u64 = 5;
 const EInvalidInventory: u64 = 6;
 const EInsufficientLiquidity: u64 = 7;
-const EInsufficientOutputAmount: u64 = 8;
+// const EInsufficientOutputAmount: u64 = 8;
 const EFactoryPaused: u64 = 9;
 const EOracleNotConfigured: u64 = 10;
 
@@ -46,6 +47,8 @@ fun init(ctx: &mut TxContext) {
 public fun create_pool<A, B>(
     factory: &mut Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     init_a: Balance<A>,
     init_b: Balance<B>,
@@ -86,8 +89,8 @@ public fun create_pool<A, B>(
 
     // Get oracle prices using clock  
     let min_price_age = factory::min_price_age(factory);
-    let _price_a = oracle::get_price<A>(oracle, clock, min_price_age);
-    let _price_b = oracle::get_price<B>(oracle, clock, min_price_age);
+    let _price_a = oracle::get_price<A>(oracle, price_info_object_a, clock, min_price_age);
+    let _price_b = oracle::get_price<B>(oracle, price_info_object_b, clock, min_price_age);
 
     // For initial liquidity, use geometric mean (sqrt(a * b))
     // This is the traditional CPMM approach
@@ -113,6 +116,8 @@ public fun create_pool<A, B>(
 public fun add_liquidity<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     mut input_a: Balance<A>,
@@ -133,8 +138,8 @@ public fun add_liquidity<A, B>(
 
     // Get oracle prices using clock
     let min_price_age = factory::min_price_age(factory);
-    let price_a = oracle::get_price<A>(oracle, clock, min_price_age);
-    let price_b = oracle::get_price<B>(oracle, clock, min_price_age);
+    let price_a = oracle::get_price<A>(oracle, price_info_object_a, clock, min_price_age);
+    let price_b = oracle::get_price<B>(oracle, price_info_object_b, clock, min_price_age);
 
     // Get token decimals
     let decimals_a = pool::token_a_decimals(pool);
@@ -250,6 +255,8 @@ public fun remove_liquidity<A, B>(
 public fun swap_a_for_b<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input: Balance<A>,
@@ -274,8 +281,8 @@ public fun swap_a_for_b<A, B>(
 
     // Get oracle prices using clock
     let min_price_age = factory::min_price_age(factory);
-    let price_a = oracle::get_price<A>(oracle, clock, min_price_age);
-    let price_b = oracle::get_price<B>(oracle, clock, min_price_age);
+    let price_a = oracle::get_price<A>(oracle, price_info_object_a, clock, min_price_age);
+    let price_b = oracle::get_price<B>(oracle, price_info_object_b, clock, min_price_age);
 
     // Compute skewness-adjusted prices if lambda > 0
     let (skew_price_a, skew_price_b) = if (lambda > 0) {
@@ -351,6 +358,8 @@ public fun swap_a_for_b<A, B>(
 public fun swap_b_for_a<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input: Balance<B>,
@@ -375,8 +384,8 @@ public fun swap_b_for_a<A, B>(
 
     // Get oracle prices using clock
     let min_price_age = factory::min_price_age(factory);
-    let price_a = oracle::get_price<A>(oracle, clock, min_price_age);
-    let price_b = oracle::get_price<B>(oracle, clock, min_price_age);
+    let price_a = oracle::get_price<A>(oracle, price_info_object_a, clock, min_price_age);
+    let price_b = oracle::get_price<B>(oracle, price_info_object_b, clock, min_price_age);
 
     // Compute skewness-adjusted prices if lambda > 0
     let (skew_price_a, skew_price_b) = if (lambda > 0) {
@@ -624,6 +633,8 @@ fun collect_protocol_fee_on_swap<A, B>(
 public fun create_pool_with_coins<A, B>(
     factory: &mut Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     init_a: Coin<A>,
     init_b: Coin<B>,
@@ -631,7 +642,7 @@ public fun create_pool_with_coins<A, B>(
     token_b_decimals: u8,
     ctx: &mut TxContext
 ): Coin<LP<A, B>> {
-    let lp_balance = create_pool(factory, oracle, clock, coin::into_balance(init_a), coin::into_balance(init_b), token_a_decimals, token_b_decimals, ctx);
+    let lp_balance = create_pool(factory, oracle, price_info_object_a, price_info_object_b, clock, coin::into_balance(init_a), coin::into_balance(init_b), token_a_decimals, token_b_decimals, ctx);
     coin::from_balance(lp_balance, ctx)
 }
 
@@ -639,6 +650,8 @@ public fun create_pool_with_coins<A, B>(
 public fun create_pool_with_coins_and_transfer_lp_to_sender<A, B>(
     factory: &mut Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     init_a: Coin<A>,
     init_b: Coin<B>,
@@ -646,13 +659,15 @@ public fun create_pool_with_coins_and_transfer_lp_to_sender<A, B>(
     token_b_decimals: u8,
     ctx: &mut TxContext
 ) {
-    let lp_coin = create_pool_with_coins(factory, oracle, clock, init_a, init_b, token_a_decimals, token_b_decimals, ctx);
+    let lp_coin = create_pool_with_coins(factory, oracle, price_info_object_a, price_info_object_b, clock, init_a, init_b, token_a_decimals, token_b_decimals, ctx);
     transfer::public_transfer(lp_coin, sender(ctx));
 }
 
 public fun add_liquidity_with_coins<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input_a: Coin<A>,
@@ -663,6 +678,8 @@ public fun add_liquidity_with_coins<A, B>(
     let (remaining_a, remaining_b, lp) = add_liquidity(
         factory,
         oracle,
+        price_info_object_a,
+        price_info_object_b,
         clock,
         pool,
         coin::into_balance(input_a),
@@ -681,6 +698,8 @@ public fun add_liquidity_with_coins<A, B>(
 public fun add_liquidity_with_coins_and_transfer_to_sender<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input_a: Coin<A>,
@@ -691,6 +710,8 @@ public fun add_liquidity_with_coins_and_transfer_to_sender<A, B>(
     let (remaining_a, remaining_b, lp) = add_liquidity(
         factory,
         oracle,
+        price_info_object_a,
+        price_info_object_b,
         clock,
         pool,
         coin::into_balance(input_a),
@@ -746,13 +767,15 @@ public fun remove_liquidity_with_coins_and_transfer_to_sender<A, B>(
 public fun swap_a_for_b_with_coin<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input: Coin<A>,
     min_out: u64,
     ctx: &mut TxContext
 ): Coin<B> {
-    let b_out = swap_a_for_b(factory, oracle, clock, pool, coin::into_balance(input), min_out);
+    let b_out = swap_a_for_b(factory, oracle, price_info_object_a, price_info_object_b, clock, pool, coin::into_balance(input), min_out);
     coin::from_balance(b_out, ctx)
 }
 
@@ -760,26 +783,30 @@ public fun swap_a_for_b_with_coin<A, B>(
 public fun swap_a_for_b_with_coin_and_transfer_to_sender<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input: Coin<A>,
     min_out: u64,
     ctx: &mut TxContext
 ) {
-    let b_coin = swap_a_for_b_with_coin(factory, oracle, clock, pool, input, min_out, ctx);
+    let b_coin = swap_a_for_b_with_coin(factory, oracle, price_info_object_a, price_info_object_b, clock, pool, input, min_out, ctx);
     transfer::public_transfer(b_coin, sender(ctx));
 }
 
 public fun swap_b_for_a_with_coin<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input: Coin<B>,
     min_out: u64,
     ctx: &mut TxContext
 ): Coin<A> {
-    let a_out = swap_b_for_a(factory, oracle, clock, pool, coin::into_balance(input), min_out);
+    let a_out = swap_b_for_a(factory, oracle, price_info_object_a, price_info_object_b, clock, pool, coin::into_balance(input), min_out);
     coin::from_balance(a_out, ctx)
 }
 
@@ -787,19 +814,348 @@ public fun swap_b_for_a_with_coin<A, B>(
 public fun swap_b_for_a_with_coin_and_transfer_to_sender<A, B>(
     factory: &Factory,
     oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
     clock: &Clock,
     pool: &mut Pool<A, B>,
     input: Coin<B>,
     min_out: u64,
     ctx: &mut TxContext
 ) {
-    let a_coin = swap_b_for_a_with_coin(factory, oracle, clock, pool, input, min_out, ctx);
+    let a_coin = swap_b_for_a_with_coin(factory, oracle, price_info_object_a, price_info_object_b, clock, pool, input, min_out, ctx);
     transfer::public_transfer(a_coin, sender(ctx));
 }
 
 #[test_only]
 public fun test_init(ctx: &mut TxContext) {
     init(ctx)
+}
+
+#[test_only]
+public fun create_pool_for_testing<A, B>(
+    factory: &mut Factory,
+    oracle: &OracleAdapter,
+    clock: &Clock,
+    init_a: Balance<A>,
+    init_b: Balance<B>,
+    token_a_decimals: u8,
+    token_b_decimals: u8,
+    ctx: &mut TxContext
+): Balance<LP<A, B>> {
+    assert!(!factory::is_paused(factory), EFactoryPaused);
+
+    let init_a_val = balance::value(&init_a);
+    let init_b_val = balance::value(&init_b);
+
+    assert!(init_a_val > 0 && init_b_val > 0, EZeroInput);
+    assert!(init_a_val <= MAX_POOL_BALANCE && init_b_val <= MAX_POOL_BALANCE, EPoolBalanceTooLarge);
+    assert!(oracle::has_config<A>(oracle) && oracle::has_config<B>(oracle), EOracleNotConfigured);
+
+    factory::register_pool<A, B>(factory);
+
+    let default_fee = 300_000;
+    let default_k = ((Q32 / 1000) as u64);
+    let default_lambda = 0;
+    let default_protocol_fee = 10_000_000;
+
+    let mut pool_obj = pool::new(
+        init_a, init_b, token_a_decimals, token_b_decimals,
+        default_fee, default_k, default_lambda, default_protocol_fee, ctx
+    );
+
+    let min_price_age = factory::min_price_age(factory);
+    let _price_a = oracle::get_price_for_testing<A>(oracle, clock, min_price_age);
+    let _price_b = oracle::get_price_for_testing<B>(oracle, clock, min_price_age);
+
+    let lp_amount_u64 = math::mul_sqrt(init_a_val, init_b_val);
+    assert!(lp_amount_u64 >= MIN_LIQUIDITY, ENoLiquidity);
+
+    let lp_balance = pool::mint_lp(&mut pool_obj, lp_amount_u64);
+
+    events::emit_pool_created(
+        pool::id(&pool_obj),
+        type_name::with_defining_ids<A>(),
+        type_name::with_defining_ids<B>(),
+        pool::balance_a(&pool_obj),
+        pool::balance_b(&pool_obj),
+        lp_amount_u64
+    );
+
+    pool::share(pool_obj);
+    lp_balance
+}
+
+#[test_only]
+public fun add_liquidity_for_testing<A, B>(
+    factory: &Factory,
+    oracle: &OracleAdapter,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    mut input_a: Balance<A>,
+    mut input_b: Balance<B>,
+    min_lp_out: u64,
+    _ctx: &mut TxContext
+): (Balance<A>, Balance<B>, Balance<LP<A, B>>) {
+    assert!(!factory::is_paused(factory), EFactoryPaused);
+
+    let input_a_val = balance::value(&input_a);
+    let input_b_val = balance::value(&input_b);
+    let pool_a_val = pool::balance_a(pool);
+    let pool_b_val = pool::balance_b(pool);
+
+    assert!(input_a_val > 0 && input_b_val > 0, EZeroInput);
+    assert!(pool_a_val <= MAX_POOL_BALANCE && pool_b_val <= MAX_POOL_BALANCE, EPoolBalanceTooLarge);
+    assert!(pool_a_val + input_a_val <= MAX_POOL_BALANCE, EPoolBalanceTooLarge);
+    assert!(pool_b_val + input_b_val <= MAX_POOL_BALANCE, EPoolBalanceTooLarge);
+
+    let min_price_age = factory::min_price_age(factory);
+    let price_a = oracle::get_price_for_testing<A>(oracle, clock, min_price_age);
+    let price_b = oracle::get_price_for_testing<B>(oracle, clock, min_price_age);
+
+    let decimals_a = pool::token_a_decimals(pool);
+    let decimals_b = pool::token_b_decimals(pool);
+
+    let parsed_input_a = math::parse_amount_to_standard_decimals(decimals_a, input_a_val, STANDARD_DECIMALS);
+    let parsed_input_b = math::parse_amount_to_standard_decimals(decimals_b, input_b_val, STANDARD_DECIMALS);
+    let parsed_pool_a = math::parse_amount_to_standard_decimals(decimals_a, pool_a_val, STANDARD_DECIMALS);
+    let parsed_pool_b = math::parse_amount_to_standard_decimals(decimals_b, pool_b_val, STANDARD_DECIMALS);
+
+    let input_a_value = (parsed_input_a as u128) * (price_a as u128);
+    let input_b_value = (parsed_input_b as u128) * (price_b as u128);
+
+    let mut deposit_a: u64;
+    let mut deposit_b: u64;
+    let lp_to_issue: u64;
+    let total_supply = pool::lp_supply(pool);
+
+    let inventory_value = (parsed_pool_a as u128) * (price_a as u128) +
+                          (parsed_pool_b as u128) * (price_b as u128);
+
+    if (total_supply == 0 || inventory_value == 0) {
+        lp_to_issue = math::mul_sqrt(input_a_val, input_b_val);
+        assert!(lp_to_issue >= MIN_LIQUIDITY, ENoLiquidity);
+    } else {
+        let ratio_a = math::mul_div_u128((input_a_val as u128), (total_supply as u128), (pool_a_val as u128));
+        let ratio_b = math::mul_div_u128((input_b_val as u128), (total_supply as u128), (pool_b_val as u128));
+        lp_to_issue = (math::min_u128(ratio_a, ratio_b) as u64);
+    };
+
+    if (total_supply == 0 || inventory_value == 0 || lp_to_issue == 0) {
+        deposit_a = input_a_val;
+        deposit_b = input_b_val;
+    } else if (input_a_value < input_b_value) {
+        deposit_a = input_a_val;
+        deposit_b = math::mul_div(input_a_val, pool_b_val, pool_a_val);
+        if (deposit_b > input_b_val) {
+            deposit_b = input_b_val;
+            deposit_a = math::mul_div(input_b_val, pool_a_val, pool_b_val);
+        };
+    } else {
+        deposit_b = input_b_val;
+        deposit_a = math::mul_div(input_b_val, pool_a_val, pool_b_val);
+        if (deposit_a > input_a_val) {
+            deposit_a = input_a_val;
+            deposit_b = math::mul_div(input_a_val, pool_b_val, pool_a_val);
+        };
+    };
+
+    assert!(lp_to_issue >= min_lp_out, EExcessiveSlippage);
+
+    pool::deposit_a(pool, balance::split(&mut input_a, deposit_a));
+    pool::deposit_b(pool, balance::split(&mut input_b, deposit_b));
+
+    let lp = pool::mint_lp(pool, lp_to_issue);
+
+    events::emit_add_liquidity(
+        pool::id(pool),
+        type_name::with_defining_ids<A>(),
+        type_name::with_defining_ids<B>(),
+        deposit_a,
+        deposit_b,
+        lp_to_issue
+    );
+
+    (input_a, input_b, lp)
+}
+
+#[test_only]
+public fun swap_a_for_b_for_testing<A, B>(
+    factory: &Factory,
+    oracle: &OracleAdapter,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input: Balance<A>,
+    min_out: u64,
+): Balance<B> {
+    assert!(!factory::is_paused(factory), EFactoryPaused);
+    assert!(balance::value(&input) > 0, EZeroInput);
+
+    let reserve_a = pool::balance_a(pool);
+    let reserve_b = pool::balance_b(pool);
+    assert!(reserve_a > 0 && reserve_b > 0, ENoLiquidity);
+
+    let amount_in = balance::value(&input);
+    assert!(amount_in * 10 <= reserve_a * 8, EInsufficientLiquidity);
+
+    let (fee, k, lambda, protocol_fee_pct) = pool::get_parameters(pool);
+    let decimals_a = pool::token_a_decimals(pool);
+    let decimals_b = pool::token_b_decimals(pool);
+
+    let min_price_age = factory::min_price_age(factory);
+    let price_a = oracle::get_price_for_testing<A>(oracle, clock, min_price_age);
+    let price_b = oracle::get_price_for_testing<B>(oracle, clock, min_price_age);
+
+    let (skew_price_a, skew_price_b) = if (lambda > 0) {
+        compute_skewness_price(reserve_a, reserve_b, decimals_a, decimals_b, price_a, price_b, lambda)
+    } else {
+        (price_a, price_b)
+    };
+
+    let amount_in_with_fee = math::mul_div_u128(
+        (amount_in as u128),
+        ((PRECISION - (fee as u64)) as u128),
+        (PRECISION as u128)
+    );
+    let amount_out = math::mul_div_u128_to_u64(
+        amount_in_with_fee * (reserve_b as u128),
+        1,
+        (reserve_a as u128) + amount_in_with_fee
+    );
+
+    assert!(amount_out >= min_out, EExcessiveSlippage);
+    assert!(amount_out * 10 <= reserve_b * 8, EInsufficientLiquidity);
+
+    let amount_out_without_fee = math::mul_div_u128_to_u64(
+        (amount_out as u128) * (PRECISION as u128),
+        1,
+        (PRECISION - (fee as u64)) as u128
+    );
+
+    pool::deposit_a(pool, input);
+    let new_balance_a = pool::balance_a(pool);
+    let new_balance_b = pool::balance_b(pool);
+
+    check_inventory(
+        new_balance_a, new_balance_b,
+        reserve_a, reserve_b,
+        decimals_a, decimals_b,
+        skew_price_a, skew_price_b,
+        amount_out_without_fee,
+        true,
+        k
+    );
+
+    if (protocol_fee_pct > 0) {
+        let fee_to_opt = factory::fee_to(factory);
+        if (option::is_some(&fee_to_opt)) {
+            collect_protocol_fee_on_swap(
+                pool, decimals_a, amount_in, fee, protocol_fee_pct,
+                price_a, price_b, skew_price_a, skew_price_b
+            );
+        };
+    };
+
+    events::emit_swap(
+        pool::id(pool),
+        type_name::with_defining_ids<A>(),
+        amount_in,
+        type_name::with_defining_ids<B>(),
+        amount_out,
+        skew_price_a,
+        skew_price_b
+    );
+
+    pool::withdraw_b(pool, amount_out)
+}
+
+#[test_only]
+public fun swap_b_for_a_for_testing<A, B>(
+    factory: &Factory,
+    oracle: &OracleAdapter,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input: Balance<B>,
+    min_out: u64,
+): Balance<A> {
+    assert!(!factory::is_paused(factory), EFactoryPaused);
+    assert!(balance::value(&input) > 0, EZeroInput);
+
+    let reserve_a = pool::balance_a(pool);
+    let reserve_b = pool::balance_b(pool);
+    assert!(reserve_a > 0 && reserve_b > 0, ENoLiquidity);
+
+    let amount_in = balance::value(&input);
+    assert!(amount_in * 10 <= reserve_b * 8, EInsufficientLiquidity);
+
+    let (fee, k, lambda, protocol_fee_pct) = pool::get_parameters(pool);
+    let decimals_a = pool::token_a_decimals(pool);
+    let decimals_b = pool::token_b_decimals(pool);
+
+    let min_price_age = factory::min_price_age(factory);
+    let price_a = oracle::get_price_for_testing<A>(oracle, clock, min_price_age);
+    let price_b = oracle::get_price_for_testing<B>(oracle, clock, min_price_age);
+
+    let (skew_price_a, skew_price_b) = if (lambda > 0) {
+        compute_skewness_price(reserve_a, reserve_b, decimals_a, decimals_b, price_a, price_b, lambda)
+    } else {
+        (price_a, price_b)
+    };
+
+    let amount_in_with_fee = math::mul_div_u128(
+        (amount_in as u128),
+        ((PRECISION - (fee as u64)) as u128),
+        (PRECISION as u128)
+    );
+    let amount_out = math::mul_div_u128_to_u64(
+        amount_in_with_fee * (reserve_a as u128),
+        1,
+        (reserve_b as u128) + amount_in_with_fee
+    );
+
+    assert!(amount_out >= min_out, EExcessiveSlippage);
+    assert!(amount_out * 10 <= reserve_a * 8, EInsufficientLiquidity);
+
+    let amount_out_without_fee = math::mul_div_u128_to_u64(
+        (amount_out as u128) * (PRECISION as u128),
+        1,
+        (PRECISION - (fee as u64)) as u128
+    );
+
+    pool::deposit_b(pool, input);
+    let new_balance_a = pool::balance_a(pool);
+    let new_balance_b = pool::balance_b(pool);
+
+    check_inventory(
+        new_balance_a, new_balance_b,
+        reserve_a, reserve_b,
+        decimals_a, decimals_b,
+        skew_price_a, skew_price_b,
+        amount_out_without_fee,
+        false,
+        k
+    );
+
+    if (protocol_fee_pct > 0) {
+        let fee_to_opt = factory::fee_to(factory);
+        if (option::is_some(&fee_to_opt)) {
+            collect_protocol_fee_on_swap(
+                pool, decimals_b, amount_in, fee, protocol_fee_pct,
+                price_a, price_b, skew_price_a, skew_price_b
+            );
+        };
+    };
+
+    events::emit_swap(
+        pool::id(pool),
+        type_name::with_defining_ids<B>(),
+        amount_in,
+        type_name::with_defining_ids<A>(),
+        amount_out,
+        skew_price_a,
+        skew_price_b
+    );
+
+    pool::withdraw_a(pool, amount_out)
 }
 
 #[test_only]

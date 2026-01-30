@@ -4,8 +4,12 @@ edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 version = "2.0.0"
 
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/mainnet" }
 brownfi_oracle = { local = "./packages/oracle" }
+
+[dependencies.Pyth]
+git = "https://github.com/pyth-network/pyth-crosschain.git"
+subdir = "target_chains/sui/contracts"
+rev = "sui-contract-testnet"
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
@@ -20,7 +24,6 @@ brownfi_oracle = { local = "./packages/oracle" }
 
 [addresses]
 brownfi_amm = "0x0"
-brownfi_oracle = "0x0"
 
 [dev-dependencies]
 # The dev-dependencies section allows overriding dependencies for `--test` and

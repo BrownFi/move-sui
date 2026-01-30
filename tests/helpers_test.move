@@ -71,7 +71,7 @@ module brownfi_amm::helpers_test {
             let init_a = balance::create_for_testing<A>(init_a);
             let init_b = balance::create_for_testing<B>(init_b);
 
-            let lp = swap::create_pool(
+            let lp = swap::create_pool_for_testing(
                 &mut factory,
                 &oracle,
                 &clock,

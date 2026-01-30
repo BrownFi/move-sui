@@ -27,7 +27,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -54,7 +54,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let a_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, input_b, 0);
+            let a_out = swap::swap_b_for_a_for_testing(&factory, &oracle, &clock, &mut pool, input_b, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -86,7 +86,7 @@ module brownfi_amm::swap_test {
             let input_a = balance::create_for_testing<A>(10);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -118,7 +118,7 @@ module brownfi_amm::swap_test {
             let input_b = balance::create_for_testing<B>(10);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let a_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, input_b, 0);
+            let a_out = swap::swap_b_for_a_for_testing(&factory, &oracle, &clock, &mut pool, input_b, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -144,7 +144,7 @@ module brownfi_amm::swap_test {
             let clock = take_shared<Clock>(&scenario);
 
             let input_a = balance::create_for_testing<A>(1300);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 608);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 608);
 
             let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
             assert!(amount_a == 21300 && amount_b == 9392 && lp_supply == 14142, 0);
@@ -166,7 +166,7 @@ module brownfi_amm::swap_test {
             let clock = take_shared<Clock>(&scenario);
 
             let input_a = balance::create_for_testing<A>(1);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -196,7 +196,7 @@ module brownfi_amm::swap_test {
             let clock = take_shared<Clock>(&scenario);
 
             let input_b = balance::create_for_testing<B>(1300);
-            let a_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, input_b, 2294);
+            let a_out = swap::swap_b_for_a_for_testing(&factory, &oracle, &clock, &mut pool, input_b, 2294);
 
             let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
             assert!(amount_a == 17706 && amount_b == 11300 && lp_supply == 14142, 0);
@@ -218,7 +218,7 @@ module brownfi_amm::swap_test {
             let clock = take_shared<Clock>(&scenario);
 
             let input_b = balance::create_for_testing<B>(1);
-            let a_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, input_b, 0);
+            let a_out = swap::swap_b_for_a_for_testing(&factory, &oracle, &clock, &mut pool, input_b, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -248,7 +248,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -275,7 +275,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -302,7 +302,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -329,7 +329,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -356,7 +356,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -383,7 +383,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -410,7 +410,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -437,7 +437,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let a_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, input_b, 0);
+            let a_out = swap::swap_b_for_a_for_testing(&factory, &oracle, &clock, &mut pool, input_b, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -464,7 +464,7 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let a_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, input_b, 0);
+            let a_out = swap::swap_b_for_a_for_testing(&factory, &oracle, &clock, &mut pool, input_b, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);
@@ -492,12 +492,12 @@ module brownfi_amm::swap_test {
             let clock = take_shared<Clock>(&scenario);
             
             let input_a_1 = balance::create_for_testing<A>(1_000_000_000);
-            let b_out_1 = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a_1, 0);
+            let b_out_1 = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a_1, 0);
             let first_output = balance::value(&b_out_1);
             balance::destroy_for_testing(b_out_1);
 
             let input_a_2 = balance::create_for_testing<A>(1_000_000_000);
-            let b_out_2 = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a_2, 0);
+            let b_out_2 = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a_2, 0);
             let second_output = balance::value(&b_out_2);
             balance::destroy_for_testing(b_out_2);
             
@@ -527,9 +527,9 @@ module brownfi_amm::swap_test {
             let factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
-            let b_out = swap::swap_a_for_b(&factory, &oracle, &clock, &mut pool, input_a, 0);
+            let b_out = swap::swap_a_for_b_for_testing(&factory, &oracle, &clock, &mut pool, input_a, 0);
 
-            let a_out = swap::swap_b_for_a(&factory, &oracle, &clock, &mut pool, b_out, 0);
+            let a_out = swap::swap_b_for_a_for_testing(&factory, &oracle, &clock, &mut pool, b_out, 0);
             return_shared(factory);
             return_shared(oracle);
             return_shared(clock);

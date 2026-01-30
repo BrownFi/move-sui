@@ -3,7 +3,8 @@ module brownfi_oracle::oracle;
 use sui::table::{Self, Table};
 use sui::clock::Clock;
 use std::type_name::{Self, TypeName};
-use brownfi_oracle::pyth_adapter::{Self, PythState};
+use brownfi_oracle::pyth_adapter;
+use pyth::price_info::PriceInfoObject;
 
 /// Oracle adapter interface for pluggable oracle sources
 /// This allows different oracle implementations (Pyth, Switchboard, manual feeds, etc.)
@@ -19,8 +20,6 @@ public struct OracleAdapter has key {
     token_configs: Table<TypeName, OracleConfig>,
     /// Minimum acceptable price age in seconds
     min_price_age: u64,
-    /// Optional Pyth state reference (if using Pyth)
-    pyth_state_id: Option<ID>,
 }
 
 /// Configuration for how to fetch price for a specific token
@@ -52,7 +51,6 @@ fun init(ctx: &mut TxContext) {
         id: object::new(ctx),
         token_configs: table::new(ctx),
         min_price_age: 15, // Default 15 seconds
-        pyth_state_id: option::none(),
     };
     transfer::share_object(oracle);
 }
@@ -63,7 +61,6 @@ public fun new(min_price_age: u64, ctx: &mut TxContext): OracleAdapter {
         id: object::new(ctx),
         token_configs: table::new(ctx),
         min_price_age,
-        pyth_state_id: option::none(),
     }
 }
 
@@ -78,12 +75,6 @@ public fun share(oracle: OracleAdapter) {
     transfer::share_object(oracle);
 }
 
-/// Set Pyth state reference (optional, only needed if using Pyth)
-/// This should be called by admin after deployment
-public fun set_pyth_state(oracle: &mut OracleAdapter, pyth_state_id: ID) {
-    oracle.pyth_state_id = option::some(pyth_state_id);
-}
-
 /// Get oracle ID (useful for factory configuration)
 public fun id(oracle: &OracleAdapter): ID {
     object::id(oracle)
@@ -94,12 +85,14 @@ public fun id(oracle: &OracleAdapter): ID {
 /// 
 /// Parameters:
 /// - oracle: OracleAdapter reference
+/// - price_info_object: Pyth PriceInfoObject for the token
 /// - clock: Clock for timestamp verification
 /// - max_price_age: Maximum acceptable price age in seconds
 /// 
 /// Returns: Price in Q32 format (2^32 = 1.0)
 public fun get_price<T>(
     oracle: &OracleAdapter,
+    price_info_object: &PriceInfoObject,
     clock: &Clock,
     max_price_age: u64
 ): u64 {
@@ -122,7 +115,7 @@ public fun get_price<T>(
     
     // Currently only support Pyth
     if (config.source_type == SOURCE_PYTH) {
-        get_price_from_pyth(oracle, config, clock, max_price_age)
+        get_price_from_pyth(price_info_object, config, clock, max_price_age)
     } else {
         // Unsupported oracle source
         abort EUnsupportedOracleSource
@@ -199,26 +192,20 @@ public fun get_source_type<T>(oracle: &OracleAdapter): vector<u8> {
 }
 
 /// Get price from Pyth oracle
-fun get_price_from_pyth(
-    oracle: &OracleAdapter,
+fun get_price_from_pyth( 
+    price_info_object: &PriceInfoObject,
     config: &OracleConfig,
     clock: &Clock,
     max_price_age: u64
 ): u64 {
-    // In production, get the actual PythState from dynamic field or registry
-    // For now, return placeholder
-    // 
-    // Production code would be:
-    // let pyth_state: &PythState = ...; // Get from registry using config.source_id
-    // pyth_adapter::get_price(pyth_state, config.config_data, clock, max_price_age)
-    
-    let _ = oracle;
-    let _ = config;
-    let _ = clock;
-    let _ = max_price_age;
-    
-    // Placeholder: return 1.0 in Q32
-    (Q32 as u64)
+    // Call the Pyth adapter to get the price
+    // config_data contains the Pyth price feed ID (32 bytes)
+    pyth_adapter::get_price(
+        price_info_object,
+        clock,
+        config.config_data,
+        max_price_age
+    )
 }
 
 
@@ -240,4 +227,25 @@ public fun set_min_price_age(
 /// Get a mock price for testing
 public fun mock_price(amount: u64): u64 {
     amount * (Q32 as u64)
+}
+
+#[test_only]
+/// Get price without requiring PriceInfoObject (for test oracle sources only)
+public fun get_price_for_testing<T>(
+    oracle: &OracleAdapter,
+    _clock: &Clock,
+    _max_price_age: u64
+): u64 {
+    let token_type = type_name::with_defining_ids<T>();
+
+    if (!table::contains(&oracle.token_configs, token_type)) {
+        return (Q32 as u64)
+    };
+
+    let config = table::borrow(&oracle.token_configs, token_type);
+
+    // Only works with "test" source type
+    assert!(config.source_type == b"test", EUnsupportedOracleSource);
+
+    1_000_000_000 // Return 1.0 with 9 decimals
 }

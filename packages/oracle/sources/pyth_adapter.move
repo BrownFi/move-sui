@@ -9,27 +9,12 @@
 /// ```
 module brownfi_oracle::pyth_adapter;
 
-use sui::table::{Self, Table};
-use sui::object::{Self, UID};
-use sui::tx_context::TxContext;
 use sui::clock::Clock;
-
-/// Mock Pyth price feed structure
-/// In production, this would come from the actual Pyth smart contract
-public struct PythPriceFeed has copy, drop, store {
-    price: u64, // Price value (with implied decimal)
-    conf: u64, // Confidence interval
-    expo: u8, // Exponent magnitude (0-255)
-    expo_is_negative: bool, // True if exponent is negative
-    publish_time: u64, // Unix timestamp
-}
-
-/// Mock Pyth state object
-/// In production, this would be the actual Pyth state from pyth-sui package
-public struct PythState has key, store {
-    id: UID,
-    prices: Table<vector<u8>, PythPriceFeed>, // price_feed_id => PythPriceFeed
-}
+use pyth::price_info;
+use pyth::price_identifier;
+use pyth::price;
+use pyth::pyth;
+use pyth::price_info::PriceInfoObject;
 
 /// Error codes
 #[allow(unused_const)]
@@ -58,21 +43,29 @@ const Q32: u128 = 4294967296; // 1 << 32
 /// In production, this should fetch the actual price from Pyth state
 /// 
 /// Parameters:
-/// - pyth_state: Reference to Pyth state object  
+/// - price_info_object: Reference to Pyth PriceInfoObject
 /// - clock: Current clock for staleness check
 /// - price_feed_id: Pyth price feed ID (32 bytes)
 /// - max_staleness: Maximum age in seconds
 /// 
 /// Returns: Price in Q32 format (2^32 represents 1.0)
 public fun get_price(
-    _pyth_state: &PythState,
+    _price_info_object: &PriceInfoObject,
     _clock: &Clock,
     _price_feed_id: vector<u8>,
     _max_staleness: u64
 ): u64 {
-    // TODO: Implement actual Pyth price fetching
-    // For now, return default price of 1.0
-    (Q32 as u64)
+    // Implement actual Pyth price fetching
+    // Make sure the price is not older than max_age seconds
+    let price_struct = pyth::get_price_no_older_than(_price_info_object, _clock, _max_staleness);
+    // Check the price feed ID
+    let price_info = price_info::get_price_info_from_price_info_object(_price_info_object);
+    let price_id = price_identifier::get_bytes(&price_info::get_price_identifier(&price_info));
+
+    assert!(price_id == _price_feed_id, EInvalidPrice);
+
+    let price_i64 = price::get_price(&price_struct);
+    price_i64.get_magnitude_if_positive()
 }
 
 /// Convert Pyth price format to Q32 format
@@ -128,52 +121,9 @@ fun pow_10_u128(n: u8): u128 {
     result
 }
 
-/// Create a mock Pyth state for testing
-#[test_only]
-public fun create_test_pyth_state(ctx: &mut TxContext): PythState {
-    PythState {
-        id: object::new(ctx),
-        prices: table::new(ctx),
-    }
-}
-
-/// Add a test price to mock Pyth state
-#[test_only]
-public fun add_test_price(
-    pyth_state: &mut PythState,
-    price_feed_id: vector<u8>,
-    price: u64,
-    conf: u64,
-    expo: u8,
-    expo_is_negative: bool,
-    publish_time: u64
-) {
-    let feed = PythPriceFeed {
-        price,
-        conf,
-        expo,
-        expo_is_negative,
-        publish_time,
-    };
-    table::add(&mut pyth_state.prices, price_feed_id, feed);
-}
-
-/// Delete test Pyth state
-#[test_only]
-public fun destroy_test_pyth_state(pyth_state: PythState) {
-    let PythState { id, prices } = pyth_state;
-    table::drop(prices);
-    object::delete(id);
-}
-
 //
 // Tests
 //
-
-#[test_only]
-use sui::test_scenario;
-#[test_only]
-use sui::tx_context;
 
 #[test]
 fun test_convert_pyth_price() {
@@ -222,22 +172,9 @@ fun test_price_confidence() {
 }
 
 #[test]
-fun test_create_mock_pyth_state() {
-    let ctx = &mut tx_context::dummy();
-    
-    // Create mock Pyth state with ETH price
-    let _eth_price = PythPriceFeed {
-        price: 200000000000, // $2000 with expo -8
-        conf: 50000000, // $0.50 confidence
-        expo: 8, // Represents -8
-        expo_is_negative: true,
-        publish_time: 1000000,
-    };
-    
-    let pyth_state = PythState {
-        id: object::new(ctx),
-        prices: table::new(ctx),
-    };
-    
-    destroy_test_pyth_state(pyth_state);
+fun test_pow_10() {
+    assert!(pow_10_u128(0) == 1, 0);
+    assert!(pow_10_u128(1) == 10, 1);
+    assert!(pow_10_u128(2) == 100, 2);
+    assert!(pow_10_u128(8) == 100000000, 3);
 }
