@@ -7,9 +7,7 @@ version = "2.0.0"
 brownfi_oracle = { local = "./packages/oracle" }
 
 [dependencies.Pyth]
-git = "https://github.com/pyth-network/pyth-crosschain.git"
-subdir = "target_chains/sui/contracts"
-rev = "sui-contract-testnet"
+local = "./packages/pyth-crosschain/target_chains/sui/contracts"
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.

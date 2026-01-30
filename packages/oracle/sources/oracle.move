@@ -229,23 +229,3 @@ public fun mock_price(amount: u64): u64 {
     amount * (Q32 as u64)
 }
 
-#[test_only]
-/// Get price without requiring PriceInfoObject (for test oracle sources only)
-public fun get_price_for_testing<T>(
-    oracle: &OracleAdapter,
-    _clock: &Clock,
-    _max_price_age: u64
-): u64 {
-    let token_type = type_name::with_defining_ids<T>();
-
-    if (!table::contains(&oracle.token_configs, token_type)) {
-        return (Q32 as u64)
-    };
-
-    let config = table::borrow(&oracle.token_configs, token_type);
-
-    // Only works with "test" source type
-    assert!(config.source_type == b"test", EUnsupportedOracleSource);
-
-    1_000_000_000 // Return 1.0 with 9 decimals
-}

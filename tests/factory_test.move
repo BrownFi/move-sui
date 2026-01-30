@@ -10,6 +10,7 @@ module brownfi_amm::factory_test {
     use brownfi_amm::factory::Factory;
     use brownfi_amm::helpers_test::{Self as test_helpers, A, B, C};
     use brownfi_oracle::oracle::OracleAdapter;
+    use pyth::price_info::PriceInfoObject;
 
     const ADDR1: address = @0xA;
 
@@ -21,14 +22,18 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::zero<A>();
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -45,14 +50,18 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(100);
             let init_b = balance::zero<B>();
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -69,16 +78,20 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             return_shared(factory);
         };
 
@@ -87,14 +100,18 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -111,14 +128,18 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<A>(100);
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -135,14 +156,18 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<B>(200);
             let init_b = balance::create_for_testing<A>(100);
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(factory);
@@ -160,16 +185,20 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<B>(100);
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             return_shared(factory);
         };
 
@@ -190,16 +219,20 @@ module brownfi_amm::factory_test {
             let mut factory = take_shared<Factory>(&scenario);
             let oracle = take_shared<OracleAdapter>(&scenario);
             let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
             let ctx = ctx(&mut scenario);
 
             let init_a = balance::create_for_testing<A>(200);
             let init_b = balance::create_for_testing<C>(100);
 
-            let lp = swap::create_pool_for_testing(&mut factory, &oracle, &clock, init_a, init_b, 0, 0, ctx);
+            let lp = swap::create_pool(&mut factory, &oracle, &pio_a, &pio_b, &clock, init_a, init_b, 0, 0, ctx);
             transfer::public_transfer(coin::from_balance(lp, ctx), sender(ctx));
 
             return_shared(oracle);
             return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
             return_shared(factory);
         };
 
