@@ -9,6 +9,19 @@ brownfi_oracle = { local = "./packages/oracle" }
 [dependencies.Pyth]
 local = "./packages/pyth-crosschain/target_chains/sui/contracts"
 
+# NOTE: For testnet publishing, uncomment these overrides to match Pyth/Wormhole's Sui framework:
+# [dependencies.Sui]
+# git = "https://github.com/MystenLabs/sui.git"
+# subdir = "crates/sui-framework/packages/sui-framework"
+# rev = "041c5f2bae2fe52079e44b70514333532d69f4e6"
+# override = true
+#
+# [dependencies.MoveStdlib]
+# git = "https://github.com/MystenLabs/sui.git"
+# subdir = "crates/sui-framework/packages/move-stdlib"
+# rev = "041c5f2bae2fe52079e44b70514333532d69f4e6"
+# override = true
+
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
 # MyRemotePackage = { git = "https://some.remote/host.git", subdir = "remote/path", rev = "main" }

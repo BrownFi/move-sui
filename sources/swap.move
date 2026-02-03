@@ -102,8 +102,8 @@ public fun create_pool<A, B>(
 
     events::emit_pool_created(
         pool::id(&pool_obj),
-        type_name::with_defining_ids<A>(),
-        type_name::with_defining_ids<B>(),
+        type_name::get<A>(),
+        type_name::get<B>(),
         pool::balance_a(&pool_obj),
         pool::balance_b(&pool_obj),
         lp_amount_u64
@@ -207,8 +207,8 @@ public fun add_liquidity<A, B>(
 
     events::emit_add_liquidity(
         pool::id(pool),
-        type_name::with_defining_ids<A>(),
-        type_name::with_defining_ids<B>(),
+        type_name::get<A>(),
+        type_name::get<B>(),
         deposit_a,
         deposit_b,
         lp_to_issue
@@ -241,8 +241,8 @@ public fun remove_liquidity<A, B>(
 
     events::emit_remove_liquidity(
         pool::id(pool),
-        type_name::with_defining_ids<A>(),
-        type_name::with_defining_ids<B>(),
+        type_name::get<A>(),
+        type_name::get<B>(),
         a_out,
         b_out,
         lp_in_amount
@@ -343,9 +343,9 @@ public fun swap_a_for_b<A, B>(
 
     events::emit_swap(
         pool::id(pool),
-        type_name::with_defining_ids<A>(),
+        type_name::get<A>(),
         amount_in,
-        type_name::with_defining_ids<B>(),
+        type_name::get<B>(),
         amount_out,
         skew_price_a,
         skew_price_b
@@ -444,9 +444,9 @@ public fun swap_b_for_a<A, B>(
 
     events::emit_swap(
         pool::id(pool),
-        type_name::with_defining_ids<B>(),
+        type_name::get<B>(),
         amount_in,
-        type_name::with_defining_ids<A>(),
+        type_name::get<A>(),
         amount_out,
         skew_price_a,
         skew_price_b
@@ -842,15 +842,15 @@ public struct FOOd has drop {}
 
 #[test]
 fun test_cmp_type_names() {
-    assert!(library::sort_names(&type_name::with_original_ids<BAR>(), &type_name::with_original_ids<FOO>()) == library::sort_less(), 0);
-    assert!(library::sort_names(&type_name::with_defining_ids<FOO>(), &type_name::with_defining_ids<FOO>()) == library::sort_equal(), 0);
-    assert!(library::sort_names(&type_name::with_defining_ids<FOO>(), &type_name::with_defining_ids<BAR>()) == library::sort_greater(), 0);
+    assert!(library::sort_names(&type_name::get<BAR>(), &type_name::get<FOO>()) == library::sort_less(), 0);
+    assert!(library::sort_names(&type_name::get<FOO>(), &type_name::get<FOO>()) == library::sort_equal(), 0);
+    assert!(library::sort_names(&type_name::get<FOO>(), &type_name::get<BAR>()) == library::sort_greater(), 0);
 
-    assert!(library::sort_names(&type_name::with_defining_ids<FOO>(), &type_name::with_defining_ids<FOOd>()) == library::sort_less(), 0);
-    assert!(library::sort_names(&type_name::with_defining_ids<FOOd>(), &type_name::with_defining_ids<FOO>()) == library::sort_greater(), 0);
+    assert!(library::sort_names(&type_name::get<FOO>(), &type_name::get<FOOd>()) == library::sort_less(), 0);
+    assert!(library::sort_names(&type_name::get<FOOd>(), &type_name::get<FOO>()) == library::sort_greater(), 0);
 
-    assert!(library::sort_names(&type_name::with_defining_ids<FOOD>(), &type_name::with_defining_ids<FOOd>()) == library::sort_less(), 0);
-    assert!(library::sort_names(&type_name::with_defining_ids<FOOd>(), &type_name::with_defining_ids<FOOD>()) == library::sort_greater(), 0);
+    assert!(library::sort_names(&type_name::get<FOOD>(), &type_name::get<FOOd>()) == library::sort_less(), 0);
+    assert!(library::sort_names(&type_name::get<FOOd>(), &type_name::get<FOOD>()) == library::sort_greater(), 0);
 }
 
 #[test]

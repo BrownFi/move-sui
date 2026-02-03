@@ -63,8 +63,8 @@ public fun create_and_share(ctx: &mut TxContext) {
 }
 
 public fun register_pool<A, B>(factory: &mut Factory) {
-    let a = type_name::with_defining_ids<A>();
-    let b = type_name::with_defining_ids<B>();
+    let a = type_name::get<A>();
+    let b = type_name::get<B>();
     assert!(library::sort_names(&a, &b) == 0, EInvalidPair);
 
     let item = PoolItem { a, b };
@@ -74,8 +74,8 @@ public fun register_pool<A, B>(factory: &mut Factory) {
 }
 
 public fun pool_exists<A, B>(factory: &Factory): bool {
-    let a = type_name::with_defining_ids<A>();
-    let b = type_name::with_defining_ids<B>();
+    let a = type_name::get<A>();
+    let b = type_name::get<B>();
     let item = PoolItem { a, b };
     table::contains(&factory.table, item)
 }
@@ -153,7 +153,7 @@ public fun test_destroy_empty(factory: Factory) {
 
 #[test_only]
 public fun test_remove_pool<A, B>(factory: &mut Factory) {
-    let a = type_name::with_defining_ids<A>();
-    let b = type_name::with_defining_ids<B>();
+    let a = type_name::get<A>();
+    let b = type_name::get<B>();
     table::remove(&mut factory.table, PoolItem { a, b });
 }

@@ -14,14 +14,14 @@ public fun sort_equal(): u8 { SORT_EQUAL }
 public fun sort_greater(): u8 { SORT_GREATER }
 
 public fun sort_names(a: &TypeName, b: &TypeName): u8 {
-    let bytes_a = ascii::as_bytes(type_name::as_string(a));
-    let bytes_b = ascii::as_bytes(type_name::as_string(b));
+    let bytes_a = ascii::as_bytes(type_name::borrow_string(a));
+    let bytes_b = ascii::as_bytes(type_name::borrow_string(b));
 
     let len_a = vector::length(bytes_a);
     let len_b = vector::length(bytes_b);
 
     let mut i = 0;
-    let n = std::u64::min(len_a, len_b);
+    let n = if (len_a < len_b) { len_a } else { len_b };
     while (i < n) {
         let byte_a = *vector::borrow(bytes_a, i);
         let byte_b = *vector::borrow(bytes_b, i);
@@ -45,8 +45,8 @@ public fun sort_names(a: &TypeName, b: &TypeName): u8 {
 }
 
 public fun are_types_sorted<A, B>(): bool {
-    let a = type_name::with_defining_ids<A>();
-    let b = type_name::with_defining_ids<B>();
+    let a = type_name::get<A>();
+    let b = type_name::get<B>();
     sort_names(&a, &b) == SORT_LESS
 }
 

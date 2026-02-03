@@ -96,7 +96,7 @@ public fun get_price<T>(
     clock: &Clock,
     max_price_age: u64
 ): u64 {
-    let token_type = type_name::with_defining_ids<T>();
+    let token_type = type_name::get<T>();
     
     // Check if token is configured
     if (!table::contains(&oracle.token_configs, token_type)) {
@@ -154,7 +154,7 @@ public fun configure_token<T>(
     source_id: ID,
     config_data: vector<u8>
 ) {
-    let token_type = type_name::with_defining_ids<T>();
+    let token_type = type_name::get<T>();
     let config = OracleConfig {
         source_type,
         source_id,
@@ -171,7 +171,7 @@ public fun configure_token<T>(
 
 /// Remove oracle configuration for a token
 public fun remove_token_config<T>(oracle: &mut OracleAdapter) {
-    let token_type = type_name::with_defining_ids<T>();
+    let token_type = type_name::get<T>();
     if (table::contains(&oracle.token_configs, token_type)) {
         table::remove(&mut oracle.token_configs, token_type);
     }
@@ -179,13 +179,13 @@ public fun remove_token_config<T>(oracle: &mut OracleAdapter) {
 
 /// Check if a token has oracle configuration
 public fun has_config<T>(oracle: &OracleAdapter): bool {
-    let token_type = type_name::with_defining_ids<T>();
+    let token_type = type_name::get<T>();
     table::contains(&oracle.token_configs, token_type)
 }
 
 /// Get oracle source type for a token
 public fun get_source_type<T>(oracle: &OracleAdapter): vector<u8> {
-    let token_type = type_name::with_defining_ids<T>();
+    let token_type = type_name::get<T>();
     assert!(table::contains(&oracle.token_configs, token_type), ETokenNotConfigured);
     let config = table::borrow(&oracle.token_configs, token_type);
     config.source_type

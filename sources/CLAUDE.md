@@ -7,21 +7,5 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #40 | 2:41 PM | 🔵 | Fixed-Point Math Library with Decimal Normalization | ~514 |
-| #39 | " | 🔵 | Library Utilities for Type Ordering and Balance Handling | ~421 |
-| #38 | 2:40 PM | 🔵 | Comprehensive Event System for Protocol Observability | ~144 |
-| #37 | " | 🔵 | Novel Inventory-Based AMM with Oracle-Adjusted Pricing | ~604 |
-| #36 | " | 🔵 | Admin Controls with Parameter Boundaries | ~388 |
-| #35 | " | 🔵 | Factory Pattern with Oracle Integration and Admin Controls | ~396 |
-| #34 | " | 🔵 | Pool Module with Novel AMM Parameters | ~375 |
-
-### Jan 29, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #120 | 4:53 PM | ✅ | Swap Functions Updated to Accept Separate PriceInfoObjects | ~403 |
-| #119 | " | ✅ | Swap Module Updated for Direct Pyth Integration | ~361 |
-| #116 | " | 🔵 | Swap Functions Updated with PriceInfoObject Parameters | ~370 |
-| #112 | 4:52 PM | 🔵 | Missing Test Wrapper Functions Identified | ~477 |
-| #109 | 4:49 PM | 🔵 | Pyth Oracle Integration with PriceInfoObject Parameters | ~531 |
+| #35 | 2:40 PM | 🔵 | Factory Pattern with Oracle Integration and Admin Controls | ~396 |
 </claude-mem-context>

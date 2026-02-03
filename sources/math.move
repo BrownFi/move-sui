@@ -42,7 +42,7 @@ public fun ceil_mul_div(a: u64, b: u64, c: u64): u64 {
 /// Calculates sqrt(a * b) with overflow protection.
 public fun mul_sqrt(a: u64, b: u64): u64 {
     let product = (a as u128) * (b as u128);
-    let result = std::u128::sqrt(product);
+    let result = sqrt_u128(product);
     assert!(result <= MAX_U64, EOverflow);
     (result as u64)
 }
@@ -122,4 +122,16 @@ public fun abs_diff_u128(a: u128, b: u128): u128 {
 /// Minimum of two u128 values
 public fun min_u128(a: u128, b: u128): u128 {
     if (a < b) a else b
+}
+
+/// Integer square root for u128 (Newton's method)
+fun sqrt_u128(x: u128): u128 {
+    if (x == 0) return 0;
+    let mut z = x;
+    let mut y = (z + 1) / 2;
+    while (y < z) {
+        z = y;
+        y = (z + x / z) / 2;
+    };
+    z
 }
