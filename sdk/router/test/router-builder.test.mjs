@@ -122,12 +122,33 @@ import {
   repayBWithBorrowedCoinAndFee,
   repayBWithCoin,
   runLaunchValidationMatrixPreflight,
+  claimProtocolLp,
+  setFactoryFeeTo,
+  setFactoryMinPriceAge,
+  setFactoryOracle,
+  setFactoryPaused,
+  setPoolAddLiquidityPaused,
+  setPoolAmmPolicy,
+  setPoolAmmSourceIds,
+  setPoolAmmSourcePolicy,
+  setPoolFee,
+  setPoolFeeSplit,
+  setPoolFeeTo,
+  setPoolGamma,
+  setPoolK,
+  setPoolKB,
+  setPoolKQ,
+  setPoolLambda,
   setPoolOracleAggregationPolicy,
   setPoolOracleMaxPriceAge,
   setPoolOracleQuorum,
   setPoolOracleSources,
+  setPoolProtocolFee,
   setPoolFlashEnabled,
   setPoolPythWeight,
+  setPoolRouterEnabled,
+  setPoolSpreads,
+  setPoolSwapsPaused,
   splitSuiFromGas,
   summarizeLaunchValidationMatrixPreflightResult,
   storkRestLatestPricesResponseToSignedPrices,
@@ -10021,6 +10042,333 @@ test("Pyth oracle admin builders target admin functions with Move argument order
       { kind: "id", value: "0xBBBB" },
       { kind: "pure-vector", type: "u8", values: Array(32).fill(1) },
       { kind: "pure-vector", type: "u8", values: Array(32).fill(2) }
+    ]
+  });
+});
+
+test("pool risk and gate admin builders target admin functions with Move argument order", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    pool: "0xPOOLAB"
+  };
+  const riskBase = { ...base, riskCap: "0xRISK" };
+
+  const feeTx = createTransactionRecorder();
+  setPoolFee({ ...riskBase, newFee: 10_000 })(feeTx);
+  assert.deepEqual(feeTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_fee",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "10000" }
+    ]
+  });
+
+  const kTx = createTransactionRecorder();
+  setPoolK({ ...riskBase, newK: 4_294_967n })(kTx);
+  assert.deepEqual(kTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_k",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u64", value: "4294967" }
+    ]
+  });
+
+  const lambdaTx = createTransactionRecorder();
+  setPoolLambda({ ...riskBase, newLambda: 123n })(lambdaTx);
+  assert.deepEqual(lambdaTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_lambda",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u64", value: "123" }
+    ]
+  });
+
+  const kBTx = createTransactionRecorder();
+  setPoolKB({ ...riskBase, newK: 456n })(kBTx);
+  assert.deepEqual(kBTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_k_b",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u64", value: "456" }
+    ]
+  });
+
+  const kQTx = createTransactionRecorder();
+  setPoolKQ({ ...riskBase, newK: 789n })(kQTx);
+  assert.deepEqual(kQTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_k_q",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u64", value: "789" }
+    ]
+  });
+
+  const feeSplitTx = createTransactionRecorder();
+  setPoolFeeSplit({ ...riskBase, newFeeSplit: 7_500_000 })(feeSplitTx);
+  assert.deepEqual(feeSplitTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_fee_split",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "7500000" }
+    ]
+  });
+
+  const protocolFeeTx = createTransactionRecorder();
+  setPoolProtocolFee({ ...riskBase, newProtocolFee: 8_000_000 })(protocolFeeTx);
+  assert.deepEqual(protocolFeeTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_protocol_fee",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "8000000" }
+    ]
+  });
+
+  const gammaTx = createTransactionRecorder();
+  setPoolGamma({ ...riskBase, newGamma: 100_000_000 })(gammaTx);
+  assert.deepEqual(gammaTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_gamma",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "100000000" }
+    ]
+  });
+
+  const spreadsTx = createTransactionRecorder();
+  setPoolSpreads({
+    ...riskBase,
+    compress: 100,
+    sSell: 200,
+    sBuy: 300,
+    fixS: 400,
+    disThreshold: 500,
+    sBound: 600
+  })(spreadsTx);
+  assert.deepEqual(spreadsTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_spreads",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "100" },
+      { kind: "u32", value: "200" },
+      { kind: "u32", value: "300" },
+      { kind: "u32", value: "400" },
+      { kind: "u32", value: "500" },
+      { kind: "u32", value: "600" }
+    ]
+  });
+
+  const feeToTx = createTransactionRecorder();
+  setPoolFeeTo({ ...base, feeCap: "0xFEE", feeTo: "0xFEETO" })(feeToTx);
+  assert.deepEqual(feeToTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_fee_to",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xFEE" },
+      { kind: "address", value: "0xFEETO" }
+    ]
+  });
+
+  const swapsPausedTx = createTransactionRecorder();
+  setPoolSwapsPaused({ ...base, pauseCap: "0xPAUSE", paused: true })(swapsPausedTx);
+  assert.deepEqual(swapsPausedTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_swaps_paused",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xPAUSE" },
+      { kind: "bool", value: true }
+    ]
+  });
+
+  const addLiquidityPausedTx = createTransactionRecorder();
+  setPoolAddLiquidityPaused({
+    ...base,
+    pauseCap: "0xPAUSE",
+    paused: false
+  })(addLiquidityPausedTx);
+  assert.deepEqual(addLiquidityPausedTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_add_liquidity_paused",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xPAUSE" },
+      { kind: "bool", value: false }
+    ]
+  });
+
+  const routerEnabledTx = createTransactionRecorder();
+  setPoolRouterEnabled({
+    ...base,
+    routerCap: "0xROUTERCAP",
+    enabled: true
+  })(routerEnabledTx);
+  assert.deepEqual(routerEnabledTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_router_enabled",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xROUTERCAP" },
+      { kind: "bool", value: true }
+    ]
+  });
+
+  const claimTx = createTransactionRecorder();
+  const claimed = claimProtocolLp({
+    ...base,
+    feeCap: "0xFEE"
+  })(claimTx);
+  assert.deepEqual(claimed, { kind: "result", index: 0 });
+  assert.deepEqual(claimTx.calls[0], {
+    target: "0xBROWN::admin::claim_protocol_lp",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xFEE" }
+    ]
+  });
+});
+
+test("AMM and factory admin builders target admin functions with Move argument order", () => {
+  const poolBase = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    pool: "0xPOOLAB",
+    ammCap: "0xAMM"
+  };
+
+  const ammPolicyTx = createTransactionRecorder();
+  setPoolAmmPolicy({
+    ...poolBase,
+    enabled: true,
+    blendWeight: 50_000_000,
+    minSources: 1,
+    fallbackMode: 1
+  })(ammPolicyTx);
+  assert.deepEqual(ammPolicyTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_amm_policy",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xAMM" },
+      { kind: "bool", value: true },
+      { kind: "u32", value: "50000000" },
+      { kind: "u8", value: "1" },
+      { kind: "u8", value: "1" }
+    ]
+  });
+
+  const sourcePolicyTx = createTransactionRecorder();
+  setPoolAmmSourcePolicy({
+    ...poolBase,
+    maxOspread: 1_000_000,
+    minLiquidityQuote: 1_000_000_000n,
+    minWindowSeconds: 60n,
+    maxWindowSeconds: 600n,
+    allowedSourceMask: 1n,
+    sourceCountLimit: 2
+  })(sourcePolicyTx);
+  assert.deepEqual(sourcePolicyTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_amm_source_policy",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xAMM" },
+      { kind: "u32", value: "1000000" },
+      { kind: "u128", value: "1000000000" },
+      { kind: "u64", value: "60" },
+      { kind: "u64", value: "600" },
+      { kind: "u64", value: "1" },
+      { kind: "u8", value: "2" }
+    ]
+  });
+
+  const sourceIdsTx = createTransactionRecorder();
+  setPoolAmmSourceIds({
+    ...poolBase,
+    allowedSourceIds: ["0xFLOWX1", "0xFLOWX2"]
+  })(sourceIdsTx);
+  assert.deepEqual(sourceIdsTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_amm_source_ids",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xAMM" },
+      { kind: "pure-vector", type: "id", values: ["0xFLOWX1", "0xFLOWX2"] }
+    ]
+  });
+
+  const factoryBase = {
+    packageId: "0xBROWN",
+    factory: "0xFACTORY",
+    adminCap: "0xADMIN"
+  };
+
+  const factoryPausedTx = createTransactionRecorder();
+  setFactoryPaused({ ...factoryBase, paused: true })(factoryPausedTx);
+  assert.deepEqual(factoryPausedTx.calls[0], {
+    target: "0xBROWN::admin::set_factory_paused",
+    typeArguments: [],
+    arguments: [
+      { kind: "object", id: "0xFACTORY" },
+      { kind: "object", id: "0xADMIN" },
+      { kind: "bool", value: true }
+    ]
+  });
+
+  const factoryFeeToTx = createTransactionRecorder();
+  setFactoryFeeTo({ ...factoryBase, feeTo: "0xFEETO" })(factoryFeeToTx);
+  assert.deepEqual(factoryFeeToTx.calls[0], {
+    target: "0xBROWN::admin::set_factory_fee_to",
+    typeArguments: [],
+    arguments: [
+      { kind: "object", id: "0xFACTORY" },
+      { kind: "object", id: "0xADMIN" },
+      { kind: "address", value: "0xFEETO" }
+    ]
+  });
+
+  const factoryOracleTx = createTransactionRecorder();
+  setFactoryOracle({ ...factoryBase, oracleId: "0xORACLE" })(factoryOracleTx);
+  assert.deepEqual(factoryOracleTx.calls[0], {
+    target: "0xBROWN::admin::set_factory_oracle",
+    typeArguments: [],
+    arguments: [
+      { kind: "object", id: "0xFACTORY" },
+      { kind: "object", id: "0xADMIN" },
+      { kind: "id", value: "0xORACLE" }
+    ]
+  });
+
+  const factoryMinAgeTx = createTransactionRecorder();
+  setFactoryMinPriceAge({ ...factoryBase, age: 15n })(factoryMinAgeTx);
+  assert.deepEqual(factoryMinAgeTx.calls[0], {
+    target: "0xBROWN::admin::set_factory_min_price_age",
+    typeArguments: [],
+    arguments: [
+      { kind: "object", id: "0xFACTORY" },
+      { kind: "object", id: "0xADMIN" },
+      { kind: "u64", value: "15" }
     ]
   });
 });

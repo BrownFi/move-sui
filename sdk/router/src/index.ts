@@ -1807,6 +1807,127 @@ export interface SetPoolFlashEnabledOptions extends PairTypesOptions {
   enabled: boolean;
 }
 
+export interface PoolRiskAdminOptions extends PairTypesOptions {
+  pool: ObjectInput;
+  riskCap: ObjectInput;
+}
+
+export interface SetPoolFeeOptions extends PoolRiskAdminOptions {
+  newFee: U32Input;
+}
+
+export interface SetPoolKOptions extends PoolRiskAdminOptions {
+  newK: U64Input;
+}
+
+export interface SetPoolLambdaOptions extends PoolRiskAdminOptions {
+  newLambda: U64Input;
+}
+
+export type SetPoolKBOptions = SetPoolKOptions;
+export type SetPoolKQOptions = SetPoolKOptions;
+
+export interface SetPoolFeeSplitOptions extends PoolRiskAdminOptions {
+  newFeeSplit: U32Input;
+}
+
+export interface SetPoolProtocolFeeOptions extends PoolRiskAdminOptions {
+  newProtocolFee: U32Input;
+}
+
+export interface SetPoolGammaOptions extends PoolRiskAdminOptions {
+  newGamma: U32Input;
+}
+
+export interface SetPoolSpreadsOptions extends PoolRiskAdminOptions {
+  compress: U32Input;
+  sSell: U32Input;
+  sBuy: U32Input;
+  fixS: U32Input;
+  disThreshold: U32Input;
+  sBound: U32Input;
+}
+
+export interface PoolFeeAdminOptions extends PairTypesOptions {
+  pool: ObjectInput;
+  feeCap: ObjectInput;
+}
+
+export interface SetPoolFeeToOptions extends PoolFeeAdminOptions {
+  feeTo: string;
+}
+
+export type ClaimProtocolLpOptions = PoolFeeAdminOptions;
+
+export interface PoolPauseAdminOptions extends PairTypesOptions {
+  pool: ObjectInput;
+  pauseCap: ObjectInput;
+}
+
+export interface SetPoolSwapsPausedOptions extends PoolPauseAdminOptions {
+  paused: boolean;
+}
+
+export interface SetPoolAddLiquidityPausedOptions extends PoolPauseAdminOptions {
+  paused: boolean;
+}
+
+export interface PoolRouterAdminOptions extends PairTypesOptions {
+  pool: ObjectInput;
+  routerCap: ObjectInput;
+}
+
+export interface SetPoolRouterEnabledOptions extends PoolRouterAdminOptions {
+  enabled: boolean;
+}
+
+export interface PoolAmmAdminOptions extends PairTypesOptions {
+  pool: ObjectInput;
+  ammCap: ObjectInput;
+}
+
+export interface SetPoolAmmPolicyOptions extends PoolAmmAdminOptions {
+  enabled: boolean;
+  blendWeight: U32Input;
+  minSources: U8Input;
+  fallbackMode: U8Input;
+}
+
+export interface SetPoolAmmSourcePolicyOptions extends PoolAmmAdminOptions {
+  maxOspread: U32Input;
+  minLiquidityQuote: U128Input;
+  minWindowSeconds: U64Input;
+  maxWindowSeconds: U64Input;
+  allowedSourceMask: U64Input;
+  sourceCountLimit: U8Input;
+}
+
+export interface SetPoolAmmSourceIdsOptions extends PoolAmmAdminOptions {
+  allowedSourceIds: readonly string[];
+}
+
+export interface FactoryAdminOptions {
+  packageId: string;
+  factory: ObjectInput;
+  adminCap: ObjectInput;
+}
+
+export interface SetFactoryPausedOptions extends FactoryAdminOptions {
+  paused: boolean;
+}
+
+export interface SetFactoryFeeToOptions extends FactoryAdminOptions {
+  feeTo: string;
+}
+
+export interface SetFactoryOracleOptions extends FactoryAdminOptions {
+  oracleId: string;
+}
+
+export interface SetFactoryMinPriceAgeOptions extends FactoryAdminOptions {
+  age: U64Input;
+}
+
 export interface PoolOracleAdminOptions extends PairTypesOptions {
   pool: ObjectInput;
   oracleCap: ObjectInput;
@@ -2061,6 +2182,16 @@ function pureObjectId(tx: TransactionLike, value: string): TransactionArgument {
     return tx.pure.address(value);
   }
   throw new Error("Transaction builder must support pure object ID values");
+}
+
+function pureAddress(tx: TransactionLike, value: string): TransactionArgument {
+  if (tx.pure.address !== undefined) {
+    return tx.pure.address(value);
+  }
+  if (tx.pure.id !== undefined) {
+    return tx.pure.id(value);
+  }
+  throw new Error("Transaction builder must support pure address values");
 }
 
 function pureVector(
@@ -7188,6 +7319,156 @@ export function removeLiquidityWithCoins(
     });
 }
 
+export function setPoolFee(options: SetPoolFeeOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_fee"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.newFee)
+      ]
+    });
+}
+
+export function setPoolK(options: SetPoolKOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_k"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        amountArg(tx, options.newK)
+      ]
+    });
+}
+
+export function setPoolLambda(options: SetPoolLambdaOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_lambda"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        amountArg(tx, options.newLambda)
+      ]
+    });
+}
+
+export function setPoolKB(options: SetPoolKBOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_k_b"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        amountArg(tx, options.newK)
+      ]
+    });
+}
+
+export function setPoolKQ(options: SetPoolKQOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_k_q"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        amountArg(tx, options.newK)
+      ]
+    });
+}
+
+export function setPoolFeeSplit(options: SetPoolFeeSplitOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_fee_split"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.newFeeSplit)
+      ]
+    });
+}
+
+export function setPoolFeeTo(options: SetPoolFeeToOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_fee_to"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.feeCap),
+        pureAddress(tx, options.feeTo)
+      ]
+    });
+}
+
+export function setPoolSwapsPaused(options: SetPoolSwapsPausedOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_swaps_paused"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.pauseCap),
+        pureBool(tx, options.paused)
+      ]
+    });
+}
+
+export function setPoolAddLiquidityPaused(
+  options: SetPoolAddLiquidityPausedOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_add_liquidity_paused"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.pauseCap),
+        pureBool(tx, options.paused)
+      ]
+    });
+}
+
+export function setPoolGamma(options: SetPoolGammaOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_gamma"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.newGamma)
+      ]
+    });
+}
+
+export function setPoolSpreads(options: SetPoolSpreadsOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_spreads"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.compress),
+        pureU32(tx, options.sSell),
+        pureU32(tx, options.sBuy),
+        pureU32(tx, options.fixS),
+        pureU32(tx, options.disThreshold),
+        pureU32(tx, options.sBound)
+      ]
+    });
+}
+
 export function setPoolFlashEnabled(options: SetPoolFlashEnabledOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7277,6 +7558,147 @@ export function setPoolOracleSources(options: SetPoolOracleSourcesOptions): Tran
         pureObjectId(tx, options.sourceIdB),
         pureVector(tx, "u8", hexOrBytesValue(options.configDataA, "oracle config data A")),
         pureVector(tx, "u8", hexOrBytesValue(options.configDataB, "oracle config data B"))
+      ]
+    });
+}
+
+export function setPoolAmmPolicy(options: SetPoolAmmPolicyOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_amm_policy"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.ammCap),
+        pureBool(tx, options.enabled),
+        pureU32(tx, options.blendWeight),
+        pureU8(tx, options.minSources),
+        pureU8(tx, options.fallbackMode)
+      ]
+    });
+}
+
+export function setPoolAmmSourcePolicy(
+  options: SetPoolAmmSourcePolicyOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_amm_source_policy"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.ammCap),
+        pureU32(tx, options.maxOspread),
+        pureU128(tx, options.minLiquidityQuote),
+        amountArg(tx, options.minWindowSeconds),
+        amountArg(tx, options.maxWindowSeconds),
+        amountArg(tx, options.allowedSourceMask),
+        pureU8(tx, options.sourceCountLimit)
+      ]
+    });
+}
+
+export function setPoolAmmSourceIds(options: SetPoolAmmSourceIdsOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_amm_source_ids"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.ammCap),
+        pureVector(tx, "id", options.allowedSourceIds)
+      ]
+    });
+}
+
+export function setPoolRouterEnabled(options: SetPoolRouterEnabledOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_router_enabled"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.routerCap),
+        pureBool(tx, options.enabled)
+      ]
+    });
+}
+
+export function setPoolProtocolFee(options: SetPoolProtocolFeeOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_protocol_fee"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.newProtocolFee)
+      ]
+    });
+}
+
+export function setFactoryPaused(options: SetFactoryPausedOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_factory_paused"),
+      typeArguments: [],
+      arguments: [
+        objectArg(tx, options.factory),
+        objectArg(tx, options.adminCap),
+        pureBool(tx, options.paused)
+      ]
+    });
+}
+
+export function setFactoryFeeTo(options: SetFactoryFeeToOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_factory_fee_to"),
+      typeArguments: [],
+      arguments: [
+        objectArg(tx, options.factory),
+        objectArg(tx, options.adminCap),
+        pureAddress(tx, options.feeTo)
+      ]
+    });
+}
+
+export function setFactoryOracle(options: SetFactoryOracleOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_factory_oracle"),
+      typeArguments: [],
+      arguments: [
+        objectArg(tx, options.factory),
+        objectArg(tx, options.adminCap),
+        pureObjectId(tx, options.oracleId)
+      ]
+    });
+}
+
+export function setFactoryMinPriceAge(
+  options: SetFactoryMinPriceAgeOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_factory_min_price_age"),
+      typeArguments: [],
+      arguments: [
+        objectArg(tx, options.factory),
+        objectArg(tx, options.adminCap),
+        amountArg(tx, options.age)
+      ]
+    });
+}
+
+export function claimProtocolLp(options: ClaimProtocolLpOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "claim_protocol_lp"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.feeCap)
       ]
     });
 }
