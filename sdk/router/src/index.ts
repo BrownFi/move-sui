@@ -800,6 +800,7 @@ export interface RouteQuoteResults {
 
 export interface LaunchValidationCase<TBuildResult = unknown> {
   name: string;
+  kind: LaunchValidationQuoteCaseKind;
   providerId: string;
   preflightContext: string;
   build(tx: TransactionLike): Promise<TBuildResult>;
@@ -807,6 +808,7 @@ export interface LaunchValidationCase<TBuildResult = unknown> {
 
 export interface LaunchValidationPreflightResult<TDryRunResult = unknown> {
   name: string;
+  kind: LaunchValidationQuoteCaseKind;
   providerId: string;
   dryRunResult: TDryRunResult;
 }
@@ -1402,6 +1404,7 @@ export interface LaunchValidationRouteCaseSummary {
 
 export interface LaunchValidationQuoteCaseSummary {
   name: string;
+  kind: LaunchValidationQuoteCaseKind;
   providerId: string;
 }
 
@@ -2826,6 +2829,7 @@ export function createExactInputRouteQuoteValidationCase<
 
   return {
     name: options.name,
+    kind: "exact-input-quote",
     providerId: options.providerId,
     preflightContext: launchValidationPreflightContext(
       options.name,
@@ -2853,6 +2857,7 @@ export function createExactInputWithoutCutoffRouteQuoteValidationCase<
 
   return {
     name: options.name,
+    kind: "exact-input-without-cutoff-quote",
     providerId: options.providerId,
     preflightContext: launchValidationPreflightContext(
       options.name,
@@ -2880,6 +2885,7 @@ export function createExactOutputRouteQuoteValidationCase<
 
   return {
     name: options.name,
+    kind: "exact-output-quote",
     providerId: options.providerId,
     preflightContext: launchValidationPreflightContext(
       options.name,
@@ -2907,6 +2913,7 @@ export function createExactOutputWithoutCutoffRouteQuoteValidationCase<
 
   return {
     name: options.name,
+    kind: "exact-output-without-cutoff-quote",
     providerId: options.providerId,
     preflightContext: launchValidationPreflightContext(
       options.name,
@@ -3026,6 +3033,7 @@ export async function preflightLaunchValidationCase<
   });
   return {
     name: options.validationCase.name,
+    kind: options.validationCase.kind,
     providerId: options.validationCase.providerId,
     dryRunResult
   };
@@ -3163,6 +3171,7 @@ export function summarizeLaunchValidationMatrixPreflightResult<
     addProviderId(quoteResult.providerId);
     return {
       name: quoteResult.name,
+      kind: quoteResult.kind,
       providerId: quoteResult.providerId
     };
   });
@@ -3202,6 +3211,7 @@ export function summarizeLaunchValidationMatrix<
     addProviderId(quoteCase.providerId);
     return {
       name: quoteCase.name,
+      kind: quoteCase.kind,
       providerId: quoteCase.providerId
     };
   });

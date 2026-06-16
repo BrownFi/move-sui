@@ -58,7 +58,7 @@ rtk "$NODE24" tools/run-launch-matrix-preflight.mjs \
 ```
 
 The quote-only preflight skips historical route input coins from the evidence matrix.
-The 2026-06-16 testnet run returned four Pyth quote cases and zero route cases.
+The 2026-06-16 testnet run returned four Pyth quote cases, including their cutoff-aware/raw quote kinds, and zero route cases.
 
 Check current-Pyth runtime readiness without submitting transactions:
 

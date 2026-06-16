@@ -91,6 +91,7 @@ test("validateLaunchMatrixConfigFile returns deterministic coverage for JSON con
     quoteCases: [
       {
         name: "stork exact output quote",
+        kind: "exact-output-quote",
         providerId: "stork-rest"
       }
     ]
@@ -122,6 +123,7 @@ test("validate-launch-matrix CLI prints JSON coverage", () => {
     quoteCases: [
       {
         name: "stork exact output quote",
+        kind: "exact-output-quote",
         providerId: "stork-rest"
       }
     ]
@@ -430,6 +432,7 @@ test("devnet smoke launch matrix is live-value clean", () => {
     quoteCases: [
       {
         name: "devnet smoke exact input quote",
+        kind: "exact-input-quote",
         providerId: "devnet-smoke"
       }
     ]
@@ -498,10 +501,12 @@ test("pyth-upgraded testnet launch matrix matches Pyth-only launch profile", () 
     quoteCases: [
       {
         name: "pyth upgraded testnet exact input quote",
+        kind: "exact-input-quote",
         providerId: "pyth"
       },
       {
         name: "pyth upgraded testnet exact output quote",
+        kind: "exact-output-quote",
         providerId: "pyth"
       }
     ]
@@ -574,18 +579,22 @@ test("pyth-current testnet launch matrix matches Pyth-only launch profile", () =
     quoteCases: [
       {
         name: "pyth current testnet exact input quote",
+        kind: "exact-input-quote",
         providerId: "pyth"
       },
       {
         name: "pyth current testnet exact output quote",
+        kind: "exact-output-quote",
         providerId: "pyth"
       },
       {
         name: "pyth current testnet exact input raw quote",
+        kind: "exact-input-without-cutoff-quote",
         providerId: "pyth"
       },
       {
         name: "pyth current testnet exact output raw quote",
+        kind: "exact-output-without-cutoff-quote",
         providerId: "pyth"
       }
     ]
@@ -661,18 +670,22 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
     quoteCases: [
       {
         name: "pyth current testnet exact input quote",
+        kind: "exact-input-quote",
         providerId: "pyth"
       },
       {
         name: "pyth current testnet exact output quote",
+        kind: "exact-output-quote",
         providerId: "pyth"
       },
       {
         name: "pyth current testnet exact input raw quote",
+        kind: "exact-input-without-cutoff-quote",
         providerId: "pyth"
       },
       {
         name: "pyth current testnet exact output raw quote",
+        kind: "exact-output-without-cutoff-quote",
         providerId: "pyth"
       }
     ]

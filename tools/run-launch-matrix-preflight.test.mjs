@@ -320,6 +320,7 @@ test("runLaunchMatrixPreflightConfigFile dry-runs a live-ready matrix through ru
     quoteCases: [
       {
         name: "custom exact input quote",
+        kind: "exact-input-quote",
         providerId: "custom"
       }
     ]
@@ -350,6 +351,7 @@ test("runLaunchMatrixPreflightConfigFile can dry-run only quote cases from a mix
     quoteCases: [
       {
         name: "custom exact input quote",
+        kind: "exact-input-quote",
         providerId: "custom"
       }
     ]
@@ -441,6 +443,7 @@ test("run-launch-matrix-preflight CLI prints launch coverage summary", () => {
     quoteCases: [
       {
         name: "custom exact input quote",
+        kind: "exact-input-quote",
         providerId: "custom"
       }
     ]

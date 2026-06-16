@@ -414,12 +414,14 @@ test("createExactInputRouteQuoteValidationCase builds a named provider quote cas
   });
 
   assert.equal(validationCase.name, "pyth SUI/USDC quote");
+  assert.equal(validationCase.kind, "exact-input-quote");
   assert.equal(validationCase.providerId, "custom");
   assert.equal(
     validationCase.preflightContext,
     "BrownFi launch validation pyth SUI/USDC quote"
   );
   assert.equal(result.name, "pyth SUI/USDC quote");
+  assert.equal(result.kind, "exact-input-quote");
   assert.equal(result.providerId, "custom");
   assert.deepEqual(result.dryRunResult, {
     effects: { status: { status: "success" } }
@@ -591,17 +593,20 @@ test("buildLaunchValidationQuoteCases hydrates serializable provider quote confi
   assert.deepEqual(
     cases.map((quoteCase) => ({
       name: quoteCase.name,
+      kind: quoteCase.kind,
       providerId: quoteCase.providerId,
       preflightContext: quoteCase.preflightContext
     })),
     [
       {
         name: "pyth exact input live quote",
+        kind: "exact-input-quote",
         providerId: "custom",
         preflightContext: "BrownFi launch validation pyth exact input live quote"
       },
       {
         name: "supra pull exact output live quote",
+        kind: "exact-output-quote",
         providerId: "custom",
         preflightContext: "BrownFi custom quote validation"
       }
@@ -615,6 +620,7 @@ test("buildLaunchValidationQuoteCases hydrates serializable provider quote confi
   });
 
   assert.equal(result.name, "supra pull exact output live quote");
+  assert.equal(result.kind, "exact-output-quote");
   assert.deepEqual(providerCalls, [
     {
       clock: "0x6",
@@ -1166,12 +1172,14 @@ test("buildLaunchValidationMatrix hydrates route and quote launch sections", () 
   assert.deepEqual(
     matrix.quoteCases.map((quoteCase) => [
       quoteCase.name,
+      quoteCase.kind,
       quoteCase.providerId,
       quoteCase.preflightContext
     ]),
     [
       [
         "quote launch exact output",
+        "exact-output-quote",
         "custom",
         "BrownFi launch validation quote launch exact output"
       ]
@@ -1312,6 +1320,7 @@ test("validateLaunchValidationMatrixConfig hydrates launch coverage without prov
     quoteCases: [
       {
         name: "stork exact output quote",
+        kind: "exact-output-quote",
         providerId: "stork-rest"
       }
     ]
@@ -2081,10 +2090,11 @@ test("preflightLaunchValidationMatrix dry-runs route cases before quote cases", 
   assert.deepEqual(
     result.quoteResults.map((quoteResult) => [
       quoteResult.name,
+      quoteResult.kind,
       quoteResult.providerId,
       quoteResult.dryRunResult.transactionBlock
     ]),
-    [["quote launch exact output", "custom", "quote-0"]]
+    [["quote launch exact output", "exact-output-quote", "custom", "quote-0"]]
   );
   assert.deepEqual(dryRunCalls, [
     { transactionBlock: "route-0" },
@@ -2205,6 +2215,7 @@ test("runLaunchValidationMatrixPreflight returns dry-run sections and coverage s
     quoteCases: [
       {
         name: "quote launch exact output",
+        kind: "exact-output-quote",
         providerId: "custom"
       }
     ]
@@ -2235,6 +2246,7 @@ test("summarizeLaunchValidationMatrixPreflightResult returns deterministic launc
     quoteResults: [
       {
         name: "pyth launch quote",
+        kind: "exact-input-quote",
         providerId: "pyth",
         dryRunResult: { effects: { status: { status: "success" } } }
       }
@@ -2261,6 +2273,7 @@ test("summarizeLaunchValidationMatrixPreflightResult returns deterministic launc
     quoteCases: [
       {
         name: "pyth launch quote",
+        kind: "exact-input-quote",
         providerId: "pyth"
       }
     ]
