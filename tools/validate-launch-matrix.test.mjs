@@ -515,9 +515,9 @@ test("pyth-current testnet launch matrix matches Pyth-only launch profile", () =
   });
 
   assert.deepEqual(summary, {
-    routeCaseCount: 9,
+    routeCaseCount: 10,
     quoteCaseCount: 2,
-    totalCaseCount: 11,
+    totalCaseCount: 12,
     providerIds: ["pyth"],
     routeCases: [
       {
@@ -563,6 +563,11 @@ test("pyth-current testnet launch matrix matches Pyth-only launch profile", () =
       {
         name: "pyth current testnet flash borrow A",
         kind: "flash-borrow-a",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth current testnet flash borrow B",
+        kind: "flash-borrow-b",
         providerId: "pyth"
       }
     ],
@@ -589,9 +594,9 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
   const matrix = JSON.parse(fs.readFileSync(config, "utf8"));
 
   assert.deepEqual(summary, {
-    routeCaseCount: 9,
+    routeCaseCount: 10,
     quoteCaseCount: 2,
-    totalCaseCount: 11,
+    totalCaseCount: 12,
     providerIds: ["pyth"],
     routeCases: [
       {
@@ -637,6 +642,11 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
       {
         name: "pyth current testnet flash borrow A",
         kind: "flash-borrow-a",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth current testnet flash borrow B",
+        kind: "flash-borrow-b",
         providerId: "pyth"
       }
     ],

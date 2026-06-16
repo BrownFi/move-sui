@@ -169,7 +169,8 @@ test("pyth current launch artifacts assemble from test coins and live feed value
   const zapInB = routeCaseByName(matrix, "pyth current testnet zap in B");
   const zapOutA = routeCaseByName(matrix, "pyth current testnet zap out A");
   const zapOutB = routeCaseByName(matrix, "pyth current testnet zap out B");
-  const flash = routeCaseByName(matrix, "pyth current testnet flash borrow A");
+  const flashA = routeCaseByName(matrix, "pyth current testnet flash borrow A");
+  const flashB = routeCaseByName(matrix, "pyth current testnet flash borrow B");
   assert.equal(exactInput.pairs[0].packageId, id("a"));
   assert.equal(exactInput.pairs[0].pool, id("8"));
   assert.deepEqual(exactInput.pairs[0].feedIds, [
@@ -195,10 +196,14 @@ test("pyth current launch artifacts assemble from test coins and live feed value
   assert.equal(zapOutA.inputAmount, "1000000");
   assert.equal(zapOutB.input, id("9"));
   assert.equal(zapOutB.minOut, "1");
-  assert.equal(flash.kind, "flash-borrow-a");
-  assert.equal(flash.amount, "1000");
-  assert.equal(flash.feeCoin, id("4"));
-  assert.equal(flash.feeCoinAmount, "1");
+  assert.equal(flashA.kind, "flash-borrow-a");
+  assert.equal(flashA.amount, "1000");
+  assert.equal(flashA.feeCoin, id("4"));
+  assert.equal(flashA.feeCoinAmount, "1");
+  assert.equal(flashB.kind, "flash-borrow-b");
+  assert.equal(flashB.amount, "1000");
+  assert.equal(flashB.feeCoin, id("5"));
+  assert.equal(flashB.feeCoinAmount, "1");
   assert.equal(
     quoteCaseByName(matrix, "pyth current testnet exact output quote").amountOut,
     "1"

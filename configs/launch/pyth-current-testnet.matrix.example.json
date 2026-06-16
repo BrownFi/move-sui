@@ -262,6 +262,33 @@
       "amount": "1000",
       "feeCoin": "0xINPUT_COIN_A",
       "feeCoinAmount": "1"
+    },
+    {
+      "name": "pyth current testnet flash borrow B",
+      "kind": "flash-borrow-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amount": "1000",
+      "feeCoin": "0xINPUT_COIN_B",
+      "feeCoinAmount": "1"
     }
   ],
   "quoteCases": [
