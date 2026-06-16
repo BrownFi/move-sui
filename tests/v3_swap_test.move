@@ -2998,6 +2998,69 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_gamma_one_disables_cutoff_for_large_sell() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 50_000_000_000, 10_000_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let risk_cap = take_from_sender<RiskCap>(&scenario);
+
+            admin::set_pool_gamma(&mut pool, &risk_cap, 100_000_000);
+
+            return_to_sender<RiskCap>(&scenario, risk_cap);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let bundle = oracle_gateway::get_swap_price_bundle(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &pool
+            );
+            let input_amount = 10_000_000_000;
+            let (quoted_out, raw_out, cutoff_out) = swap::quote_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                input_amount
+            );
+
+            assert!(quoted_out == raw_out, 0);
+            assert!(cutoff_out == raw_out, 1);
+            assert!(quoted_out > 3_334_443_334, 2);
+
+            let input_a = balance::create_for_testing<A>(input_amount);
+            let b_out = swap::swap_a_for_b_with_bundle(&bundle, &clock, &mut pool, input_a, 0);
+            let (amount_a, amount_b, _) = swap::pool_balances(&pool);
+
+            assert!(balance::value(&b_out) == quoted_out, 3);
+            assert!(amount_a == 60_000_000_000, 4);
+            assert!(amount_b + quoted_out == 10_000_000_000, 5);
+
+            balance::destroy_for_testing(b_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_gamma_cutoff_clamps_worsening_buy() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         test_helpers::create_test_pool(&mut scenario, 10_000_000_000, 50_000_000_000);
