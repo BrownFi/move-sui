@@ -163,6 +163,10 @@ test("pyth current launch artifacts assemble from test coins and live feed value
   assert.equal(matrix.providerIds[0], "pyth");
   const exactInput = routeCaseByName(matrix, "pyth current testnet exact input route");
   const exactOutput = routeCaseByName(matrix, "pyth current testnet exact output route");
+  const exactOutputResults = routeCaseByName(
+    matrix,
+    "pyth current testnet exact output results route"
+  );
   const addLiquidity = routeCaseByName(matrix, "pyth current testnet add liquidity");
   const removeLiquidity = routeCaseByName(matrix, "pyth current testnet remove liquidity");
   const zapInA = routeCaseByName(matrix, "pyth current testnet zap in A");
@@ -184,6 +188,13 @@ test("pyth current launch artifacts assemble from test coins and live feed value
     feedValues.QUOTE_FEED_ID
   ]);
   assert.equal(exactOutput.amountOut, "1");
+  assert.equal(exactOutputResults.kind, "exact-output-results");
+  assert.equal(exactOutputResults.input, id("5"));
+  assert.equal(exactOutputResults.amountOut, "1");
+  assert.deepEqual(exactOutputResults.pairs[0].feedIds, [
+    feedValues.BASE_FEED_ID,
+    feedValues.QUOTE_FEED_ID
+  ]);
   assert.equal(addLiquidity.input, id("4"));
   assert.equal(addLiquidity.inputB, id("5"));
   assert.equal(removeLiquidity.input, id("9"));

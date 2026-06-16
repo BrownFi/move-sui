@@ -70,6 +70,33 @@
       "amountOut": "1"
     },
     {
+      "name": "pyth current testnet exact output results route",
+      "kind": "exact-output-results",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_B",
+        "TYPE_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_B",
+      "inputAmount": "1000000",
+      "amountOut": "1"
+    },
+    {
       "name": "pyth current testnet add liquidity",
       "kind": "add-liquidity",
       "providerId": "pyth",

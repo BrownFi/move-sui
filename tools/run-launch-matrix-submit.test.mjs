@@ -329,6 +329,32 @@ test("submitLaunchMatrixRoutesConfigFile transfers exact-output change and outpu
   assert.equal(report.summary.routeCaseCount, 1);
 });
 
+test("submitLaunchMatrixRoutesConfigFile transfers exact-output-results change and output coins", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root, {
+    routeCases: [
+      {
+        name: "custom exact output results route",
+        kind: "exact-output-results",
+        providerId: "custom",
+        clock: "0x6",
+        path: ["0x1::coin_a::COIN_A", "0x1::coin_b::COIN_B"],
+        pairs: [routePair()],
+        input: "0x3",
+        amountOut: "1"
+      }
+    ]
+  });
+  const runtime = writeRuntime(root, {
+    requireTransfers: true,
+    expectedTransferObjectCounts: [2]
+  });
+
+  const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
+
+  assert.equal(report.summary.routeCaseCount, 1);
+});
+
 test("submitLaunchMatrixRoutesConfigFile transfers all add-liquidity returned coins", async () => {
   const root = fixtureRoot();
   const config = writeMatrix(root, {
