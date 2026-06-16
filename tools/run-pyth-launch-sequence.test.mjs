@@ -14,6 +14,133 @@ function fixtureRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "brownfi-pyth-launch-sequence-"));
 }
 
+function id(fill) {
+  return `0x${fill.repeat(64)}`;
+}
+
+function createTransactionRecorder(sender = id("f")) {
+  return {
+    sender,
+    calls: [],
+    transfers: [],
+    object(objectId) {
+      return { kind: "object", id: objectId };
+    },
+    pure: {
+      address(value) {
+        return { kind: "address", value };
+      }
+    },
+    moveCall(call) {
+      this.calls.push(call);
+      return { kind: "result", index: this.calls.length - 1 };
+    },
+    transferObjects(objects, recipient) {
+      this.transfers.push({ objects, recipient });
+    }
+  };
+}
+
+test("claimPythLaunchProtocolLp builds and transfers the claimed LP coin", async () => {
+  const { claimPythLaunchProtocolLp } = await import("./run-pyth-launch-sequence.mjs");
+  const packageId = id("a");
+  const typeA = `${id("1")}::coin_a::COIN_A`;
+  const typeB = `${id("2")}::coin_b::COIN_B`;
+  const pool = id("3");
+  const feeCap = id("4");
+  const sender = id("5");
+  const tx = createTransactionRecorder(sender);
+  const calls = [];
+
+  const report = await claimPythLaunchProtocolLp({
+    claimConfig: {
+      network: "testnet",
+      packageId,
+      typeA,
+      typeB,
+      pool,
+      feeCap
+    },
+    runtime: {
+      network: "testnet",
+      sender,
+      routeTransactionFactory(context) {
+        calls.push(["tx-factory", context]);
+        return tx;
+      },
+      async executeTransaction(txArg, context) {
+        calls.push(["execute", txArg, context]);
+        assert.equal(txArg, tx);
+        return {
+          effects: {
+            transactionDigest: "claim-digest",
+            status: { status: "success" }
+          },
+          events: [
+            {
+              type: `${packageId}::events::ProtocolLpClaimed`,
+              parsedJson: { pool_id: pool }
+            }
+          ]
+        };
+      }
+    }
+  });
+
+  assert.deepEqual(calls, [
+    [
+      "tx-factory",
+      {
+        kind: "claim-protocol-lp",
+        packageId,
+        typeA,
+        typeB,
+        pool
+      }
+    ],
+    [
+      "execute",
+      tx,
+      {
+        kind: "claim-protocol-lp",
+        packageId,
+        typeA,
+        typeB,
+        pool
+      }
+    ]
+  ]);
+  assert.deepEqual(tx.calls, [
+    {
+      target: `${packageId}::admin::claim_protocol_lp`,
+      typeArguments: [typeA, typeB],
+      arguments: [
+        { kind: "object", id: pool },
+        { kind: "object", id: feeCap }
+      ]
+    }
+  ]);
+  assert.deepEqual(tx.transfers, [
+    {
+      objects: [{ kind: "result", index: 0 }],
+      recipient: { kind: "address", value: sender }
+    }
+  ]);
+  assert.deepEqual(report, {
+    status: "success",
+    network: "testnet",
+    transactionDigest: "claim-digest",
+    packageId,
+    pool,
+    txEvidence: {
+      name: "pyth claim protocol lp",
+      digest: "claim-digest",
+      expectedMoveCalls: [`${packageId}::admin::claim_protocol_lp`],
+      expectedEventTypes: [`${packageId}::events::ProtocolLpClaimed`]
+    }
+  });
+});
+
 test("parsePythLaunchSequenceArgs accepts tx evidence RPC retry options", async () => {
   const { parsePythLaunchSequenceArgs } = await import("./run-pyth-launch-sequence.mjs");
 
@@ -193,6 +320,20 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
     txEvidence: [],
     txVerification: []
   };
+  const protocolLpClaim = {
+    status: "success",
+    transactionDigest: "digest-protocol-lp-claim",
+    txEvidence: {
+      name: "pyth claim protocol lp",
+      digest: "digest-protocol-lp-claim",
+      expectedMoveCalls: [
+        "0xbrownfi::admin::claim_protocol_lp"
+      ],
+      expectedEventTypes: [
+        "0xbrownfi::events::ProtocolLpClaimed"
+      ]
+    }
+  };
 
   const report = await runPythLaunchSequence({
     root,
@@ -241,6 +382,10 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
       async submitLaunchMatrixRoutesConfigFile(options) {
         calls.push(["submit-matrix", options]);
         return submit;
+      },
+      async claimPythLaunchProtocolLpConfig(options) {
+        calls.push(["claim-protocol-lp", options]);
+        return protocolLpClaim;
       }
     }
   });
@@ -256,7 +401,9 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
     "verify-setup",
     "verify-setup",
     "materialize-matrix",
-    "submit-matrix"
+    "submit-matrix",
+    "claim-protocol-lp",
+    "verify-setup"
   ]);
   assert.deepEqual(
     calls.slice(4, 9).map(([, options]) => ({
@@ -373,6 +520,35 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
       status: "success"
     }
   ]);
+  assert.deepEqual(calls.at(-2), [
+    "claim-protocol-lp",
+    {
+      config: path.join(outDir, "pool.json"),
+      poolResult: path.join(outDir, "pool-result.json"),
+      runtime: "tools/pyth-launch-runtime.mjs",
+      runtimeConfig: undefined,
+      out: path.join(outDir, "protocol-lp-claim.json")
+    }
+  ]);
+  assert.deepEqual(calls.at(-1), [
+    "verify-setup",
+    {
+      network: "testnet",
+      evidence: protocolLpClaim.txEvidence,
+      txName: "setup:protocolLpClaim",
+      rpcUrl: "https://fullnode.testnet.sui.io:443",
+      useRtk: true,
+      rpcRetries: "2",
+      rpcRetryDelayMs: "10",
+      execFileSync: undefined
+    }
+  ]);
+  assert.deepEqual(report.results.protocolLpClaim, protocolLpClaim);
+  assert.deepEqual(report.results.protocolLpClaimVerification, {
+    txName: "setup:protocolLpClaim",
+    digest: "digest-protocol-lp-claim",
+    status: "success"
+  });
 });
 
 test("runPythLaunchSequence writes launch artifacts and submits routes in order", async () => {
@@ -579,6 +755,7 @@ test("runPythLaunchSequence writes launch artifacts and submits routes in order"
     poolResult: poolResultOut,
     matrix: matrixOut,
     submit: submitOut,
+    protocolLpClaim: path.join(outDir, "protocol-lp-claim.json"),
     summary: summaryOut
   });
   assert.equal(report.status, "success");

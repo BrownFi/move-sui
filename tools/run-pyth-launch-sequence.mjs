@@ -2,8 +2,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { claimProtocolLp } from "../sdk/router/dist/index.js";
 import { createPythLaunchPoolConfig } from "./create-pyth-launch-pool.mjs";
 import { materializeLaunchMatrix } from "./materialize-launch-matrix.mjs";
 import { materializePythLaunchPoolConfig } from "./materialize-pyth-launch-pool.mjs";
@@ -180,8 +181,169 @@ function defaultDependencies() {
     createPythLaunchPoolConfig,
     materializeLaunchMatrix,
     submitLaunchMatrixRoutesConfigFile,
+    claimPythLaunchProtocolLpConfig,
     verifySuiTxEvidence
   };
+}
+
+function loadProtocolLpClaimConfig({ config, poolResult }) {
+  const poolConfig = readJson(config);
+  const poolCreate = readJson(poolResult);
+  return {
+    network: requireString(poolConfig.network, "Pyth protocol LP claim network"),
+    packageId: requireString(poolConfig.packageId, "Pyth protocol LP claim packageId"),
+    typeA: requireString(poolConfig.typeA, "Pyth protocol LP claim typeA"),
+    typeB: requireString(poolConfig.typeB, "Pyth protocol LP claim typeB"),
+    feeCap: requireString(poolConfig.feeCap, "Pyth protocol LP claim feeCap"),
+    pool: requireString(poolCreate.pool, "Pyth protocol LP claim pool")
+  };
+}
+
+async function loadProtocolLpClaimRuntime(runtimePath, claimConfig, runtimeConfig) {
+  const runtimeUrl = pathToFileURL(path.resolve(runtimePath)).href;
+  const runtimeModule = await import(runtimeUrl);
+  const createRuntime =
+    runtimeModule.createPythLaunchMatrixRuntime ??
+    runtimeModule.createLaunchMatrixRuntime ??
+    runtimeModule.default;
+  if (typeof createRuntime !== "function") {
+    throw new Error("Pyth protocol LP claim runtime module must export createLaunchMatrixRuntime");
+  }
+  const runtime = await createRuntime({ config: claimConfig, runtimeConfig });
+  if (runtime === null || typeof runtime !== "object") {
+    throw new Error("Pyth protocol LP claim runtime factory must return an object");
+  }
+  return runtime;
+}
+
+function runtimeProtocolLpClaimTransactionFactory(runtime) {
+  const factory =
+    runtime.routeTransactionFactory ??
+    runtime.poolTransactionFactory ??
+    runtime.transactionFactory;
+  if (typeof factory !== "function") {
+    throw new Error("Pyth protocol LP claim runtime must provide routeTransactionFactory");
+  }
+  return factory;
+}
+
+function assertRuntimeNetworkMatchesClaimConfig(runtime, claimConfig) {
+  if (typeof runtime.network !== "string" || runtime.network.length === 0) {
+    throw new Error(`Pyth protocol LP claim network ${claimConfig.network} requires runtime network`);
+  }
+  if (runtime.network !== claimConfig.network) {
+    throw new Error(
+      `Pyth protocol LP claim network ${claimConfig.network} does not match runtime network ${runtime.network}`
+    );
+  }
+}
+
+function assertExecuteTransaction(runtime) {
+  if (typeof runtime.executeTransaction !== "function") {
+    throw new Error("Pyth protocol LP claim runtime must provide executeTransaction");
+  }
+}
+
+function assertTransactionSucceeded(result, label) {
+  const status = result?.effects?.status?.status;
+  if (status !== "success") {
+    const error = result?.effects?.status?.error;
+    throw new Error(`${label} failed: ${status ?? "missing status"}${error ? ` ${error}` : ""}`);
+  }
+}
+
+function runtimeSender(runtime, tx) {
+  const sender = runtime.sender ?? tx.sender;
+  if (typeof sender !== "string" || sender.length === 0) {
+    throw new Error("Pyth protocol LP claim runtime must expose sender to transfer claimed LP");
+  }
+  return sender;
+}
+
+function transferClaimedLp(tx, runtime, claimedLp) {
+  if (typeof tx.transferObjects !== "function") {
+    throw new Error("Pyth protocol LP claim transaction builder must support transferObjects");
+  }
+  if (typeof tx.pure?.address !== "function") {
+    throw new Error("Pyth protocol LP claim transaction builder must support pure address values");
+  }
+  tx.transferObjects([claimedLp], tx.pure.address(runtimeSender(runtime, tx)));
+}
+
+function expectedProtocolLpClaimMoveTarget(config) {
+  return `${config.packageId}::admin::claim_protocol_lp`;
+}
+
+function expectedProtocolLpClaimEvents(config) {
+  return [`${config.packageId}::events::ProtocolLpClaimed`];
+}
+
+export async function claimPythLaunchProtocolLp({
+  claimConfig,
+  runtime,
+  routerSdk = { claimProtocolLp }
+}) {
+  const config = {
+    network: requireString(claimConfig.network, "Pyth protocol LP claim network"),
+    packageId: requireString(claimConfig.packageId, "Pyth protocol LP claim packageId"),
+    typeA: requireString(claimConfig.typeA, "Pyth protocol LP claim typeA"),
+    typeB: requireString(claimConfig.typeB, "Pyth protocol LP claim typeB"),
+    feeCap: requireString(claimConfig.feeCap, "Pyth protocol LP claim feeCap"),
+    pool: requireString(claimConfig.pool, "Pyth protocol LP claim pool")
+  };
+  const runtimeObject = runtime;
+  assertRuntimeNetworkMatchesClaimConfig(runtimeObject, config);
+  const transactionFactory = runtimeProtocolLpClaimTransactionFactory(runtimeObject);
+  assertExecuteTransaction(runtimeObject);
+
+  const context = {
+    kind: "claim-protocol-lp",
+    packageId: config.packageId,
+    typeA: config.typeA,
+    typeB: config.typeB,
+    pool: config.pool
+  };
+  const tx = transactionFactory(context);
+  const claimedLp = routerSdk.claimProtocolLp({
+    packageId: config.packageId,
+    typeA: config.typeA,
+    typeB: config.typeB,
+    pool: config.pool,
+    feeCap: config.feeCap
+  })(tx);
+  transferClaimedLp(tx, runtimeObject, claimedLp);
+  const result = await runtimeObject.executeTransaction(tx, context);
+  assertTransactionSucceeded(result, "Pyth protocol LP claim transaction");
+  const digest = requireString(
+    result.effects.transactionDigest,
+    "Pyth protocol LP claim transaction digest"
+  );
+  return {
+    status: "success",
+    network: config.network,
+    transactionDigest: digest,
+    packageId: config.packageId,
+    pool: config.pool,
+    txEvidence: {
+      name: "pyth claim protocol lp",
+      digest,
+      expectedMoveCalls: [expectedProtocolLpClaimMoveTarget(config)],
+      expectedEventTypes: expectedProtocolLpClaimEvents(config)
+    }
+  };
+}
+
+export async function claimPythLaunchProtocolLpConfig({ config, poolResult, runtime, runtimeConfig, out }) {
+  const claimConfig = loadProtocolLpClaimConfig({ config, poolResult });
+  const runtimeObject =
+    typeof runtime === "string"
+      ? await loadProtocolLpClaimRuntime(runtime, claimConfig, runtimeConfig)
+      : runtime;
+  const summary = await claimPythLaunchProtocolLp({ claimConfig, runtime: runtimeObject });
+  if (out !== undefined) {
+    writeJson(out, summary);
+  }
+  return summary;
 }
 
 function setupEvidenceForLaunch({ testCoins, brownfiPublish, poolCreate }) {
@@ -308,6 +470,7 @@ export async function runPythLaunchSequence({
     poolResult: path.join(outDir, "pool-result.json"),
     matrix: path.join(outDir, "matrix.json"),
     submit: path.join(outDir, "submit.json"),
+    protocolLpClaim: path.join(outDir, "protocol-lp-claim.json"),
     summary: path.join(outDir, "summary.json")
   };
 
@@ -391,6 +554,36 @@ export async function runPythLaunchSequence({
   });
   writeJson(artifacts.submit, submit);
 
+  let protocolLpClaim;
+  let protocolLpClaimVerification;
+  if (poolCreate.protocolFeeSetup?.txEvidence !== undefined) {
+    protocolLpClaim = resumeExistingArtifacts
+      ? readSuccessfulArtifact(artifacts.protocolLpClaim, "Pyth protocol LP claim")
+      : undefined;
+    if (protocolLpClaim === undefined) {
+      protocolLpClaim = await deps.claimPythLaunchProtocolLpConfig({
+        config: artifacts.poolConfig,
+        poolResult: artifacts.poolResult,
+        runtime,
+        runtimeConfig,
+        out: artifacts.protocolLpClaim
+      });
+      writeJson(artifacts.protocolLpClaim, protocolLpClaim);
+    }
+    if (txEvidenceVerification !== undefined) {
+      protocolLpClaimVerification = deps.verifySuiTxEvidence({
+        network,
+        evidence: protocolLpClaim.txEvidence,
+        txName: "setup:protocolLpClaim",
+        rpcUrl: txEvidenceVerification.rpcUrl,
+        useRtk: txEvidenceVerification.useRtk,
+        rpcRetries: txEvidenceVerification.rpcRetries,
+        rpcRetryDelayMs: txEvidenceVerification.rpcRetryDelayMs,
+        execFileSync: txEvidenceVerification.execFileSync
+      });
+    }
+  }
+
   const report = {
     status: "success",
     network,
@@ -403,7 +596,9 @@ export async function runPythLaunchSequence({
       setupEvidence,
       setupVerification,
       matrixMaterialization,
-      submit
+      submit,
+      ...(protocolLpClaim === undefined ? {} : { protocolLpClaim }),
+      ...(protocolLpClaimVerification === undefined ? {} : { protocolLpClaimVerification })
     }
   };
   writeJson(artifacts.summary, report);
