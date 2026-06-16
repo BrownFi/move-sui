@@ -19,15 +19,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -36,7 +36,7 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0x3f0fb10777b4cfca1bac17abff9caa3273975de9e4ec4c6dd5c5561f64494e8e",
+      "input": "0xc02bb7eb19fac08b1fbd193aa0e1037ed80988abeb29380d24f005c84e600657",
       "inputAmount": "1000000",
       "minOutputs": [
         "1"
@@ -48,15 +48,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -65,7 +65,34 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0x3f0fb10777b4cfca1bac17abff9caa3273975de9e4ec4c6dd5c5561f64494e8e",
+      "input": "0xc02bb7eb19fac08b1fbd193aa0e1037ed80988abeb29380d24f005c84e600657",
+      "inputAmount": "1000000",
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet exact output results route",
+      "kind": "exact-output-results",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xc02bb7eb19fac08b1fbd193aa0e1037ed80988abeb29380d24f005c84e600657",
       "inputAmount": "1000000",
       "amountOut": "1"
     },
@@ -75,15 +102,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -92,8 +119,8 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0xe21623c33a91605688c61b85b31ab990a822c446dffb26139621e65a8c9c7b96",
-      "inputB": "0x3f0fb10777b4cfca1bac17abff9caa3273975de9e4ec4c6dd5c5561f64494e8e",
+      "input": "0xe9a188f59c37e568eef72a0eea2759f1f56f12cbeed802b2636f39914a4ac01b",
+      "inputB": "0xc02bb7eb19fac08b1fbd193aa0e1037ed80988abeb29380d24f005c84e600657",
       "inputAAmount": "1000000",
       "inputBAmount": "1000000",
       "minLpOut": "1"
@@ -104,15 +131,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -121,7 +148,7 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0x3e933f5af65654f4792348d98e58cbec7ee1b20441edcf5dc68e38a3bfa4f590",
+      "input": "0x38df551dd94465eddcf04507724f239b9f32fee09619ae6d6ab7b373aa13cf1b",
       "inputAmount": "1000000",
       "minAOut": "1",
       "minBOut": "1"
@@ -132,15 +159,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -149,7 +176,7 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0xe21623c33a91605688c61b85b31ab990a822c446dffb26139621e65a8c9c7b96",
+      "input": "0xe9a188f59c37e568eef72a0eea2759f1f56f12cbeed802b2636f39914a4ac01b",
       "inputAmount": "1000000",
       "minBFromSwap": "1",
       "minLpOut": "1"
@@ -160,15 +187,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -177,7 +204,7 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0x3f0fb10777b4cfca1bac17abff9caa3273975de9e4ec4c6dd5c5561f64494e8e",
+      "input": "0xc02bb7eb19fac08b1fbd193aa0e1037ed80988abeb29380d24f005c84e600657",
       "inputAmount": "1000000",
       "minAFromSwap": "1",
       "minLpOut": "1"
@@ -188,15 +215,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -205,7 +232,7 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0x3e933f5af65654f4792348d98e58cbec7ee1b20441edcf5dc68e38a3bfa4f590",
+      "input": "0x38df551dd94465eddcf04507724f239b9f32fee09619ae6d6ab7b373aa13cf1b",
       "inputAmount": "1000000",
       "minOut": "1"
     },
@@ -215,15 +242,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -232,7 +259,7 @@
           "updatePayloadByteLength": 0
         }
       ],
-      "input": "0x3e933f5af65654f4792348d98e58cbec7ee1b20441edcf5dc68e38a3bfa4f590",
+      "input": "0x38df551dd94465eddcf04507724f239b9f32fee09619ae6d6ab7b373aa13cf1b",
       "inputAmount": "1000000",
       "minOut": "1"
     },
@@ -242,15 +269,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -260,7 +287,7 @@
         }
       ],
       "amount": "1000",
-      "feeCoin": "0xe21623c33a91605688c61b85b31ab990a822c446dffb26139621e65a8c9c7b96",
+      "feeCoin": "0xe9a188f59c37e568eef72a0eea2759f1f56f12cbeed802b2636f39914a4ac01b",
       "feeCoinAmount": "1"
     },
     {
@@ -269,15 +296,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -287,7 +314,7 @@
         }
       ],
       "amount": "1000",
-      "feeCoin": "0x3f0fb10777b4cfca1bac17abff9caa3273975de9e4ec4c6dd5c5561f64494e8e",
+      "feeCoin": "0xc02bb7eb19fac08b1fbd193aa0e1037ed80988abeb29380d24f005c84e600657",
       "feeCoinAmount": "1"
     }
   ],
@@ -298,15 +325,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -323,15 +350,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -348,15 +375,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -373,15 +400,15 @@
       "providerId": "pyth",
       "clock": "0x6",
       "path": [
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+        "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B"
       ],
       "pairs": [
         {
-          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
-          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
-          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+          "typeA": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_a::COIN_A",
+          "typeB": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf::coin_b::COIN_B",
+          "pool": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
           "feedIds": [
             "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
             "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
@@ -395,171 +422,185 @@
   ],
   "setupEvidence": {
     "testCoins": {
-      "packageId": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c",
-      "digest": "bJHz72312R777BkUihaGMeRVoU9QaxB1fXC7UUEfpw2"
+      "packageId": "0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf",
+      "digest": "YdW1X2HKziRRuS2oS2V1K76nsA4xiCZYXxZfSYHoVg4"
     },
     "brownfiPackage": {
-      "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
-      "digest": "3n3WhX63AQ8SVjbhL8EcyGWpP2xSoX74BhjuSnPEYJEz"
+      "packageId": "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457",
+      "digest": "32E7Q5fj4rRXKEjFgLTbxeNbuPYHSTavZW1WKKcgC1G2"
     },
     "pool": {
-      "objectId": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
-      "digest": "BFuhrzvjtgZKRvCNLrP7oNaSzFHiQy2hpXKWkQgnMjjz",
-      "lpCoin": "0x3e933f5af65654f4792348d98e58cbec7ee1b20441edcf5dc68e38a3bfa4f590",
+      "objectId": "0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956",
+      "digest": "8TUKFzuZdkRPbxkCt1kUfm4YeJytHkQHa85ns1oaiB2A",
+      "lpCoin": "0x38df551dd94465eddcf04507724f239b9f32fee09619ae6d6ab7b373aa13cf1b",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::swap::create_pool_with_coins_and_transfer_lp_to_sender"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::swap::create_pool_with_coins_and_transfer_lp_to_sender"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PoolCreated",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PoolCreated",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync"
       ]
     },
     "flashEnable": {
-      "digest": "24jBprRwgqPG9aqcFAjZaeDHP6D86JjyDyW8t6EMWs6J",
+      "digest": "AkxAnkeWHMSctZEq9PA8Rp7qh8rm9cQZpYvifGcsJykf",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::admin::set_pool_flash_enabled"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::admin::set_pool_flash_enabled"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PoolGateStateChanged"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PoolGateStateChanged"
       ]
     }
   },
   "txEvidence": [
     {
       "name": "pyth current testnet exact input route",
-      "digest": "FhmphFaiT4RzHXfEprH4zGmZUtKDWSoeHT1x1u1jf9Ht",
+      "digest": "57k6iPtG7Hv8UqEEXPcjQvKTabM2okjUVWoniLbXizkn",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::swap_exact_b_for_a_with_bundle"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::swap_exact_b_for_a_with_bundle"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PriceBundleUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::SwapExecuted",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Swap"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PriceBundleUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::SwapExecuted",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Swap"
       ]
     },
     {
       "name": "pyth current testnet exact output route",
-      "digest": "F6uVciswJ2SHphVExbrPRyeavmfmVegUFjpoC5diu1ga",
+      "digest": "G1EG2ijNh7gdRjuZrUM7ySJnvZTmqp8vUhdsqJ2YWwvA",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::swap_b_for_exact_a_with_bundle"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::swap_b_for_exact_a_with_bundle"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PriceBundleUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::SwapExecuted",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Swap"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PriceBundleUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::SwapExecuted",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Swap"
+      ]
+    },
+    {
+      "name": "pyth current testnet exact output results route",
+      "digest": "Bu5ZSDGeENaDPm8StLjJxjNzKptKXJ75qz71ijQuSJNk",
+      "expectedMoveCalls": [
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::swap_b_for_exact_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PriceBundleUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::SwapExecuted",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Swap"
       ]
     },
     {
       "name": "pyth current testnet add liquidity",
-      "digest": "praGFhbZZFK7C7Aa3kWSsK9qWWBgriygZbdYBY6nuSE",
+      "digest": "s22wmPBygVBsD1awN4NGz3XA35kSJXQwZN2MVbJthMa",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::add_liquidity_with_bundle"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::add_liquidity_with_bundle"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::AddLiquidity"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::AddLiquidity"
       ]
     },
     {
       "name": "pyth current testnet remove liquidity",
-      "digest": "GMb2P1Xhi9x3Y2NPc2t6wDzDZYodzhXyy33ATKiTZyDb",
+      "digest": "7p9Vm4L1iDgTzJkiuTvoJTmijdhaPtw5tXfJaY8vpKQn",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::remove_liquidity_with_coins"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::remove_liquidity_with_coins"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::RemoveLiquidity"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::RemoveLiquidity"
       ]
     },
     {
       "name": "pyth current testnet zap in A",
-      "digest": "6qZzpQUT9ioZCPKbggQhMZwZ2Koh7AQuDR4SiJGiLXva",
+      "digest": "CcUkmwNyyE79RWv2Zbb7RuzHGmgE23Sfn3EeXmHfL5KS",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::zap_in_a_with_bundle"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::zap_in_a_with_bundle"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PriceBundleUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::SwapExecuted",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Swap",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::AddLiquidity"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PriceBundleUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::SwapExecuted",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Swap",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::AddLiquidity"
       ]
     },
     {
       "name": "pyth current testnet zap in B",
-      "digest": "B24ehmKuXAyTTZRakE4DZ3YDRvX2hYAL2YoqXTJPwUhh",
+      "digest": "HKQ3xSD8yMpR6UicjeGex6gRX5w3HYfcBoimkyQkHXFU",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::zap_in_b_with_bundle"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::zap_in_b_with_bundle"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PriceBundleUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::SwapExecuted",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Swap",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::AddLiquidity"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PriceBundleUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::SwapExecuted",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Swap",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::AddLiquidity"
       ]
     },
     {
       "name": "pyth current testnet zap out A",
-      "digest": "6Tw53jsQgbkBzgWMpknXrdrdntnSsMtUBod1Lr1gdzUr",
+      "digest": "9wNhBUbJS9Bs3sYrm6xHPCRNXTAvacpq4dLn6jETKQAu",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::zap_out_a_with_bundle"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::zap_out_a_with_bundle"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PriceBundleUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::SwapExecuted",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Swap",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::RemoveLiquidity"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PriceBundleUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::SwapExecuted",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Swap",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::RemoveLiquidity"
       ]
     },
     {
       "name": "pyth current testnet zap out B",
-      "digest": "ALnNCR5JfxFE6x5zTpiQZZfaTzgEMjE5wWw7PHKCCuNx",
+      "digest": "DnbwDdipeGNpbJ5LeWEY8yiUNHQnPovkm3QxrjfFEk55",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::router::zap_out_b_with_bundle"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::router::zap_out_b_with_bundle"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Sync",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::PriceBundleUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::SwapExecuted",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::Swap",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::RemoveLiquidity"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Sync",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::PriceBundleUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::SwapExecuted",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::Swap",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::RemoveLiquidity"
       ]
     },
     {
       "name": "pyth current testnet flash borrow A",
-      "digest": "EQrn4T1LHaRLu7zuxKkTGsD2NGYHdW2NCapJa3onRvC9",
+      "digest": "FDMZ3Fno11s2kNyXU1JNmAso6ThL1QjizBm9SkPSyzEh",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::flash::borrow_a_with_coin",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::flash::repay_a_with_coin"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::flash::borrow_a_with_coin",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::flash::repay_a_with_coin"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::FlashBorrowed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::FlashRepaid"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::FlashBorrowed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::FlashRepaid"
       ]
     },
     {
       "name": "pyth current testnet flash borrow B",
-      "digest": "HiYzRpQUXRi4KTfn2DJMoaMmiyp7Q47WuyZmBeqwobuS",
+      "digest": "5xL3vKTPrLBxUU8Y63QtgbWDV1wvKPZV1snUyw76dsYH",
       "expectedMoveCalls": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::flash::borrow_b_with_coin",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::flash::repay_b_with_coin"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::flash::borrow_b_with_coin",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::flash::repay_b_with_coin"
       ],
       "expectedEventTypes": [
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::OracleQuorumUsed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::FlashBorrowed",
-        "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629::events::FlashRepaid"
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::OracleQuorumUsed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::FlashBorrowed",
+        "0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457::events::FlashRepaid"
       ]
     }
   ]

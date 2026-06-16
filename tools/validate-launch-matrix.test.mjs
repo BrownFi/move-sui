@@ -616,9 +616,9 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
   const matrix = JSON.parse(fs.readFileSync(config, "utf8"));
 
   assert.deepEqual(summary, {
-    routeCaseCount: 10,
+    routeCaseCount: 11,
     quoteCaseCount: 4,
-    totalCaseCount: 14,
+    totalCaseCount: 15,
     providerIds: ["pyth"],
     routeCases: [
       {
@@ -629,6 +629,11 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
       {
         name: "pyth current testnet exact output route",
         kind: "exact-output",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth current testnet exact output results route",
+        kind: "exact-output-results",
         providerId: "pyth"
       },
       {
