@@ -1750,3 +1750,7 @@
   - Source check: Solidity `BrownFiV3Router.spec.ts` covers add/remove liquidity round trips and add/remove minimum-output guards. Existing Sui direct-router and core tests covered those paths, but the active Pyth launch path uses `router::add_liquidity_with_bundle` followed by `router::remove_liquidity_with_coins`.
   - Decision: add test-only Move coverage for the Pyth bundle add-then-remove round trip, an unreachable bundle add min-LP guard, and an unreachable remove min-A guard after LP was minted through the bundle path.
   - Verification: focused tests for all three liquidity cases passed 1/1, `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 296/296, and `rtk git diff --check` passed.
+- 2026-06-16 Pyth exact-output submit transfer coverage slice:
+  - Source check: exact-output Move router calls return both input-change and output coins. The launch submitter already had generic tuple-output transfer logic, but the checked tools tests covered exact-input, add-liquidity, and zap transfers without directly proving exact-output transferred both returned coins before execution.
+  - Decision: add test-only coverage to `tools/run-launch-matrix-submit.test.mjs` that submits a single exact-output route and requires exactly two transferred route outputs.
+  - Verification: focused `run-launch-matrix-submit` node tests passed 16/16, `rtk npm test --prefix tools` passed 149/149, and `rtk git diff --check` passed.
