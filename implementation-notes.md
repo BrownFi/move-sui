@@ -1746,3 +1746,7 @@
   - Source check: Solidity `BrownFiV3Zap.spec.ts` covers zap-in rejection when `amountOtherMin` is unreachable and zap-out rejection when final `amountMin` is unreachable. Existing Sui Pyth bundle zap tests covered happy paths but not those failure guards.
   - Decision: add test-only Move coverage for bundle `zap_in_a_with_bundle` with an unreachable swap minimum and bundle `zap_out_a_with_bundle` with an unreachable final output minimum. These assertions intentionally use the existing `swap::EExcessiveSlippage` abort rather than adding router-specific error codes.
   - Verification: focused tests for both slippage cases passed 1/1, `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 293/293, and `rtk git diff --check` passed.
+- 2026-06-16 Pyth bundle liquidity router coverage slice:
+  - Source check: Solidity `BrownFiV3Router.spec.ts` covers add/remove liquidity round trips and add/remove minimum-output guards. Existing Sui direct-router and core tests covered those paths, but the active Pyth launch path uses `router::add_liquidity_with_bundle` followed by `router::remove_liquidity_with_coins`.
+  - Decision: add test-only Move coverage for the Pyth bundle add-then-remove round trip, an unreachable bundle add min-LP guard, and an unreachable remove min-A guard after LP was minted through the bundle path.
+  - Verification: focused tests for all three liquidity cases passed 1/1, `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 296/296, and `rtk git diff --check` passed.
