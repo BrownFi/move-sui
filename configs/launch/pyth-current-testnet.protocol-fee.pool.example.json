@@ -1,0 +1,28 @@
+{
+  "name": "brownfi-v3-pyth-current-testnet-protocol-fee-pool-example",
+  "description": "Optional current-Pyth testnet pool-creation template that configures pool-local protocol fee setup for live protocol LP accrual and claim evidence.",
+  "network": "testnet",
+  "packageId": "0xBROWNFI_PACKAGE",
+  "typeA": "TYPE_A",
+  "typeB": "TYPE_B",
+  "factory": "0xFACTORY",
+  "poolCreatorCap": "0xPOOL_CREATOR_CAP",
+  "pauseCap": "0xPAUSE_CAP",
+  "feeCap": "0xFEE_CAP",
+  "riskCap": "0xRISK_CAP",
+  "feeTo": "0xFEE_TO",
+  "protocolFee": 20000000,
+  "oracle": "0xORACLE_ADAPTER",
+  "feedIds": [
+    "0xBASE_FEED_ID",
+    "0xQUOTE_FEED_ID"
+  ],
+  "clock": "0x6",
+  "initA": "0xINIT_COIN_A",
+  "initB": "0xINIT_COIN_B",
+  "initAAmount": "10000000000",
+  "initBAmount": "10000000000",
+  "tokenADecimals": 9,
+  "tokenBDecimals": 9,
+  "flashEnabled": true
+}

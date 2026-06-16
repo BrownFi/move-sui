@@ -22,7 +22,7 @@ function usage() {
     [
       "Usage: node tools/run-pyth-launch-sequence.mjs --network <network> --feeds <file> --runtime <module> --out-dir <dir>",
       "       [--launch-config <file>] [--pool-template <file>] [--matrix-template <file>] [--root <dir>]",
-      "       [--test-coin-package-path <dir>] [--package-out <dir>] [--runtime-config <file>] [--use-rtk]",
+      "       [--test-coin-package-path <dir>] [--package-out <dir>] [--runtime-config <file>] [--pool-values <file>]... [--use-rtk]",
       "       [--resume-existing-artifacts]",
       "       [--test-coin-gas-budget <mist>] [--package-gas-budget <mist>]",
       "       [--expected-dependency <object-id>]... [--expected-module <module>]...",
@@ -41,6 +41,7 @@ export function parsePythLaunchSequenceArgs(argv) {
     poolTemplate: DEFAULT_POOL_TEMPLATE,
     matrixTemplate: DEFAULT_MATRIX_TEMPLATE,
     feeds: [],
+    poolValues: [],
     expectedDependencyIds: [],
     expectedModules: []
   };
@@ -51,6 +52,8 @@ export function parsePythLaunchSequenceArgs(argv) {
       args.network = argv[++i];
     } else if (arg === "--feeds" || arg === "--feed-values") {
       args.feeds.push(argv[++i]);
+    } else if (arg === "--pool-values" || arg === "--pool-value") {
+      args.poolValues.push(argv[++i]);
     } else if (arg === "--runtime") {
       args.runtime = argv[++i];
     } else if (arg === "--runtime-config") {
@@ -195,6 +198,7 @@ function loadProtocolLpClaimConfig({ config, poolResult }) {
     typeA: requireString(poolConfig.typeA, "Pyth protocol LP claim typeA"),
     typeB: requireString(poolConfig.typeB, "Pyth protocol LP claim typeB"),
     feeCap: requireString(poolConfig.feeCap, "Pyth protocol LP claim feeCap"),
+    feeTo: requireString(poolConfig.feeTo, "Pyth protocol LP claim feeTo"),
     pool: requireString(poolCreate.pool, "Pyth protocol LP claim pool")
   };
 }
@@ -252,22 +256,14 @@ function assertTransactionSucceeded(result, label) {
   }
 }
 
-function runtimeSender(runtime, tx) {
-  const sender = runtime.sender ?? tx.sender;
-  if (typeof sender !== "string" || sender.length === 0) {
-    throw new Error("Pyth protocol LP claim runtime must expose sender to transfer claimed LP");
-  }
-  return sender;
-}
-
-function transferClaimedLp(tx, runtime, claimedLp) {
+function transferClaimedLp(tx, feeTo, claimedLp) {
   if (typeof tx.transferObjects !== "function") {
     throw new Error("Pyth protocol LP claim transaction builder must support transferObjects");
   }
   if (typeof tx.pure?.address !== "function") {
     throw new Error("Pyth protocol LP claim transaction builder must support pure address values");
   }
-  tx.transferObjects([claimedLp], tx.pure.address(runtimeSender(runtime, tx)));
+  tx.transferObjects([claimedLp], tx.pure.address(feeTo));
 }
 
 function expectedProtocolLpClaimMoveTarget(config) {
@@ -289,6 +285,7 @@ export async function claimPythLaunchProtocolLp({
     typeA: requireString(claimConfig.typeA, "Pyth protocol LP claim typeA"),
     typeB: requireString(claimConfig.typeB, "Pyth protocol LP claim typeB"),
     feeCap: requireString(claimConfig.feeCap, "Pyth protocol LP claim feeCap"),
+    feeTo: requireString(claimConfig.feeTo, "Pyth protocol LP claim feeTo"),
     pool: requireString(claimConfig.pool, "Pyth protocol LP claim pool")
   };
   const runtimeObject = runtime;
@@ -311,7 +308,7 @@ export async function claimPythLaunchProtocolLp({
     pool: config.pool,
     feeCap: config.feeCap
   })(tx);
-  transferClaimedLp(tx, runtimeObject, claimedLp);
+  transferClaimedLp(tx, config.feeTo, claimedLp);
   const result = await runtimeObject.executeTransaction(tx, context);
   assertTransactionSucceeded(result, "Pyth protocol LP claim transaction");
   const digest = requireString(
@@ -324,6 +321,7 @@ export async function claimPythLaunchProtocolLp({
     transactionDigest: digest,
     packageId: config.packageId,
     pool: config.pool,
+    feeTo: config.feeTo,
     txEvidence: {
       name: "pyth claim protocol lp",
       digest,
@@ -442,6 +440,7 @@ export async function runPythLaunchSequence({
   poolTemplate = DEFAULT_POOL_TEMPLATE,
   matrixTemplate = DEFAULT_MATRIX_TEMPLATE,
   feeds,
+  poolValues = [],
   runtime,
   runtimeConfig,
   outDir,
@@ -463,6 +462,7 @@ export async function runPythLaunchSequence({
   };
   const resolvedRoot = requireString(root, "Pyth launch root");
   const launchValues = valuesFiles(feeds, "Pyth launch feed values");
+  const poolOnlyValues = valuesFiles(poolValues, "Pyth launch pool-only values");
   const artifacts = {
     testCoins: path.join(requireString(outDir, "Pyth launch output directory"), "test-coins.json"),
     brownfiPublish: path.join(outDir, "brownfi-publish.json"),
@@ -508,7 +508,7 @@ export async function runPythLaunchSequence({
 
   const poolMaterialization = deps.materializePythLaunchPoolConfig({
     template: requireString(poolTemplate, "Pyth launch pool template"),
-    values: [artifacts.testCoins, ...launchValues],
+    values: [artifacts.testCoins, ...launchValues, ...poolOnlyValues],
     publishObjects: artifacts.brownfiPublish,
     out: artifacts.poolConfig
   });

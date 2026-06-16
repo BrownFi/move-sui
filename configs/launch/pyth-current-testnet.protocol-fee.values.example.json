@@ -1,0 +1,7 @@
+{
+  "name": "brownfi-v3-pyth-current-testnet-protocol-fee-values-example",
+  "description": "Pool-only value template for the optional current-Pyth testnet protocol-fee launch path. Replace FEE_TO with the protocol LP recipient address before live submission.",
+  "replacements": {
+    "FEE_TO": "0xFEE_TO"
+  }
+}

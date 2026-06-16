@@ -10,6 +10,11 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+function writeJson(file, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
 function fixtureRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "brownfi-pyth-launch-sequence-"));
 }
@@ -49,6 +54,7 @@ test("claimPythLaunchProtocolLp builds and transfers the claimed LP coin", async
   const pool = id("3");
   const feeCap = id("4");
   const sender = id("5");
+  const feeTo = id("6");
   const tx = createTransactionRecorder(sender);
   const calls = [];
 
@@ -59,7 +65,8 @@ test("claimPythLaunchProtocolLp builds and transfers the claimed LP coin", async
       typeA,
       typeB,
       pool,
-      feeCap
+      feeCap,
+      feeTo
     },
     runtime: {
       network: "testnet",
@@ -123,7 +130,7 @@ test("claimPythLaunchProtocolLp builds and transfers the claimed LP coin", async
   assert.deepEqual(tx.transfers, [
     {
       objects: [{ kind: "result", index: 0 }],
-      recipient: { kind: "address", value: sender }
+      recipient: { kind: "address", value: feeTo }
     }
   ]);
   assert.deepEqual(report, {
@@ -132,6 +139,7 @@ test("claimPythLaunchProtocolLp builds and transfers the claimed LP coin", async
     transactionDigest: "claim-digest",
     packageId,
     pool,
+    feeTo,
     txEvidence: {
       name: "pyth claim protocol lp",
       digest: "claim-digest",
@@ -139,6 +147,62 @@ test("claimPythLaunchProtocolLp builds and transfers the claimed LP coin", async
       expectedEventTypes: [`${packageId}::events::ProtocolLpClaimed`]
     }
   });
+});
+
+test("claimPythLaunchProtocolLpConfig loads fee recipient from pool config", async () => {
+  const { claimPythLaunchProtocolLpConfig } = await import("./run-pyth-launch-sequence.mjs");
+  const root = fixtureRoot();
+  const packageId = id("a");
+  const typeA = `${id("1")}::coin_a::COIN_A`;
+  const typeB = `${id("2")}::coin_b::COIN_B`;
+  const pool = id("3");
+  const feeCap = id("4");
+  const feeTo = id("5");
+  const config = path.join(root, "pool.json");
+  const poolResult = path.join(root, "pool-result.json");
+  const out = path.join(root, "claim.json");
+  writeJson(config, {
+    network: "testnet",
+    packageId,
+    typeA,
+    typeB,
+    feeCap,
+    feeTo
+  });
+  writeJson(poolResult, {
+    status: "success",
+    pool
+  });
+
+  const tx = createTransactionRecorder(id("6"));
+  const report = await claimPythLaunchProtocolLpConfig({
+    config,
+    poolResult,
+    runtime: {
+      network: "testnet",
+      routeTransactionFactory() {
+        return tx;
+      },
+      async executeTransaction() {
+        return {
+          effects: {
+            transactionDigest: "claim-digest",
+            status: { status: "success" }
+          }
+        };
+      }
+    },
+    out
+  });
+
+  assert.equal(report.feeTo, feeTo);
+  assert.deepEqual(tx.transfers, [
+    {
+      objects: [{ kind: "result", index: 0 }],
+      recipient: { kind: "address", value: feeTo }
+    }
+  ]);
+  assert.deepEqual(readJson(out), report);
 });
 
 test("parsePythLaunchSequenceArgs accepts tx evidence RPC retry options", async () => {
@@ -204,6 +268,25 @@ test("parsePythLaunchSequenceArgs accepts explicit runtime config", async () => 
   ]);
 
   assert.equal(args.runtimeConfig, "runtime.local.json");
+});
+
+test("parsePythLaunchSequenceArgs accepts pool-only values files", async () => {
+  const { parsePythLaunchSequenceArgs } = await import("./run-pyth-launch-sequence.mjs");
+
+  const args = parsePythLaunchSequenceArgs([
+    "--network",
+    "testnet",
+    "--feeds",
+    "feeds.json",
+    "--pool-values",
+    "fee-values.json",
+    "--runtime",
+    "runtime.mjs",
+    "--out-dir",
+    "out"
+  ]);
+
+  assert.deepEqual(args.poolValues, ["fee-values.json"]);
 });
 
 test("parsePythLaunchSequenceArgs defaults to the verified current-Pyth launch profile", async () => {
@@ -549,6 +632,168 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
     digest: "digest-protocol-lp-claim",
     status: "success"
   });
+});
+
+test("runPythLaunchSequence keeps pool-only values out of matrix materialization", async () => {
+  const { runPythLaunchSequence } = await import("./run-pyth-launch-sequence.mjs");
+  const root = fixtureRoot();
+  const outDir = path.join(root, "out");
+  const calls = [];
+
+  const testCoins = {
+    status: "success",
+    transactionDigest: "digest-testcoins",
+    packageId: "0xtestcoins",
+    replacements: {
+      TYPE_A: "0xtestcoins::coin_a::COIN_A",
+      TYPE_B: "0xtestcoins::coin_b::COIN_B",
+      INIT_COIN_A: "0xinita",
+      INIT_COIN_B: "0xinitb",
+      INPUT_COIN_A: "0xinputa",
+      INPUT_COIN_B: "0xinputb",
+      TOKEN_A_DECIMALS: 9,
+      TOKEN_B_DECIMALS: 9
+    }
+  };
+  const publish = {
+    status: "success",
+    transactionDigest: "digest-brownfi",
+    packageId: "0xbrownfi",
+    publishObjects: {
+      packageId: "0xbrownfi",
+      factory: "0xfactory",
+      oracleAdapter: "0xoracle",
+      poolCreatorCap: "0xpoolcap",
+      caps: {
+        FeeCap: "0xfeecap",
+        RiskCap: "0xriskcap"
+      }
+    }
+  };
+  const poolCreate = {
+    status: "success",
+    transactionDigest: "digest-pool",
+    pool: "0xpool",
+    lpCoin: "0xlp",
+    replacements: {
+      POOL: "0xpool",
+      LP_COIN: "0xlp"
+    },
+    txEvidence: {
+      name: "pyth create pool",
+      digest: "digest-pool",
+      expectedMoveCalls: [
+        "0xbrownfi::swap::create_pool_with_coins_and_transfer_lp_to_sender"
+      ],
+      expectedEventTypes: [
+        "0xbrownfi::events::PoolCreated",
+        "0xbrownfi::events::Sync"
+      ]
+    },
+    protocolFeeSetup: {
+      status: "success",
+      transactionDigest: "digest-protocol-fee",
+      txEvidence: {
+        name: "pyth configure protocol fee",
+        digest: "digest-protocol-fee",
+        expectedMoveCalls: [
+          "0xbrownfi::admin::set_pool_fee_to",
+          "0xbrownfi::admin::set_pool_protocol_fee"
+        ],
+        expectedEventTypes: [
+          "0xbrownfi::events::FeeToUpdated",
+          "0xbrownfi::events::PoolParametersUpdated",
+          "0xbrownfi::events::ConfigUpdated"
+        ]
+      }
+    }
+  };
+  const submit = {
+    summary: {
+      routeCaseCount: 1,
+      providerIds: ["pyth"],
+      routeCases: []
+    },
+    txEvidence: []
+  };
+  const protocolLpClaim = {
+    status: "success",
+    transactionDigest: "digest-protocol-lp-claim",
+    txEvidence: {
+      name: "pyth claim protocol lp",
+      digest: "digest-protocol-lp-claim",
+      expectedMoveCalls: ["0xbrownfi::admin::claim_protocol_lp"],
+      expectedEventTypes: ["0xbrownfi::events::ProtocolLpClaimed"]
+    }
+  };
+
+  await runPythLaunchSequence({
+    root,
+    network: "testnet",
+    launchConfig: "configs/launch/pyth-current-testnet.json",
+    poolTemplate: "configs/launch/pyth-current-testnet.protocol-fee.pool.example.json",
+    matrixTemplate: "configs/launch/pyth-current-testnet.matrix.example.json",
+    feeds: "configs/launch/pyth-current-testnet.feeds.beta-usdt-sdai.json",
+    poolValues: "fee-values.json",
+    runtime: "tools/pyth-launch-runtime.mjs",
+    outDir,
+    dependencies: {
+      publishLaunchTestCoins() {
+        return testCoins;
+      },
+      publishLaunchPackage() {
+        return publish;
+      },
+      materializePythLaunchPoolConfig(options) {
+        calls.push(["materialize-pool", options]);
+        return { status: "success", out: options.out };
+      },
+      async createPythLaunchPoolConfig() {
+        return poolCreate;
+      },
+      materializeLaunchMatrix(options) {
+        calls.push(["materialize-matrix", options]);
+        return { status: "success", out: options.out };
+      },
+      async submitLaunchMatrixRoutesConfigFile() {
+        return submit;
+      },
+      async claimPythLaunchProtocolLpConfig() {
+        return protocolLpClaim;
+      }
+    }
+  });
+
+  const testCoinsOut = path.join(outDir, "test-coins.json");
+  assert.deepEqual(calls, [
+    [
+      "materialize-pool",
+      {
+        template: "configs/launch/pyth-current-testnet.protocol-fee.pool.example.json",
+        values: [
+          testCoinsOut,
+          "configs/launch/pyth-current-testnet.feeds.beta-usdt-sdai.json",
+          "fee-values.json"
+        ],
+        publishObjects: path.join(outDir, "brownfi-publish.json"),
+        out: path.join(outDir, "pool.json")
+      }
+    ],
+    [
+      "materialize-matrix",
+      {
+        template: "configs/launch/pyth-current-testnet.matrix.example.json",
+        values: [
+          testCoinsOut,
+          "configs/launch/pyth-current-testnet.feeds.beta-usdt-sdai.json"
+        ],
+        out: path.join(outDir, "matrix.json"),
+        publishResult: path.join(outDir, "brownfi-publish.json"),
+        poolResult: path.join(outDir, "pool-result.json"),
+        launchConfig: "configs/launch/pyth-current-testnet.json"
+      }
+    ]
+  ]);
 });
 
 test("runPythLaunchSequence writes launch artifacts and submits routes in order", async () => {

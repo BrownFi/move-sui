@@ -10,6 +10,11 @@ This runbook uses the checked current-Pyth launch defaults:
 - Runtime config: `configs/launch/pyth-current-testnet.runtime.example.json`
 - Feed values: `configs/launch/pyth-current-testnet.feeds.beta-usdt-sdai.json`
 
+Optional protocol-fee launch values are separate from route-matrix values:
+
+- Protocol-fee pool template: `configs/launch/pyth-current-testnet.protocol-fee.pool.example.json`
+- Protocol-fee pool-only values: `configs/launch/pyth-current-testnet.protocol-fee.values.example.json`
+
 The checked live evidence file is verifier-only:
 
 - `configs/launch/pyth-current-testnet.live-evidence.matrix.json`
@@ -239,6 +244,16 @@ rtk "$NODE24" tools/run-pyth-launch-sequence.mjs \
   --tx-evidence-rpc-retry-delay-ms 1000
 ```
 
+For an opt-in protocol-fee run, create a local pool-only values file from
+`configs/launch/pyth-current-testnet.protocol-fee.values.example.json` with a live `FEE_TO`, then add:
+
+```sh
+  --pool-template configs/launch/pyth-current-testnet.protocol-fee.pool.example.json \
+  --pool-values /path/to/protocol-fee-values.json
+```
+
+`--pool-values` are passed only to pool materialization, so `FEE_TO` does not leak into matrix materialization. When the protocol-fee pool template is used, the sequence configures `fee_to` and protocol fee after pool creation, submits routes, then claims protocol LP, transfers the claimed LP coin to configured `FEE_TO`, and verifies `setup:protocolLpClaim` when `--verify-tx-evidence` is set.
+
 The sequence writes:
 
 - `$OUT_DIR/test-coins.json`
@@ -247,9 +262,10 @@ The sequence writes:
 - `$OUT_DIR/pool-result.json`
 - `$OUT_DIR/matrix.json`
 - `$OUT_DIR/submit.json`
+- `$OUT_DIR/protocol-lp-claim.json` when protocol fee setup is enabled
 - `$OUT_DIR/summary.json`
 
-`summary.json` includes generated `setupEvidence` for the test-coin publish, BrownFi package publish, pool-create, and optional flash-enable transactions. When `--verify-tx-evidence` is set, it also includes `setupVerification`; route evidence and route verification remain in `submit.json`.
+`summary.json` includes generated `setupEvidence` for the test-coin publish, BrownFi package publish, pool-create, optional protocol-fee setup, and optional flash-enable transactions. When `--verify-tx-evidence` is set, it also includes `setupVerification`; route evidence and route verification remain in `submit.json`. Protocol-LP claim evidence and the configured fee recipient are written under `results.protocolLpClaim` when protocol fee setup is enabled.
 
 If setup transactions already landed but later verification failed, rerun with:
 

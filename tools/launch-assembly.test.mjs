@@ -229,6 +229,40 @@ test("pyth current launch artifacts assemble from test coins and live feed value
   );
 });
 
+test("pyth current protocol-fee pool artifact assembles from publish caps and fee recipient", () => {
+  const { root, publishResult, testCoins } = fixtureRoot();
+  const parsedPublish = JSON.parse(fs.readFileSync(publishResult, "utf8"));
+  parsedPublish.publishObjects.caps.FeeCap = id("a1");
+  parsedPublish.publishObjects.caps.RiskCap = id("a2");
+  writeJson(publishResult, parsedPublish);
+  const feeValues = path.join(root, "fee-values.json");
+  writeJson(feeValues, {
+    replacements: {
+      FEE_TO: id("a3")
+    }
+  });
+  const poolOut = path.join(root, "pool-current-protocol-fee.json");
+  const feeds = "configs/launch/pyth-current-testnet.feeds.beta-usdt-sdai.json";
+
+  materializePythLaunchPoolConfig({
+    template: "configs/launch/pyth-current-testnet.protocol-fee.pool.example.json",
+    publishObjects: publishResult,
+    values: [testCoins, feeds, feeValues],
+    out: poolOut
+  });
+
+  const pool = JSON.parse(fs.readFileSync(poolOut, "utf8"));
+  assert.equal(pool.packageId, id("a"));
+  assert.equal(pool.typeA, `${id("e")}::coin_a::COIN_A`);
+  assert.equal(pool.typeB, `${id("e")}::coin_b::COIN_B`);
+  assert.equal(pool.pauseCap, id("f"));
+  assert.equal(pool.feeCap, id("a1"));
+  assert.equal(pool.riskCap, id("a2"));
+  assert.equal(pool.feeTo, id("a3"));
+  assert.equal(pool.protocolFee, 20000000);
+  assert.equal(pool.flashEnabled, true);
+});
+
 test("pyth upgraded feed values example declares only feed replacements", () => {
   const values = JSON.parse(
     fs.readFileSync("configs/launch/pyth-upgraded-testnet.feeds.example.json", "utf8")
@@ -249,4 +283,12 @@ test("pyth current live feed values declare only feed replacements", () => {
     "BASE_FEED_ID",
     "QUOTE_FEED_ID"
   ]);
+});
+
+test("pyth current protocol-fee values example declares only fee recipient replacement", () => {
+  const values = JSON.parse(
+    fs.readFileSync("configs/launch/pyth-current-testnet.protocol-fee.values.example.json", "utf8")
+  );
+
+  assert.deepEqual(Object.keys(values.replacements).sort(), ["FEE_TO"]);
 });
