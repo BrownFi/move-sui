@@ -2854,6 +2854,65 @@ module brownfi_amm::v3_router_test {
     }
 
     #[test]
+    fun test_router_zap_in_then_zap_out_a_with_bundle_keeps_loss_under_five_percent() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool);
+            let amount_in = 200_000;
+            let input_a = coin::from_balance(balance::create_for_testing<A>(amount_in), ctx(&mut scenario));
+
+            let (remaining_a, remaining_b, lp) = router::zap_in_a_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                0,
+                0,
+                ctx(&mut scenario)
+            );
+            let a_out = router::zap_out_a_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                lp,
+                0,
+                ctx(&mut scenario)
+            );
+            let total_a_returned = coin::value(&remaining_a) + coin::value(&a_out);
+
+            assert!(coin::value(&remaining_b) == 0, 0);
+            assert!(total_a_returned * 100 > amount_in * 95, 1);
+
+            balance::destroy_for_testing(coin::into_balance(remaining_a));
+            balance::destroy_for_testing(coin::into_balance(remaining_b));
+            balance::destroy_for_testing(coin::into_balance(a_out));
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     #[expected_failure(abort_code = router::ERouterDisabled)]
     fun test_router_swap_aborts_when_pool_router_disabled() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
