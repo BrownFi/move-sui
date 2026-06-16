@@ -1772,3 +1772,7 @@
   - Source check: Solidity `BrownFiV3.spec.ts` covers `allows partial rebalancing when oracle drift leaves pre-trade skew already above gamma`.
   - Decision: add Pyth-bundle Move coverage with B priced above A and reserves already beyond gamma. The test executes a small A-for-B sell, then proves the pool remains beyond gamma while the relative skew improves, matching the Solidity partial-rebalance intent without changing production logic.
   - Verification: `rtk sui move test test_gamma_allows_partial_rebalancing_sell_when_oracle_drift_is_already_over_limit --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.
+- 2026-06-16 Pyth SDK oracle-admin builder slice:
+  - Finding: `sdk/router` covered Pyth route/liquidity/zap/flash builders and launch-time flash enablement, but did not expose TypeScript builders for the pool-local Pyth oracle policy/source configuration functions needed by operators.
+  - Decision: add SDK PTB builders for `admin::set_pool_pyth_weight`, `set_pool_oracle_max_price_age`, `set_pool_oracle_quorum`, `set_pool_oracle_aggregation_policy`, and `set_pool_oracle_sources`. `source_id_a/b` are encoded as pure Move `ID` values via `tx.pure.id` with `tx.pure.address` fallback, matching the launch tooling convention; source type strings are byte vectors and Pyth feed configs are hex byte vectors.
+  - RED/GREEN: `rtk npm test --prefix sdk/router -- --test-name-pattern "Pyth oracle admin builders"` first failed because the exports were missing, then passed with the new exact target/argument-order coverage.

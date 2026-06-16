@@ -1,4 +1,5 @@
 export type U64Input = number | bigint | string;
+export type U32Input = number | bigint | string;
 export type U8Input = number | bigint | string;
 export type U128Input = number | bigint | string;
 export type SupraPairIdInput = number | bigint;
@@ -25,8 +26,11 @@ export interface TransactionLike {
   pure: {
     bool?(value: boolean): TransactionArgument;
     u8?(value: U8Input): TransactionArgument;
+    u32?(value: U32Input): TransactionArgument;
     u64(value: U64Input): TransactionArgument;
     u128?(value: U128Input): TransactionArgument;
+    id?(value: string): TransactionArgument;
+    address?(value: string): TransactionArgument;
     vector?(type: string, values: readonly unknown[]): TransactionArgument;
   };
   moveCall(call: MoveCall): TransactionArgument;
@@ -1803,6 +1807,42 @@ export interface SetPoolFlashEnabledOptions extends PairTypesOptions {
   enabled: boolean;
 }
 
+export interface PoolOracleAdminOptions extends PairTypesOptions {
+  pool: ObjectInput;
+  oracleCap: ObjectInput;
+}
+
+export interface SetPoolPythWeightOptions extends PoolOracleAdminOptions {
+  newWeight: U32Input;
+}
+
+export interface SetPoolOracleMaxPriceAgeOptions extends PoolOracleAdminOptions {
+  newAge: U64Input;
+}
+
+export interface SetPoolOracleQuorumOptions extends PoolOracleAdminOptions {
+  minSources: U8Input;
+  requiredSourceMask: U64Input;
+  allowedSourceMask: U64Input;
+}
+
+export interface SetPoolOracleAggregationPolicyOptions extends PoolOracleAdminOptions {
+  primarySource: U8Input;
+  maxPairTimeDeltaMs: U64Input;
+  maxConfidence: U64Input;
+  maxDeviation: U64Input;
+  mode: U8Input;
+}
+
+export interface SetPoolOracleSourcesOptions extends PoolOracleAdminOptions {
+  sourceTypeA: string | BytesInput;
+  sourceTypeB: string | BytesInput;
+  sourceIdA: string;
+  sourceIdB: string;
+  configDataA: string | BytesInput;
+  configDataB: string | BytesInput;
+}
+
 export interface FlashBorrowWithCoinResults {
   result: TransactionResult;
   borrowed: TransactionArgument;
@@ -1999,11 +2039,28 @@ function pureU8(tx: TransactionLike, value: U8Input): TransactionArgument {
   return tx.pure.u8(value);
 }
 
+function pureU32(tx: TransactionLike, value: U32Input): TransactionArgument {
+  if (tx.pure.u32 === undefined) {
+    throw new Error("Transaction builder must support pure u32 values");
+  }
+  return tx.pure.u32(value);
+}
+
 function pureU128(tx: TransactionLike, value: U128Input): TransactionArgument {
   if (tx.pure.u128 === undefined) {
     throw new Error("Transaction builder must support pure u128 values");
   }
   return tx.pure.u128(value);
+}
+
+function pureObjectId(tx: TransactionLike, value: string): TransactionArgument {
+  if (tx.pure.id !== undefined) {
+    return tx.pure.id(value);
+  }
+  if (tx.pure.address !== undefined) {
+    return tx.pure.address(value);
+  }
+  throw new Error("Transaction builder must support pure object ID values");
 }
 
 function pureVector(
@@ -2030,6 +2087,41 @@ function splitGasCoin(tx: TransactionLike, amount: SuiAmountInput): TransactionA
 
 function bytesValue(value: BytesInput): number[] {
   return Array.from(value);
+}
+
+function asciiOrBytesValue(value: string | BytesInput, fieldName: string): number[] {
+  if (typeof value !== "string") {
+    return bytesValue(value);
+  }
+  const bytes: number[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const byte = value.charCodeAt(i);
+    if (byte > 255) {
+      throw new Error(`${fieldName} must contain only single-byte characters`);
+    }
+    bytes.push(byte);
+  }
+  return bytes;
+}
+
+function hexOrBytesValue(value: string | BytesInput, fieldName: string): number[] {
+  if (typeof value !== "string") {
+    return bytesValue(value);
+  }
+
+  const hex = value.startsWith("0x") || value.startsWith("0X") ? value.slice(2) : value;
+  if (hex.length % 2 !== 0) {
+    throw new Error(`${fieldName} must be an even-length hex string`);
+  }
+  if (!/^[0-9a-fA-F]*$/.test(hex)) {
+    throw new Error(`${fieldName} must be a hex string`);
+  }
+
+  const bytes: number[] = [];
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes.push(Number.parseInt(hex.slice(i, i + 2), 16));
+  }
+  return bytes;
 }
 
 function byteArrayValue(value: BytesInput, fieldName: string): Uint8Array {
@@ -7105,6 +7197,86 @@ export function setPoolFlashEnabled(options: SetPoolFlashEnabledOptions): Transa
         objectArg(tx, options.pool),
         objectArg(tx, options.pauseCap),
         pureBool(tx, options.enabled)
+      ]
+    });
+}
+
+export function setPoolPythWeight(options: SetPoolPythWeightOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_pyth_weight"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.oracleCap),
+        pureU32(tx, options.newWeight)
+      ]
+    });
+}
+
+export function setPoolOracleMaxPriceAge(
+  options: SetPoolOracleMaxPriceAgeOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_oracle_max_price_age"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.oracleCap),
+        amountArg(tx, options.newAge)
+      ]
+    });
+}
+
+export function setPoolOracleQuorum(options: SetPoolOracleQuorumOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_oracle_quorum"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.oracleCap),
+        pureU8(tx, options.minSources),
+        amountArg(tx, options.requiredSourceMask),
+        amountArg(tx, options.allowedSourceMask)
+      ]
+    });
+}
+
+export function setPoolOracleAggregationPolicy(
+  options: SetPoolOracleAggregationPolicyOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_oracle_aggregation_policy"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.oracleCap),
+        pureU8(tx, options.primarySource),
+        amountArg(tx, options.maxPairTimeDeltaMs),
+        amountArg(tx, options.maxConfidence),
+        amountArg(tx, options.maxDeviation),
+        pureU8(tx, options.mode)
+      ]
+    });
+}
+
+export function setPoolOracleSources(options: SetPoolOracleSourcesOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_oracle_sources"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.oracleCap),
+        pureVector(tx, "u8", asciiOrBytesValue(options.sourceTypeA, "oracle source type A")),
+        pureVector(tx, "u8", asciiOrBytesValue(options.sourceTypeB, "oracle source type B")),
+        pureObjectId(tx, options.sourceIdA),
+        pureObjectId(tx, options.sourceIdB),
+        pureVector(tx, "u8", hexOrBytesValue(options.configDataA, "oracle config data A")),
+        pureVector(tx, "u8", hexOrBytesValue(options.configDataB, "oracle config data B"))
       ]
     });
 }

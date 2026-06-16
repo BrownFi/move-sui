@@ -122,7 +122,12 @@ import {
   repayBWithBorrowedCoinAndFee,
   repayBWithCoin,
   runLaunchValidationMatrixPreflight,
+  setPoolOracleAggregationPolicy,
+  setPoolOracleMaxPriceAge,
+  setPoolOracleQuorum,
+  setPoolOracleSources,
   setPoolFlashEnabled,
+  setPoolPythWeight,
   splitSuiFromGas,
   summarizeLaunchValidationMatrixPreflightResult,
   storkRestLatestPricesResponseToSignedPrices,
@@ -194,11 +199,20 @@ function createTransactionRecorder() {
       u8(value) {
         return { kind: "u8", value: String(value) };
       },
+      u32(value) {
+        return { kind: "u32", value: String(value) };
+      },
       u64(value) {
         return { kind: "u64", value: String(value) };
       },
       u128(value) {
         return { kind: "u128", value: String(value) };
+      },
+      id(value) {
+        return { kind: "id", value };
+      },
+      address(value) {
+        return { kind: "address", value };
       },
       vector(type, values) {
         return { kind: "pure-vector", type, values: Array.from(values) };
@@ -9906,6 +9920,107 @@ test("setPoolFlashEnabled targets the admin pool gate with Move argument order",
       { kind: "object", id: "0xPOOLAB" },
       { kind: "object", id: "0xPAUSE" },
       { kind: "bool", value: true }
+    ]
+  });
+});
+
+test("Pyth oracle admin builders target admin functions with Move argument order", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    pool: "0xPOOLAB",
+    oracleCap: "0xORACLECAP"
+  };
+
+  const pythWeightTx = createTransactionRecorder();
+  setPoolPythWeight({ ...base, newWeight: 100_000_000 })(pythWeightTx);
+  assert.deepEqual(pythWeightTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_pyth_weight",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xORACLECAP" },
+      { kind: "u32", value: "100000000" }
+    ]
+  });
+
+  const maxAgeTx = createTransactionRecorder();
+  setPoolOracleMaxPriceAge({ ...base, newAge: 15n })(maxAgeTx);
+  assert.deepEqual(maxAgeTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_oracle_max_price_age",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xORACLECAP" },
+      { kind: "u64", value: "15" }
+    ]
+  });
+
+  const quorumTx = createTransactionRecorder();
+  setPoolOracleQuorum({
+    ...base,
+    minSources: 1,
+    requiredSourceMask: 1n,
+    allowedSourceMask: 1n
+  })(quorumTx);
+  assert.deepEqual(quorumTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_oracle_quorum",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xORACLECAP" },
+      { kind: "u8", value: "1" },
+      { kind: "u64", value: "1" },
+      { kind: "u64", value: "1" }
+    ]
+  });
+
+  const aggregationTx = createTransactionRecorder();
+  setPoolOracleAggregationPolicy({
+    ...base,
+    primarySource: 0,
+    maxPairTimeDeltaMs: 1000n,
+    maxConfidence: 0n,
+    maxDeviation: 0n,
+    mode: 0
+  })(aggregationTx);
+  assert.deepEqual(aggregationTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_oracle_aggregation_policy",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xORACLECAP" },
+      { kind: "u8", value: "0" },
+      { kind: "u64", value: "1000" },
+      { kind: "u64", value: "0" },
+      { kind: "u64", value: "0" },
+      { kind: "u8", value: "0" }
+    ]
+  });
+
+  const sourcesTx = createTransactionRecorder();
+  setPoolOracleSources({
+    ...base,
+    sourceTypeA: "pyth",
+    sourceTypeB: "pyth",
+    sourceIdA: "0xAAAA",
+    sourceIdB: "0xBBBB",
+    configDataA: PYTH_FEED_A,
+    configDataB: PYTH_FEED_B
+  })(sourcesTx);
+  assert.deepEqual(sourcesTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_oracle_sources",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xORACLECAP" },
+      { kind: "pure-vector", type: "u8", values: [112, 121, 116, 104] },
+      { kind: "pure-vector", type: "u8", values: [112, 121, 116, 104] },
+      { kind: "id", value: "0xAAAA" },
+      { kind: "id", value: "0xBBBB" },
+      { kind: "pure-vector", type: "u8", values: Array(32).fill(1) },
+      { kind: "pure-vector", type: "u8", values: Array(32).fill(2) }
     ]
   });
 });
