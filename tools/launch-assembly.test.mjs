@@ -205,7 +205,15 @@ test("pyth current launch artifacts assemble from test coins and live feed value
   assert.equal(flashB.feeCoin, id("5"));
   assert.equal(flashB.feeCoinAmount, "1");
   assert.equal(
+    quoteCaseByName(matrix, "pyth current testnet exact input raw quote").amountIn,
+    "1000000"
+  );
+  assert.equal(
     quoteCaseByName(matrix, "pyth current testnet exact output quote").amountOut,
+    "1"
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth current testnet exact output raw quote").amountOut,
     "1"
   );
 });

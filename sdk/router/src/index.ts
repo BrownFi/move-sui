@@ -847,7 +847,9 @@ export interface CreateExactOutputRouteQuoteValidationCaseOptions<
 
 export type LaunchValidationQuoteCaseKind =
   | "exact-input-quote"
-  | "exact-output-quote";
+  | "exact-input-without-cutoff-quote"
+  | "exact-output-quote"
+  | "exact-output-without-cutoff-quote";
 
 export interface LaunchValidationQuoteBaseCaseConfig<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
@@ -864,7 +866,7 @@ export interface LaunchValidationQuoteBaseCaseConfig<
 export interface LaunchValidationExactInputQuoteCaseConfig<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 > extends LaunchValidationQuoteBaseCaseConfig<THop> {
-  kind: "exact-input-quote";
+  kind: "exact-input-quote" | "exact-input-without-cutoff-quote";
   amountIn: SuiAmountInput;
   amountOut?: never;
 }
@@ -872,7 +874,7 @@ export interface LaunchValidationExactInputQuoteCaseConfig<
 export interface LaunchValidationExactOutputQuoteCaseConfig<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 > extends LaunchValidationQuoteBaseCaseConfig<THop> {
-  kind: "exact-output-quote";
+  kind: "exact-output-quote" | "exact-output-without-cutoff-quote";
   amountOut: SuiAmountInput;
   amountIn?: never;
 }
@@ -2835,6 +2837,33 @@ export function createExactInputRouteQuoteValidationCase<
   };
 }
 
+export function createExactInputWithoutCutoffRouteQuoteValidationCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+>(
+  options: CreateExactInputRouteQuoteValidationCaseOptions<THop>
+): LaunchValidationCase<RouteQuoteResults> {
+  const quoteOptions: QuoteExactInputWithRegisteredRouteOptions<THop> = {
+    providerRegistry: options.providerRegistry,
+    providerId: options.providerId,
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs,
+    amountIn: options.amountIn
+  };
+
+  return {
+    name: options.name,
+    providerId: options.providerId,
+    preflightContext: launchValidationPreflightContext(
+      options.name,
+      options.preflightContext
+    ),
+    build(tx) {
+      return quoteExactInputWithoutCutoffWithRegisteredRoute(tx, quoteOptions);
+    }
+  };
+}
+
 export function createExactOutputRouteQuoteValidationCase<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 >(
@@ -2858,6 +2887,33 @@ export function createExactOutputRouteQuoteValidationCase<
     ),
     build(tx) {
       return quoteExactOutputWithRegisteredRoute(tx, quoteOptions);
+    }
+  };
+}
+
+export function createExactOutputWithoutCutoffRouteQuoteValidationCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+>(
+  options: CreateExactOutputRouteQuoteValidationCaseOptions<THop>
+): LaunchValidationCase<RouteQuoteResults> {
+  const quoteOptions: QuoteExactOutputWithRegisteredRouteOptions<THop> = {
+    providerRegistry: options.providerRegistry,
+    providerId: options.providerId,
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs,
+    amountOut: options.amountOut
+  };
+
+  return {
+    name: options.name,
+    providerId: options.providerId,
+    preflightContext: launchValidationPreflightContext(
+      options.name,
+      options.preflightContext
+    ),
+    build(tx) {
+      return quoteExactOutputWithoutCutoffWithRegisteredRoute(tx, quoteOptions);
     }
   };
 }
@@ -2888,6 +2944,26 @@ export function buildLaunchValidationQuoteCases<
       });
     }
 
+    if (quoteCase.kind === "exact-input-without-cutoff-quote") {
+      getRoutePriceProvider(options.providerRegistry, quoteCase.providerId);
+      validateLaunchRouteLimits(
+        quoteCase.name,
+        quoteCase.path,
+        quoteCase.pairs,
+        options.routeLimits
+      );
+      return createExactInputWithoutCutoffRouteQuoteValidationCase({
+        name: quoteCase.name,
+        providerRegistry: options.providerRegistry,
+        providerId: quoteCase.providerId,
+        preflightContext: quoteCase.preflightContext ?? quoteCase.context,
+        clock: quoteCase.clock,
+        path: quoteCase.path,
+        pairs: quoteCase.pairs,
+        amountIn: quoteCase.amountIn
+      });
+    }
+
     if (quoteCase.kind === "exact-output-quote") {
       getRoutePriceProvider(options.providerRegistry, quoteCase.providerId);
       validateLaunchRouteLimits(
@@ -2897,6 +2973,26 @@ export function buildLaunchValidationQuoteCases<
         options.routeLimits
       );
       return createExactOutputRouteQuoteValidationCase({
+        name: quoteCase.name,
+        providerRegistry: options.providerRegistry,
+        providerId: quoteCase.providerId,
+        preflightContext: quoteCase.preflightContext ?? quoteCase.context,
+        clock: quoteCase.clock,
+        path: quoteCase.path,
+        pairs: quoteCase.pairs,
+        amountOut: quoteCase.amountOut
+      });
+    }
+
+    if (quoteCase.kind === "exact-output-without-cutoff-quote") {
+      getRoutePriceProvider(options.providerRegistry, quoteCase.providerId);
+      validateLaunchRouteLimits(
+        quoteCase.name,
+        quoteCase.path,
+        quoteCase.pairs,
+        options.routeLimits
+      );
+      return createExactOutputWithoutCutoffRouteQuoteValidationCase({
         name: quoteCase.name,
         providerRegistry: options.providerRegistry,
         providerId: quoteCase.providerId,

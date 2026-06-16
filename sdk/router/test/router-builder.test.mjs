@@ -991,6 +991,115 @@ test("preflightLaunchValidationQuoteCases builds and dry-runs Pyth quote cases",
   ]);
 });
 
+test("preflightLaunchValidationQuoteCases builds raw no-cutoff Pyth quote cases", async () => {
+  const txs = [];
+  const createTransaction = (validationCase, index) => {
+    const tx = createTransactionRecorder();
+    tx.build = async () => `${validationCase.name}-bytes`;
+    txs[index] = tx;
+    return tx;
+  };
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const registry = createRoutePriceProviderRegistry([
+    createPythRoutePriceProvider({
+      priceFeedConnection: {
+        async getPriceFeedsUpdateData(feedIdsArg) {
+          return feedIdsArg.map((feedId) => ({ update: feedId }));
+        }
+      },
+      pythClient: {
+        async updatePriceFeeds(_txArg, _updatesArg, _feedIdsArg) {
+          return ["0xPRICEA", "0xPRICEB"];
+        }
+      }
+    })
+  ]);
+  const rawExactInputQuoteCase = {
+    name: "pyth current raw exact input quote",
+    kind: "exact-input-without-cutoff-quote",
+    providerId: "pyth",
+    clock: "0x6",
+    path: ["0x1::a::A", "0x1::b::B"],
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      }
+    ],
+    amountIn: 100n
+  };
+  const rawExactOutputQuoteCase = {
+    name: "pyth current raw exact output quote",
+    kind: "exact-output-without-cutoff-quote",
+    providerId: "pyth",
+    clock: "0x6",
+    path: ["0x1::a::A", "0x1::b::B"],
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      }
+    ],
+    amountOut: 7n
+  };
+  const rawExactInputBuildTx = createTransactionRecorder();
+  const [rawExactInputValidationCase] = buildLaunchValidationQuoteCases({
+    providerRegistry: registry,
+    cases: [rawExactInputQuoteCase]
+  });
+  const rawExactInputBuild = await rawExactInputValidationCase.build(rawExactInputBuildTx);
+
+  const results = await preflightLaunchValidationQuoteCases({
+    providerRegistry: registry,
+    createTransaction,
+    suiClient,
+    cases: [rawExactInputQuoteCase, rawExactOutputQuoteCase]
+  });
+
+  assert.deepEqual(
+    results.map((result) => [result.name, result.providerId, result.dryRunResult.transactionBlock]),
+    [
+      ["pyth current raw exact input quote", "pyth", "pyth current raw exact input quote-bytes"],
+      ["pyth current raw exact output quote", "pyth", "pyth current raw exact output quote-bytes"]
+    ]
+  );
+  assert.deepEqual(
+    txs.map((tx) => tx.calls.map((call) => call.target)),
+    [
+      [
+        "0xBROWN::pyth_source::read_price_a",
+        "0xBROWN::pyth_source::read_price_b",
+        "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+        "0xBROWN::swap::quote_a_for_b_with_bundle"
+      ],
+      [
+        "0xBROWN::pyth_source::read_price_a",
+        "0xBROWN::pyth_source::read_price_b",
+        "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+        "0xBROWN::swap::quote_a_for_exact_b_without_cutoff_with_bundle"
+      ]
+    ]
+  );
+  assert.deepEqual(rawExactInputBuild.amounts[1], {
+    kind: "nested-result",
+    index: 3,
+    resultIndex: 1
+  });
+});
+
 test("buildLaunchValidationMatrix hydrates route and quote launch sections", () => {
   const routeFactoryCalls = [];
   const providerRegistry = createRoutePriceProviderRegistry([

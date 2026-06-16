@@ -341,6 +341,56 @@
         }
       ],
       "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet exact input raw quote",
+      "kind": "exact-input-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
+        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
+          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
+          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
+          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "pyth current testnet exact output raw quote",
+      "kind": "exact-output-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
+        "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x26e904b6dd56a7f8ff1671584eb0b7da138993663e5d48294d3c2c004fe2a629",
+          "typeA": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_a::COIN_A",
+          "typeB": "0xff23e4c74d9fdc8820ea55ee8c79ea498d10e0b6a97ad1925d0e379989d3883c::coin_b::COIN_B",
+          "pool": "0xafbf7faf6b99f573a2717684451e9f9ecf9904cce6aa4b8cca1d75a730fe09ca",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
     }
   ],
   "setupEvidence": {
