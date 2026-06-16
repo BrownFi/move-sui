@@ -217,6 +217,22 @@ function setupEvidenceForLaunch({ testCoins, brownfiPublish, poolCreate }) {
       )
     }
   };
+  if (poolCreate.protocolFeeSetup?.txEvidence !== undefined) {
+    evidence.protocolFeeSetup = {
+      digest: requireString(
+        poolCreate.protocolFeeSetup.txEvidence.digest,
+        "Pyth launch protocol fee setup transaction digest"
+      ),
+      expectedMoveCalls: optionalStringArray(
+        poolCreate.protocolFeeSetup.txEvidence.expectedMoveCalls,
+        "Pyth launch protocol fee setup expectedMoveCalls"
+      ),
+      expectedEventTypes: optionalStringArray(
+        poolCreate.protocolFeeSetup.txEvidence.expectedEventTypes,
+        "Pyth launch protocol fee setup expectedEventTypes"
+      )
+    };
+  }
   if (poolCreate.flashEnable?.txEvidence !== undefined) {
     evidence.flashEnable = {
       digest: requireString(

@@ -204,3 +204,60 @@ test("materializePythLaunchPoolConfig can merge multiple values files", () => {
   assert.equal(pool.initA, id("5"));
   assert.equal(pool.initB, id("6"));
 });
+
+test("materializePythLaunchPoolConfig can materialize optional protocol fee setup fields", () => {
+  const { root, publishObjects, values } = fixtureRoot();
+  writeJson(publishObjects, {
+    packageId: id("a"),
+    factory: id("b"),
+    poolCreatorCap: id("c"),
+    oracleAdapter: id("d"),
+    caps: {
+      FeeCap: id("7"),
+      RiskCap: id("8")
+    }
+  });
+  const parsedValues = JSON.parse(fs.readFileSync(values, "utf8"));
+  parsedValues.replacements.FEE_TO = id("9");
+  writeJson(values, parsedValues);
+  const template = path.join(root, "protocol-fee-pool-template.json");
+  writeJson(template, {
+    name: "protocol-fee-pool",
+    network: "testnet",
+    packageId: "0xBROWNFI_PACKAGE",
+    typeA: "TYPE_A",
+    typeB: "TYPE_B",
+    factory: "0xFACTORY",
+    poolCreatorCap: "0xPOOL_CREATOR_CAP",
+    feeCap: "0xFEE_CAP",
+    riskCap: "0xRISK_CAP",
+    feeTo: "0xFEE_TO",
+    protocolFee: 10000000,
+    oracle: "0xORACLE_ADAPTER",
+    feedIds: ["0xBASE_FEED_ID", "0xQUOTE_FEED_ID"],
+    clock: "0x6",
+    initA: "0xINIT_COIN_A",
+    initB: "0xINIT_COIN_B",
+    tokenADecimals: 9,
+    tokenBDecimals: 9
+  });
+  const out = path.join(root, "protocol-fee-pool.json");
+
+  const result = materializePythLaunchPoolConfig({
+    template,
+    publishObjects,
+    values,
+    out
+  });
+
+  const pool = JSON.parse(fs.readFileSync(out, "utf8"));
+  assert.equal(result.status, "success");
+  assert.equal(pool.feeCap, id("7"));
+  assert.equal(pool.riskCap, id("8"));
+  assert.equal(pool.feeTo, id("9"));
+  assert.equal(pool.protocolFee, 10000000);
+  assert.equal(result.validation.feeCap, id("7"));
+  assert.equal(result.validation.riskCap, id("8"));
+  assert.equal(result.validation.feeTo, id("9"));
+  assert.equal(result.validation.protocolFee, 10000000);
+});

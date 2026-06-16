@@ -7,7 +7,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   createPoolWithCoinsAndTransferLpToSender,
   fetchAndUpdatePythPriceInfoObjectsFromFeeds,
-  setPoolFlashEnabled
+  setPoolFlashEnabled,
+  setPoolFeeTo,
+  setPoolProtocolFee
 } from "../sdk/router/dist/index.js";
 import { extractLaunchPoolCreateObjects } from "./extract-launch-pool-create-objects.mjs";
 
@@ -18,6 +20,9 @@ const PLACEHOLDER_TOKENS = [
   "FACTORY",
   "POOL_CREATOR_CAP",
   "PAUSE_CAP",
+  "FEE_CAP",
+  "RISK_CAP",
+  "FEE_TO",
   "ORACLE_ADAPTER",
   "BASE_FEED_ID",
   "QUOTE_FEED_ID",
@@ -159,6 +164,22 @@ function requireOptionalU64(value, label) {
   return stringValue;
 }
 
+function requireOptionalU32(value, label) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
+    throw new Error(`${label} must be a u32 integer when present`);
+  }
+  const stringValue = String(value);
+  if (!/^[0-9]+$/.test(stringValue)) {
+    throw new Error(`${label} must be a u32 integer when present`);
+  }
+  const parsed = BigInt(stringValue);
+  if (parsed > 4294967295n) {
+    throw new Error(`${label} must be a u32 integer when present`);
+  }
+  return Number(parsed);
+}
+
 function configPathPart(parent, key) {
   return typeof key === "number" ? `${parent}[${key}]` : (parent ? `${parent}.${key}` : key);
 }
@@ -212,6 +233,19 @@ function loadPoolConfig(file) {
     pauseCap: config.pauseCap === undefined
       ? undefined
       : requireString(config.pauseCap, "Pyth launch pool config pauseCap"),
+    feeCap: config.feeCap === undefined
+      ? undefined
+      : requireString(config.feeCap, "Pyth launch pool config feeCap"),
+    riskCap: config.riskCap === undefined
+      ? undefined
+      : requireString(config.riskCap, "Pyth launch pool config riskCap"),
+    feeTo: config.feeTo === undefined
+      ? undefined
+      : requireString(config.feeTo, "Pyth launch pool config feeTo"),
+    protocolFee: requireOptionalU32(
+      config.protocolFee,
+      "Pyth launch pool config protocolFee"
+    ),
     oracle: requireString(config.oracle, "Pyth launch pool config oracle"),
     feedIds: requireFeedIds(config.feedIds),
     clock: requireString(config.clock, "Pyth launch pool config clock"),
@@ -448,6 +482,21 @@ function expectedFlashEnableEvents(config) {
   return [`${config.packageId}::events::PoolGateStateChanged`];
 }
 
+function expectedProtocolFeeSetupMoveTargets(config) {
+  return [
+    `${config.packageId}::admin::set_pool_fee_to`,
+    `${config.packageId}::admin::set_pool_protocol_fee`
+  ];
+}
+
+function expectedProtocolFeeSetupEvents(config) {
+  return [
+    `${config.packageId}::events::FeeToUpdated`,
+    `${config.packageId}::events::PoolParametersUpdated`,
+    `${config.packageId}::events::ConfigUpdated`
+  ];
+}
+
 function nonNegativeInteger(value, fallback) {
   return Number.isSafeInteger(value) && value >= 0 ? value : fallback;
 }
@@ -526,13 +575,71 @@ async function maybeEnableFlash({ config, runtime, transactionFactory, pool, rou
   };
 }
 
+async function maybeConfigureProtocolFee({ config, runtime, transactionFactory, pool, routerSdk }) {
+  if (config.protocolFee === undefined) return undefined;
+  const feeCap = requireString(
+    config.feeCap,
+    "Pyth launch pool config feeCap"
+  );
+  const riskCap = requireString(
+    config.riskCap,
+    "Pyth launch pool config riskCap"
+  );
+  const feeTo = requireString(
+    config.feeTo,
+    "Pyth launch pool config feeTo"
+  );
+  const context = {
+    kind: "configure-protocol-fee",
+    packageId: config.packageId,
+    typeA: config.typeA,
+    typeB: config.typeB,
+    pool
+  };
+  const tx = transactionFactory(context);
+  routerSdk.setPoolFeeTo({
+    packageId: config.packageId,
+    typeA: config.typeA,
+    typeB: config.typeB,
+    pool,
+    feeCap,
+    feeTo
+  })(tx);
+  routerSdk.setPoolProtocolFee({
+    packageId: config.packageId,
+    typeA: config.typeA,
+    typeB: config.typeB,
+    pool,
+    riskCap,
+    newProtocolFee: config.protocolFee
+  })(tx);
+  const result = await runtime.executeTransaction(tx, context);
+  assertTransactionSucceeded(result, "Pyth launch protocol fee setup transaction");
+  const digest = requireString(
+    result.effects.transactionDigest,
+    "Pyth launch protocol fee setup transaction digest"
+  );
+  return {
+    status: "success",
+    transactionDigest: digest,
+    txEvidence: {
+      name: "pyth configure protocol fee",
+      digest,
+      expectedMoveCalls: expectedProtocolFeeSetupMoveTargets(config),
+      expectedEventTypes: expectedProtocolFeeSetupEvents(config)
+    }
+  };
+}
+
 export async function createPythLaunchPool({
   poolConfig,
   runtime,
   routerSdk = {
     createPoolWithCoinsAndTransferLpToSender,
     fetchAndUpdatePythPriceInfoObjectsFromFeeds,
-    setPoolFlashEnabled
+    setPoolFlashEnabled,
+    setPoolFeeTo,
+    setPoolProtocolFee
   }
 }) {
   const config = requireRecord(poolConfig, "Pyth launch pool config");
@@ -608,6 +715,13 @@ export async function createPythLaunchPool({
   const txResult = await runtimeObject.executeTransaction(tx, context);
   const extracted = extractLaunchPoolCreateObjects(txResult);
   assertExtractedPackageMatchesConfig(extracted, config);
+  const protocolFeeSetup = await maybeConfigureProtocolFee({
+    config,
+    runtime: runtimeObject,
+    transactionFactory,
+    pool: extracted.pool,
+    routerSdk
+  });
   const flashEnable = await maybeEnableFlash({
     config,
     runtime: runtimeObject,
@@ -625,6 +739,7 @@ export async function createPythLaunchPool({
     lpCoin: extracted.lpCoin,
     priceInfoObjects: Array.from(priceInfoObjects),
     replacements: extracted.replacements,
+    ...(protocolFeeSetup === undefined ? {} : { protocolFeeSetup }),
     ...(flashEnable === undefined ? {} : { flashEnable }),
     txEvidence: {
       name: "pyth create pool",

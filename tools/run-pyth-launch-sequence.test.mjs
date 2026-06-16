@@ -152,6 +152,23 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
         "0xbrownfi::events::Sync"
       ]
     },
+    protocolFeeSetup: {
+      status: "success",
+      transactionDigest: "digest-protocol-fee",
+      txEvidence: {
+        name: "pyth configure protocol fee",
+        digest: "digest-protocol-fee",
+        expectedMoveCalls: [
+          "0xbrownfi::admin::set_pool_fee_to",
+          "0xbrownfi::admin::set_pool_protocol_fee"
+        ],
+        expectedEventTypes: [
+          "0xbrownfi::events::FeeToUpdated",
+          "0xbrownfi::events::PoolParametersUpdated",
+          "0xbrownfi::events::ConfigUpdated"
+        ]
+      }
+    },
     flashEnable: {
       status: "success",
       transactionDigest: "digest-flash-enable",
@@ -237,11 +254,12 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
     "verify-setup",
     "verify-setup",
     "verify-setup",
+    "verify-setup",
     "materialize-matrix",
     "submit-matrix"
   ]);
   assert.deepEqual(
-    calls.slice(4, 8).map(([, options]) => ({
+    calls.slice(4, 9).map(([, options]) => ({
       txName: options.txName,
       evidence: options.evidence,
       rpcUrl: options.rpcUrl,
@@ -292,6 +310,25 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
         rpcRetryDelayMs: "10"
       },
       {
+        txName: "setup:protocolFeeSetup",
+        evidence: {
+          digest: "digest-protocol-fee",
+          expectedMoveCalls: [
+            "0xbrownfi::admin::set_pool_fee_to",
+            "0xbrownfi::admin::set_pool_protocol_fee"
+          ],
+          expectedEventTypes: [
+            "0xbrownfi::events::FeeToUpdated",
+            "0xbrownfi::events::PoolParametersUpdated",
+            "0xbrownfi::events::ConfigUpdated"
+          ]
+        },
+        rpcUrl: "https://fullnode.testnet.sui.io:443",
+        useRtk: true,
+        rpcRetries: "2",
+        rpcRetryDelayMs: "10"
+      },
+      {
         txName: "setup:flashEnable",
         evidence: {
           digest: "digest-flash-enable",
@@ -323,6 +360,11 @@ test("runPythLaunchSequence verifies setup evidence before submitting routes whe
     {
       txName: "setup:pool",
       digest: "digest-pool",
+      status: "success"
+    },
+    {
+      txName: "setup:protocolFeeSetup",
+      digest: "digest-protocol-fee",
       status: "success"
     },
     {

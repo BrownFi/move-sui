@@ -14,6 +14,9 @@ const PLACEHOLDER_LITERALS = new Map([
   ["FACTORY", "0xFACTORY"],
   ["POOL_CREATOR_CAP", "0xPOOL_CREATOR_CAP"],
   ["PAUSE_CAP", "0xPAUSE_CAP"],
+  ["FEE_CAP", "0xFEE_CAP"],
+  ["RISK_CAP", "0xRISK_CAP"],
+  ["FEE_TO", "0xFEE_TO"],
   ["ORACLE_ADAPTER", "0xORACLE_ADAPTER"],
   ["BASE_FEED_ID", "0xBASE_FEED_ID"],
   ["QUOTE_FEED_ID", "0xQUOTE_FEED_ID"],
@@ -148,6 +151,18 @@ function loadPublishObjectReplacements(file) {
     replacements.PAUSE_CAP = requireString(
       publishObjects.caps.PauseCap,
       "Publish objects caps.PauseCap"
+    );
+  }
+  if (publishObjects.caps?.FeeCap !== undefined) {
+    replacements.FEE_CAP = requireString(
+      publishObjects.caps.FeeCap,
+      "Publish objects caps.FeeCap"
+    );
+  }
+  if (publishObjects.caps?.RiskCap !== undefined) {
+    replacements.RISK_CAP = requireString(
+      publishObjects.caps.RiskCap,
+      "Publish objects caps.RiskCap"
     );
   }
   return replacements;

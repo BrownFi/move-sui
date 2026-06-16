@@ -31,6 +31,9 @@ const initA = id("6");
 const initB = id("7");
 const feedA = id("8");
 const feedB = id("9");
+const feeCap = id("a");
+const riskCap = id("d");
+const feeTo = id("e");
 
 function createTransactionRecorder() {
   return {
@@ -54,6 +57,12 @@ function createTransactionRecorder() {
       },
       bool(value) {
         return { kind: "bool", value };
+      },
+      u32(value) {
+        return { kind: "u32", value: String(value) };
+      },
+      address(value) {
+        return { kind: "address", value };
       }
     },
     makeMoveVec(vector) {
@@ -125,6 +134,30 @@ function successfulFlashEnableResult() {
       {
         type: `${packageId}::events::PoolGateStateChanged`,
         parsedJson: { pool_id: "0xPOOL", gate: "flash_enabled", enabled: true }
+      }
+    ],
+    objectChanges: []
+  };
+}
+
+function successfulProtocolFeeSetupResult() {
+  return {
+    effects: {
+      transactionDigest: "protocol-fee-setup-digest",
+      status: { status: "success" }
+    },
+    events: [
+      {
+        type: `${packageId}::events::FeeToUpdated`,
+        parsedJson: { new_fee_to: feeTo }
+      },
+      {
+        type: `${packageId}::events::PoolParametersUpdated`,
+        parsedJson: { pool_id: "0xPOOL" }
+      },
+      {
+        type: `${packageId}::events::ConfigUpdated`,
+        parsedJson: { pool_id: "0xPOOL" }
       }
     ],
     objectChanges: []
@@ -362,6 +395,132 @@ test("createPythLaunchPoolConfig can enable flash after pool creation", async ()
       digest: "flash-enable-digest",
       expectedMoveCalls: [`${packageId}::admin::set_pool_flash_enabled`],
       expectedEventTypes: [`${packageId}::events::PoolGateStateChanged`]
+    }
+  });
+});
+
+test("createPythLaunchPoolConfig can configure protocol fee after pool creation", async () => {
+  const root = fixtureRoot();
+  const config = path.join(root, "pool.json");
+  writeJson(config, poolConfig({ feeCap, riskCap, feeTo, protocolFee: 10000000 }));
+  const poolTx = createTransactionRecorder();
+  const protocolFeeTx = createTransactionRecorder();
+  const calls = [];
+
+  const runtime = {
+    network: "testnet",
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIds) {
+        calls.push(["fetch", feedIds]);
+        return [{ update: "a-b" }];
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updates, feedIds) {
+        calls.push(["update", txArg, updates, feedIds]);
+        assert.equal(txArg, poolTx);
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    },
+    pythContractConfig: {
+      pythStateId: id("b")
+    },
+    poolTransactionFactory(context) {
+      calls.push(["tx-factory", context]);
+      return context.kind === "configure-protocol-fee" ? protocolFeeTx : poolTx;
+    },
+    async executeTransaction(txArg, context) {
+      calls.push(["execute", txArg, context]);
+      if (context.kind === "configure-protocol-fee") {
+        assert.equal(txArg, protocolFeeTx);
+        return successfulProtocolFeeSetupResult();
+      }
+      assert.equal(txArg, poolTx);
+      return successfulCreatePoolResult();
+    }
+  };
+
+  const report = await createPythLaunchPoolConfig({ config, runtime });
+
+  assert.deepEqual(calls, [
+    [
+      "tx-factory",
+      {
+        kind: "create-pool",
+        packageId,
+        typeA,
+        typeB
+      }
+    ],
+    ["fetch", [feedA, feedB]],
+    ["update", poolTx, [{ update: "a-b" }], [feedA, feedB]],
+    [
+      "execute",
+      poolTx,
+      {
+        kind: "create-pool",
+        packageId,
+        typeA,
+        typeB
+      }
+    ],
+    [
+      "tx-factory",
+      {
+        kind: "configure-protocol-fee",
+        packageId,
+        typeA,
+        typeB,
+        pool: "0xPOOL"
+      }
+    ],
+    [
+      "execute",
+      protocolFeeTx,
+      {
+        kind: "configure-protocol-fee",
+        packageId,
+        typeA,
+        typeB,
+        pool: "0xPOOL"
+      }
+    ]
+  ]);
+  assert.deepEqual(protocolFeeTx.calls, [
+    {
+      target: `${packageId}::admin::set_pool_fee_to`,
+      typeArguments: [typeA, typeB],
+      arguments: [
+        { kind: "object", id: "0xPOOL" },
+        { kind: "object", id: feeCap },
+        { kind: "address", value: feeTo }
+      ]
+    },
+    {
+      target: `${packageId}::admin::set_pool_protocol_fee`,
+      typeArguments: [typeA, typeB],
+      arguments: [
+        { kind: "object", id: "0xPOOL" },
+        { kind: "object", id: riskCap },
+        { kind: "u32", value: "10000000" }
+      ]
+    }
+  ]);
+  assert.deepEqual(report.protocolFeeSetup, {
+    status: "success",
+    transactionDigest: "protocol-fee-setup-digest",
+    txEvidence: {
+      name: "pyth configure protocol fee",
+      digest: "protocol-fee-setup-digest",
+      expectedMoveCalls: [
+        `${packageId}::admin::set_pool_fee_to`,
+        `${packageId}::admin::set_pool_protocol_fee`
+      ],
+      expectedEventTypes: [
+        `${packageId}::events::FeeToUpdated`,
+        `${packageId}::events::PoolParametersUpdated`,
+        `${packageId}::events::ConfigUpdated`
+      ]
     }
   });
 });
