@@ -1768,3 +1768,7 @@
   - Source check: Solidity `BrownFiV3Pair._applyGammaCutoff` returns the requested output unchanged when `gamma >= PRECISION`, and `BrownFiV3.spec.ts` has a `gamma=1 disables the cutoff` fixture.
   - Decision: add Pyth-bundle Move coverage for the same otherwise-clipped large sell after setting pool gamma to `100_000_000`. The test proves cutoff-aware quote output equals raw output and the state-changing swap returns that raw output.
   - Verification: `rtk sui move test test_gamma_one_disables_cutoff_for_large_sell --allow-dirty --build-env testnet --warnings-are-errors` passed immediately. This is coverage-only; no production change was required.
+- 2026-06-16 Pyth oracle-drift gamma partial-rebalance coverage slice:
+  - Source check: Solidity `BrownFiV3.spec.ts` covers `allows partial rebalancing when oracle drift leaves pre-trade skew already above gamma`.
+  - Decision: add Pyth-bundle Move coverage with B priced above A and reserves already beyond gamma. The test executes a small A-for-B sell, then proves the pool remains beyond gamma while the relative skew improves, matching the Solidity partial-rebalance intent without changing production logic.
+  - Verification: `rtk sui move test test_gamma_allows_partial_rebalancing_sell_when_oracle_drift_is_already_over_limit --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.

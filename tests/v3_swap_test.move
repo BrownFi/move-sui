@@ -3061,6 +3061,82 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_gamma_allows_partial_rebalancing_sell_when_oracle_drift_is_already_over_limit() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts(&mut scenario, 100_000_000_000, 900_000_000_000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let bundle = periphery_library_fixture_bundle(&pool, &clock, 1_200_000_000);
+            let input_amount = 2_000_000_000;
+            let pre_quote_value = 100_000_000_000u128;
+            let pre_base_value = math::mul_div_down_u128(
+                900_000_000_000,
+                1_200_000_000,
+                1_000_000_000
+            );
+            let pre_abs = pre_base_value - pre_quote_value;
+            let pre_total = pre_base_value + pre_quote_value;
+
+            assert!(pre_abs * 100_000_000 > pre_total * 80_000_000, 0);
+
+            let (quoted_out, raw_out, cutoff_out) = swap::quote_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                input_amount
+            );
+
+            assert!(quoted_out > 0, 1);
+            assert!(quoted_out == raw_out, 2);
+            assert!(cutoff_out == raw_out, 3);
+
+            let b_out = swap::swap_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                balance::create_for_testing<A>(input_amount),
+                0
+            );
+            let (amount_a, amount_b, _) = swap::pool_balances(&pool);
+            let input_no_fee = math::pseudo_in_from_actual_u128(
+                (input_amount as u128),
+                100_000,
+                100_000_000
+            );
+            let retained_fee = (input_amount as u128) - input_no_fee;
+            let post_quote_no_fee = (amount_a as u128) - retained_fee;
+            let post_base_value = math::mul_div_down_u128(
+                (amount_b as u128),
+                1_200_000_000,
+                1_000_000_000
+            );
+            let post_abs = post_base_value - post_quote_no_fee;
+            let post_total = post_base_value + post_quote_no_fee;
+
+            assert!(balance::value(&b_out) == quoted_out, 4);
+            assert!(post_abs * 100_000_000 > post_total * 80_000_000, 5);
+            assert!(post_abs * pre_total < pre_abs * post_total, 6);
+
+            balance::destroy_for_testing(b_out);
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_gamma_cutoff_clamps_worsening_buy() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         test_helpers::create_test_pool(&mut scenario, 10_000_000_000, 50_000_000_000);
