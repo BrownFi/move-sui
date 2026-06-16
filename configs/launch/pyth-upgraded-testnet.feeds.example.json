@@ -1,0 +1,8 @@
+{
+  "name": "brownfi-v3-pyth-upgraded-testnet-feeds-example",
+  "description": "Feed-only live-value template for Pyth-upgraded testnet launch materialization. Combine this with test-coin publish output before materializing pool or matrix configs.",
+  "replacements": {
+    "BASE_FEED_ID": "0xBASE_FEED_ID",
+    "QUOTE_FEED_ID": "0xQUOTE_FEED_ID"
+  }
+}

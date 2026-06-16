@@ -4,6 +4,7 @@ const EOverflow: u64 = 0;
 const EDivisionByZero: u64 = 1;
 
 const MAX_U64: u128 = 18446744073709551615;
+const MAX_U64_U256: u256 = 18446744073709551615;
 const Q32: u128 = 4294967296; // 1 << 32 (reduced from Q64 to prevent overflow)
 
 /// Calculates (a * b) / c with overflow protection.
@@ -20,6 +21,59 @@ public fun mul_div_u128(a: u128, b: u128, c: u128): u128 {
     // For extremely large numbers, we'd need u256, but for now use u128
     // This matches Solidity's FullMath behavior within u128 range
     (a * b) / c
+}
+
+/// Calculates floor((a * b) / c). Use when rounding must be explicit.
+public fun mul_div_down_u128(a: u128, b: u128, c: u128): u128 {
+    assert!(c != 0, EDivisionByZero);
+    (a * b) / c
+}
+
+/// Calculates ceil((a * b) / c). Use for pool-favoring required input/penalty math.
+public fun mul_div_up_u128(a: u128, b: u128, c: u128): u128 {
+    assert!(c != 0, EDivisionByZero);
+    let product = a * b;
+    if (product == 0) 0 else ((product - 1) / c) + 1
+}
+
+public fun mul_div_down_u256(a: u256, b: u256, c: u256): u256 {
+    assert!(c != 0, EDivisionByZero);
+    (a * b) / c
+}
+
+public fun mul_div_up_u256(a: u256, b: u256, c: u256): u256 {
+    assert!(c != 0, EDivisionByZero);
+    let product = a * b;
+    if (product == 0) 0 else ((product - 1) / c) + 1
+}
+
+public fun mul_div_down_to_u64(a: u128, b: u128, c: u128): u64 {
+    let result = mul_div_down_u128(a, b, c);
+    assert!(result <= MAX_U64, EOverflow);
+    (result as u64)
+}
+
+public fun mul_div_up_to_u64(a: u128, b: u128, c: u128): u64 {
+    let result = mul_div_up_u128(a, b, c);
+    assert!(result <= MAX_U64, EOverflow);
+    (result as u64)
+}
+
+public fun u256_to_u64_checked(value: u256): u64 {
+    assert!(value <= MAX_U64_U256, EOverflow);
+    (value as u64)
+}
+
+/// Converts trader-paid input into BrownFi v3 no-fee pseudo input.
+public fun pseudo_in_from_actual_u128(actual_in: u128, fee: u32, precision: u128): u128 {
+    assert!(precision != 0, EDivisionByZero);
+    mul_div_down_u128(actual_in, precision, precision + (fee as u128))
+}
+
+/// Calculates the BrownFi v3 fee amount from no-fee pseudo input.
+public fun fee_from_pseudo_input_u128(pseudo_in: u128, fee: u32, precision: u128): u128 {
+    assert!(precision != 0, EDivisionByZero);
+    mul_div_down_u128(pseudo_in, (fee as u128), precision)
 }
 
 /// Calculates (a * b) / c and returns u64 with overflow check
@@ -66,11 +120,52 @@ public fun parse_amount_to_standard_decimals(
         amount / pow_10(diff)
     } else if (token_decimals < standard_decimals) {
         let diff = standard_decimals - token_decimals;
-        amount * pow_10(diff)
+        let result = (amount as u128) * (pow_10(diff) as u128);
+        assert!(result <= MAX_U64, EOverflow);
+        (result as u64)
     } else {
         amount
     }
 }
+
+public fun parse_amount_from_standard_decimals(
+    token_decimals: u8,
+    amount: u64,
+    standard_decimals: u8
+): u64 {
+    if (token_decimals > standard_decimals) {
+        let diff = token_decimals - standard_decimals;
+        let result = (amount as u128) * (pow_10(diff) as u128);
+        assert!(result <= MAX_U64, EOverflow);
+        (result as u64)
+    } else if (token_decimals < standard_decimals) {
+        let diff = standard_decimals - token_decimals;
+        amount / pow_10(diff)
+    } else {
+        amount
+    }
+}
+
+public fun parse_amount_from_standard_decimals_up(
+    token_decimals: u8,
+    amount: u64,
+    standard_decimals: u8
+): u64 {
+    if (token_decimals > standard_decimals) {
+        let diff = token_decimals - standard_decimals;
+        let result = (amount as u128) * (pow_10(diff) as u128);
+        assert!(result <= MAX_U64, EOverflow);
+        (result as u64)
+    } else if (token_decimals < standard_decimals) {
+        let diff = standard_decimals - token_decimals;
+        let result = ceil_div_u128((amount as u128), (pow_10(diff) as u128));
+        assert!(result <= MAX_U64, EOverflow);
+        (result as u64)
+    } else {
+        amount
+    }
+}
+
 
 /// Calculate 10^n for small exponents (up to 18)
 public fun pow_10(n: u8): u64 {
@@ -124,11 +219,27 @@ public fun min_u128(a: u128, b: u128): u128 {
     if (a < b) a else b
 }
 
+public fun sqrt_up_u256(x: u256): u256 {
+    let root = sqrt_u256(x);
+    if (root * root < x) root + 1 else root
+}
+
 /// Integer square root for u128 (Newton's method)
 fun sqrt_u128(x: u128): u128 {
     if (x == 0) return 0;
     let mut z = x;
     let mut y = (z + 1) / 2;
+    while (y < z) {
+        z = y;
+        y = (z + x / z) / 2;
+    };
+    z
+}
+
+fun sqrt_u256(x: u256): u256 {
+    if (x == 0) return 0;
+    let mut z = x;
+    let mut y = x / 2 + 1;
     while (y < z) {
         z = y;
         y = (z + x / z) / 2;

@@ -1,0 +1,17 @@
+{
+  "name": "brownfi-v3-pyth-upgraded-testnet-values-example",
+  "description": "Shared live-value template for Pyth-upgraded testnet launch materialization. Replace token types, feed IDs, and coin object IDs before creating the pool or route matrix.",
+  "replacements": {
+    "TYPE_A": "TYPE_A",
+    "TYPE_B": "TYPE_B",
+    "BASE_FEED_ID": "0xBASE_FEED_ID",
+    "QUOTE_FEED_ID": "0xQUOTE_FEED_ID",
+    "INIT_COIN_A": "0xINIT_COIN_A",
+    "INIT_COIN_B": "0xINIT_COIN_B",
+    "INPUT_COIN": "0xINPUT_COIN",
+    "INPUT_COIN_A": "0xINPUT_COIN_A",
+    "INPUT_COIN_B": "0xINPUT_COIN_B",
+    "TOKEN_A_DECIMALS": 9,
+    "TOKEN_B_DECIMALS": 9
+  }
+}

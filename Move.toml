@@ -9,6 +9,21 @@ brownfi_oracle = { local = "./packages/oracle" }
 [dependencies.Pyth]
 local = "./packages/pyth-crosschain/target_chains/sui/contracts"
 
+[dependencies.flowx_clmm]
+git = "https://github.com/FlowX-Finance/clmm-contracts.git"
+rev = "95441b22ca9d5d7420a6e527afcfc1a2639fcc39"
+
+[dependencies.Switchboard]
+git = "https://github.com/switchboard-xyz/sui.git"
+subdir = "on_demand/"
+rev = "mainnet"
+
+[dependencies.stork]
+local = "./packages/stork-sui"
+
+[dependencies.SupraOracle]
+local = "./packages/supra-sui"
+
 # NOTE: For testnet publishing, uncomment these overrides to match Pyth/Wormhole's Sui framework:
 # [dependencies.Sui]
 # git = "https://github.com/MystenLabs/sui.git"
@@ -35,6 +50,7 @@ local = "./packages/pyth-crosschain/target_chains/sui/contracts"
 
 [addresses]
 brownfi_amm = "0x0"
+supra_validator = "0x3a75968d0951fc99e7b336b26088d0f6888efd691b9cf2ac61c3958cfaa6d41b"
 
 [dev-dependencies]
 # The dev-dependencies section allows overriding dependencies for `--test` and

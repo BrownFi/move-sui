@@ -1,0 +1,15 @@
+{
+  "name": "brownfi-v3-pyth-upgraded-testnet-runtime-example",
+  "description": "Runtime config template for Pyth-upgraded testnet launch preflight. Secrets and concrete Sui client objects stay in the runtime module/environment.",
+  "network": "testnet",
+  "providerId": "pyth",
+  "contractSet": "upgraded",
+  "rpcUrlEnv": "BROWNFI_SUI_RPC_URL",
+  "privateKeyEnv": "BROWNFI_SUI_PRIVATE_KEY",
+  "suiKeystorePathEnv": "BROWNFI_SUI_KEYSTORE_PATH",
+  "suiKeystoreAddressEnv": "BROWNFI_SUI_SENDER",
+  "senderAddressEnv": "BROWNFI_SUI_SENDER",
+  "requirePythApiKey": false,
+  "pythApiKeyEnv": "PYTH_HERMES_API_KEY",
+  "pythHermesEndpointEnv": "PYTH_HERMES_ENDPOINT"
+}

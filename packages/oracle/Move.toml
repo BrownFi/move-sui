@@ -6,11 +6,6 @@ edition = "2024.beta"
 [dependencies.Pyth]
 local = "../pyth-crosschain/target_chains/sui/contracts"
 
-[dependencies.Wormhole]
-git = "https://github.com/wormhole-foundation/wormhole.git"
-subdir = "sui/wormhole"
-rev = "sui/testnet"
-
 # NOTE: For testnet publishing, uncomment this override:
 # [dependencies.Sui]
 # git = "https://github.com/MystenLabs/sui.git"

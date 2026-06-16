@@ -1,0 +1,13 @@
+{
+  "name": "@brownfi/sui-launch-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "cd .. && node --test tools/*.test.mjs"
+  },
+  "dependencies": {
+    "@mysten/sui": "^1.3.0",
+    "@pythnetwork/pyth-sui-js": "^3.0.0"
+  }
+}

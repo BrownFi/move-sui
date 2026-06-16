@@ -80,7 +80,7 @@ public fun id(oracle: &OracleAdapter): ID {
     object::id(oracle)
 }
 
-/// Get price for a token type (in Q32 format)
+/// Get price for a token type in the adapter's normalized absolute scale.
 /// Currently only supports Pyth Network oracle
 /// 
 /// Parameters:
@@ -89,19 +89,32 @@ public fun id(oracle: &OracleAdapter): ID {
 /// - clock: Clock for timestamp verification
 /// - max_price_age: Maximum acceptable price age in seconds
 /// 
-/// Returns: Price in Q32 format (2^32 = 1.0)
+/// Returns: normalized absolute price
 public fun get_price<T>(
     oracle: &OracleAdapter,
     price_info_object: &PriceInfoObject,
     clock: &Clock,
     max_price_age: u64
 ): u64 {
-    let token_type = type_name::get<T>();
+    let (price, _, _) = get_price_with_bounds<T>(oracle, price_info_object, clock, max_price_age);
+    price
+}
+
+/// Get price plus confidence bounds for a token type.
+///
+/// Returns `(price, upper, lower)` as absolute prices in the adapter's normalized scale.
+public fun get_price_with_bounds<T>(
+    oracle: &OracleAdapter,
+    price_info_object: &PriceInfoObject,
+    clock: &Clock,
+    max_price_age: u64
+): (u64, u64, u64) {
+    let token_type = type_name::with_defining_ids<T>();
     
     // Check if token is configured
     if (!table::contains(&oracle.token_configs, token_type)) {
         // Return default price of 1.0 for tokens without oracle
-        return (Q32 as u64)
+        return ((Q32 as u64), (Q32 as u64), (Q32 as u64))
     };
     
     let config = table::borrow(&oracle.token_configs, token_type);
@@ -110,12 +123,12 @@ public fun get_price<T>(
     // Q32 = 2^32 prevents overflow issues
     // Price = 1e9 represents $1 with 9 decimals
     if (config.source_type == b"test") {
-        return 1_000_000_000 // Return 1.0 with 9 decimals
+        return (1_000_000_000, 1_000_000_000, 1_000_000_000)
     };
     
     // Currently only support Pyth
     if (config.source_type == SOURCE_PYTH) {
-        get_price_from_pyth(price_info_object, config, clock, max_price_age)
+        get_price_with_bounds_from_pyth(price_info_object, config, clock, max_price_age)
     } else {
         // Unsupported oracle source
         abort EUnsupportedOracleSource
@@ -154,7 +167,7 @@ public fun configure_token<T>(
     source_id: ID,
     config_data: vector<u8>
 ) {
-    let token_type = type_name::get<T>();
+    let token_type = type_name::with_defining_ids<T>();
     let config = OracleConfig {
         source_type,
         source_id,
@@ -171,7 +184,7 @@ public fun configure_token<T>(
 
 /// Remove oracle configuration for a token
 public fun remove_token_config<T>(oracle: &mut OracleAdapter) {
-    let token_type = type_name::get<T>();
+    let token_type = type_name::with_defining_ids<T>();
     if (table::contains(&oracle.token_configs, token_type)) {
         table::remove(&mut oracle.token_configs, token_type);
     }
@@ -179,28 +192,43 @@ public fun remove_token_config<T>(oracle: &mut OracleAdapter) {
 
 /// Check if a token has oracle configuration
 public fun has_config<T>(oracle: &OracleAdapter): bool {
-    let token_type = type_name::get<T>();
+    let token_type = type_name::with_defining_ids<T>();
     table::contains(&oracle.token_configs, token_type)
 }
 
 /// Get oracle source type for a token
 public fun get_source_type<T>(oracle: &OracleAdapter): vector<u8> {
-    let token_type = type_name::get<T>();
+    let token_type = type_name::with_defining_ids<T>();
     assert!(table::contains(&oracle.token_configs, token_type), ETokenNotConfigured);
     let config = table::borrow(&oracle.token_configs, token_type);
     config.source_type
 }
 
-/// Get price from Pyth oracle
-fun get_price_from_pyth( 
+/// Get oracle source object ID for a token.
+public fun get_source_id<T>(oracle: &OracleAdapter): ID {
+    let token_type = type_name::with_defining_ids<T>();
+    assert!(table::contains(&oracle.token_configs, token_type), ETokenNotConfigured);
+    let config = table::borrow(&oracle.token_configs, token_type);
+    config.source_id
+}
+
+/// Get oracle source-specific config data for a token.
+public fun get_config_data<T>(oracle: &OracleAdapter): vector<u8> {
+    let token_type = type_name::with_defining_ids<T>();
+    assert!(table::contains(&oracle.token_configs, token_type), ETokenNotConfigured);
+    let config = table::borrow(&oracle.token_configs, token_type);
+    config.config_data
+}
+
+fun get_price_with_bounds_from_pyth(
     price_info_object: &PriceInfoObject,
     config: &OracleConfig,
     clock: &Clock,
     max_price_age: u64
-): u64 {
+): (u64, u64, u64) {
     // Call the Pyth adapter to get the price
     // config_data contains the Pyth price feed ID (32 bytes)
-    pyth_adapter::get_price(
+    pyth_adapter::get_price_with_bounds(
         price_info_object,
         clock,
         config.config_data,
@@ -228,4 +256,3 @@ public fun set_min_price_age(
 public fun mock_price(amount: u64): u64 {
     amount * (Q32 as u64)
 }
-

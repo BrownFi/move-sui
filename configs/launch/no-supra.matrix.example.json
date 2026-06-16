@@ -1,0 +1,164 @@
+{
+  "name": "brownfi-v3-no-supra-launch-matrix-example",
+  "description": "Offline launch-matrix template for the no-Supra package profile. Replace placeholder package/pool/coin/feed/object values before live dry-run.",
+  "providerIds": [
+    "pyth",
+    "stork-rest",
+    "switchboard"
+  ],
+  "ammProviderIds": [
+    "flowx"
+  ],
+  "routeLimits": {
+    "maxHops": 2,
+    "maxOracleSourcesPerHop": 1,
+    "maxAmmSourcesPerHop": 1,
+    "maxUpdatePayloadBytes": 250000
+  },
+  "routeCases": [
+    {
+      "name": "pyth exact input smoke route",
+      "kind": "exact-input",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "flowxDirectAmm": [
+            {
+              "flowxPool": "0xFLOWX_POOL",
+              "sourceMask": "16",
+              "twapWindowSeconds": "60",
+              "twalWindowSeconds": "300",
+              "validForMs": "5000"
+            }
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN",
+      "minOutputs": [
+        "1"
+      ]
+    },
+    {
+      "name": "pyth add liquidity smoke route",
+      "kind": "add-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_A",
+      "inputB": "0xINPUT_COIN_B",
+      "minLpOut": "1"
+    },
+    {
+      "name": "pyth remove liquidity smoke route",
+      "kind": "remove-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xLP_COIN",
+      "minAOut": "1",
+      "minBOut": "1"
+    }
+  ],
+  "quoteCases": [
+    {
+      "name": "stork exact input live quote",
+      "kind": "exact-input-quote",
+      "providerId": "stork-rest",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "BASE_ASSET_ID",
+            "QUOTE_ASSET_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "switchboard exact output live quote",
+      "kind": "exact-output-quote",
+      "providerId": "switchboard",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "quoteVerifier": "0xSWITCHBOARD_QUOTE_VERIFIER",
+          "feedIds": [
+            "BASE_FEED_HASH",
+            "QUOTE_FEED_HASH"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1000000"
+    }
+  ]
+}

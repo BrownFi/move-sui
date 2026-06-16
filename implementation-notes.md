@@ -1,0 +1,1722 @@
+## Assumptions
+
+- Current implementation work proceeds in small verified slices because the full Sui V3 architecture spans swap math, oracle quorum, TWAP blending, router flows, and flash swaps.
+- The first production slice targets EVM V3 parity for swap fee semantics.
+- Per user direction on 2026-06-16, active implementation and live-validation work is Pyth-only. Existing non-Pyth adapter notes/code are historical or optional scaffolding and should not drive current scope unless explicitly requested.
+- Latest external docs must be checked before adding provider-specific oracle, AMM, or router SDK code. For the current scope, this means Pyth and Sui docs first; other provider docs are out of scope unless re-requested.
+- Per user direction, current implementation continues against the vendored/current Pyth Sui package first; the upgraded Pyth Core path remains a documented launch-readiness risk rather than blocking local implementation.
+- Live Sui testnet Pyth launch evidence must use feed IDs from `https://hermes-beta.pyth.network`, not public Hermes feed IDs. Public Hermes BTC/ETH updates carried Wormhole guardian set index `6`, while the documented Sui testnet Wormhole states inspected on 2026-06-14 had guardian set index `0`; that mismatch reproduces the `dynamic_field::borrow_child_object` abort during `vaa::parse_and_verify`.
+- Hermes Beta USDT/SDAI updates carry guardian set index `0` with one signature. That matches the current Sui testnet Wormhole state, but not the upgraded/simple-majority testnet state, whose guardian set has a higher quorum; upgraded Pyth testnet live execution needs a compatible multi-signature update stream or API access before BrownFi can use it for landed pool/route evidence.
+
+## Decisions
+
+- BrownFi V3 no-fee pseudo input is `actual_in * PRECISION / (PRECISION + fee)`, rounded down, matching `BrownFiV3Pair.sol`.
+- The helper lives in `math.move` so both swap directions use the same explicit rounding rule.
+- BrownFi V3 protocol fee value is derived from pseudo input as `pseudo_in * fee / PRECISION`, rounded down, rather than `actual_in - pseudo_in`.
+- Exact-input swaps now use the BrownFi V3 forward formula in Q32 with `u256` intermediates, sqrt rounded up for conservative output, and the K=2 constant-product branch.
+- Exact-input quote helpers now return `(effective_output, raw_output, cutoff_output)` for direct and bundle A/B directions, using the same internal analytics helper as exact-input swap execution. Typed two-hop bundle router exact-input quote helpers now return route amounts for cutoff-aware and raw/no-cutoff forward/reverse routes.
+- Exact-output quote helpers now use the BrownFi V3 backward formula in Q32 with required input rounded up and two-pass gamma cutoff clipping that returns `(amount_in, effective_out)`. Typed two-hop bundle exact-output route quote helpers now return `(required_input, intermediate_effective_out, terminal_effective_out)` for forward and reverse routes, matching the implemented `getAmountsIn`-style cutoff propagation without adding a generic route interpreter.
+- Gamma cutoff for exact-input swaps follows `BrownFiV3Pair.sol`: cutoff subterms round up, then output is clipped with `min(raw, cutoff)`.
+- Exact-input and exact-output swaps no longer include the prototype fixed 80% reserve-size guard; V3 gamma cutoff and inventory checks are the documented swap-size/invariant controls.
+- The Pyth-only gateway now produces a pool-bound `PriceBundle` with quote orientation, pool-local policy version, same-PTB validity window, source counts, and explicit swap prices. Exact-input and exact-output core swaps can consume a prebuilt bundle and validate pool/orientation/time before using prices.
+- Oracle max price age and policy version are now copied into pool state at creation so quote validity is bound to the pool, not mutable factory reads.
+- Pool-local oracle quorum gates are present from day one: default policy requires the Pyth source only, and the gateway fails closed when policy requires more oracle sources than the current Pyth-only adapter can provide.
+- The Pyth adapter now normalizes legacy/current Pyth `PriceInfoObject` price/exponent data into BrownFi's 9-decimal absolute price scale before the AMM gateway computes Q32 relative base/quote prices.
+- The Pyth adapter rejects mismatched feed IDs, negative prices, and zero normalized prices before forming a BrownFi oracle price. It does not hard-code a confidence threshold; V3 docs route confidence through gateway `Ospread` / `disThreshold` policy.
+- The Pyth-only gateway fallback now uses Pyth confidence bounds to compute `Ospread`, rejects when `Ospread > dis_threshold`, and includes `compress * Ospread` in sell/buy spreads.
+- The gateway now applies pool skewness to `adj_price` before sell/buy spread. It follows the Sui architecture and Solidity `OracleGateway.sol` fee cap, `fee / (2 + fee) + s_bound`, rather than the older prose-only `2 - fee` expression in the design note.
+- The BrownFi-owned reading gateway now has a primary-with-sanity multi-reading path. It consumes source-paired `PriceReading` vectors, requires the configured primary pair, counts unique source masks toward quorum, enforces required/allowed source masks, rejects stale or high-confidence readings, and rejects secondary relative prices outside `oracle_max_deviation`. It uses the primary pair as the resolved bundle price.
+- Pool-local AMM TWAP gates are present from day one: default policy keeps the Solidity-compatible 50/50 AMM blend gate available, requires zero AMM sources, and starts with an empty allowed-source mask so arbitrary AMM readings are ignored until `AmmCap` registers an allowed source policy. Once an AMM source policy is registered, the gateway can blend valid AMM readings without a second AMM-enable call; if governance requires AMM sources before an adapter/source exists, the gateway fails closed.
+- The AMM gateway now has a BrownFi-owned `AmmReading` path. It filters pool/source/liquidity/window/expiry/exact source-ID allowlist/per-source AMM-oracle spread policy before aggregation, fails closed when required source counts are not met, supports oracle-only fallback for advisory AMM when no valid reading remains, aggregates accepted AMM relative prices by quote liquidity, computes aggregate AMM/oracle `Ospread`, and blends with the supported oracle relative reference using the Solidity-compatible `pyth_weight` oracle weight. Direct AMM readings carry one source object ID; path readings carry a primary and optional secondary source object ID, and exact source-ID allowlists must authorize both legs when the secondary ID is present. Reviewed adapter modules may mint zero-liquidity AMM readings so illiquid sources are skipped by the gateway instead of aborting before fallback policy applies; positive normalized AMM price remains required. Pool `amm_blend_weight` is currently a policy gate for whether AMM readings may affect pricing, not the arithmetic blend weight.
+- Admin config now enforces the AMM/oracle-weight invariant: `pyth_weight = 0` remains allowed only while AMM blend pricing is disabled; enabling AMM blend with zero `pyth_weight`, or setting `pyth_weight` to zero while AMM blend is active, aborts with `EAmmPolicyInvalid`.
+- Admin config now rejects oracle source-count policies that cannot be satisfied by the configured allowed source mask. AMM config rejects required-source policies that cannot be satisfied by an explicit allowed source mask, nonzero source-count cap, or non-empty exact source-ID allowlist, while still allowing governance to configure required AMM sources before adapters/source masks/source IDs exist so the gateway fails closed until follow-up configuration.
+- `PriceBundle` now carries keccak/BCS `policy_digest` and `price_digest` values. The policy digest commits to the pool price-policy fields currently modeled, including the pool-local oracle source type, source object ID, source config data captured at creation, AMM exact source-ID allowlist, `fee`, and `lambda`; for Pyth, source config data is the feed ID. The price digest commits to resolved bundle fields, including `o_spread`, plus the policy digest. When BrownFi `PriceReading` values are used, it commits to an oracle metadata digest covering source mask/count, validity, every reading's source/feed/price-bounds/confidence/timestamp/exponent/decimal data, and each paired relative candidate. When AMM readings are used, it also commits to an AMM metadata digest covering aggregate relative price, total quote liquidity, accepted source mask/count, validity, and each accepted AMM candidate's source IDs, price, liquidity, window, and timestamps.
+- `PriceBundle` now stores separate resolved oracle and aggregate AMM relative prices. Swap execution still uses the final `adj_price`/sell/buy prices, while bundle add-liquidity uses the separate oracle and AMM relative prices to follow the documented minimum-valuation mint rule and return the greater-side residual.
+- `PriceBundle` validation now checks policy version, so a bundle minted before an oracle/AMM policy update cannot be reused after the pool policy changes.
+- State-changing bundle swap paths now emit `PriceBundleUsed` with pool/token identifiers, policy and price digests, Pyth A/B prices, oracle/AMM relative prices, adjusted/sell/buy prices, the direction-selected pre-trade price, and oracle/AMM source counts. This covers the local BrownFi V3 requirement to emit used primary price sources and pre-trade price for analytics.
+- State-changing add-liquidity paths now include pricing observability in `AddLiquidity`: deposited token amounts, LP minted, Pyth A/B prices, oracle/AMM relative prices, and oracle/AMM source counts. This maps Solidity `Mint(price0, price1, ammPrice)` observability onto the current Sui bundle model.
+- `Sync` now mirrors Solidity reserve observability as a Sui pool-bound event carrying pool ID and current reserves. It is emitted from core reserve mutation paths: pool creation, add/remove liquidity, and state-changing swaps. This intentionally does not copy EVM public `sync()`/`skim()` functions.
+- State-changing bundle swap paths now emit `SwapExecuted` with direction `0` for sell and `1` for buy, input/output token identifiers, actual input, pseudo input, output analytics, fee amount, protocol LP accrued, adjusted/sell/buy prices, source counts, and `Ospread`. Exact-input paths report pre-cutoff raw output and the gamma-clipped output. Exact-output paths report the requested output and the backward quote's cutoff-checked `effective_out`; execution still requires `effective_out == amount_out`.
+- `SwapExecuted.fee_amount` uses `pseudo_input * fee / PRECISION`, rounded down, matching the BrownFi V3 docs and Solidity protocol-fee accounting rather than treating `actual_input - pseudo_input` rounding slack as the fee.
+- Flash borrow/repay exists as a Sui hot-potato receipt module and is disabled per pool by default. Enabling or disabling flash increments the pool policy version so outstanding receipts cannot be repaid across policy changes.
+- Flash receipt repayment is exact-amount for this slice: borrowed balance plus a pool-favoring rounded-up fee must be returned in the borrowed token type.
+- Flash exposes balance-level core APIs plus `Coin<T>` wrappers for PTB-facing borrow/repay flows. The wrappers only convert between `Coin<T>` and `Balance<T>` and delegate all validation to the balance core.
+- `sdk/router` exposes flash `Coin<T>` PTB thunks for `borrow_a_with_coin`, `borrow_b_with_coin`, `repay_a_with_coin`, and `repay_b_with_coin`; it does not parse receipts or duplicate flash validation off-chain. Borrow-result helpers only split the Sui multi-return PTB result into borrowed coin and receipt handles for later PTB commands.
+- Flash receipts now store `policy_digest` and `price_digest` at borrow time and reject repayment with a different policy or resolved price bundle.
+- Flash borrow/repay now emits `FlashBorrowed` and `FlashRepaid` events carrying pool ID, token type, direction, amount/fee fields, policy version, policy digest, and price digest. The event payload mirrors already-modeled receipt/bundle facts rather than introducing a new flash accounting model.
+- Router support is pool-local and typed: newly created pools default `router_enabled = true`, admins can disable it, and router helpers fail closed before delegating to core swap/liquidity paths.
+- The on-chain router module exposes exact A/B swaps, a typed A/B/C two-hop helper, add/remove liquidity helpers including bundle-based add liquidity, direct and bundle zap-in/zap-out helpers, and a day-one two-hop route limit assertion for SDK/PTB builders.
+- Typed two-hop exact-output router helpers now assert the final-hop quote's `effective_out` before executing the first hop. If the final requested output is clipped by gamma cutoff, direct and bundle routes abort with the swap cutoff error instead of passing a zero intermediate output into the first hop.
+- Initial pool LP bootstrap now uses Pyth-only value in the normalized 9-decimal price scale, mints total LP equal to that value, locks `MINIMUM_LIQUIDITY = 1000` raw LP units in a pool-owned non-withdrawable balance, and returns `total - 1000` LP to the creator.
+- Pool creation rejects token decimals greater than `18`, matching the explicit bound in `BrownFiV3Pair.sol` initialization.
+- Pool creation rejects initial normalized value below `10_000_000_000`, matching BrownFi V3's documented/Solidity `$10` first-mint floor in Sui's 9-decimal value units.
+- Pool creation now requires `PoolCreatorCap`, and the cap is bound to the factory object ID so a cap from one factory cannot authorize pool creation on another factory.
+- Protocol LP accrual and claiming now use pool-local `fee_to`; the factory fee recipient no longer controls swap protocol-fee minting.
+- Protocol LP accrual now emits `ProtocolLpAccrued` when a swap mints nonzero LP into the pool protocol balance. It includes the pool ID, configured `fee_to`, LP minted, and the fee-inclusive post-trade pool value used by the mint formula. Protocol LP claim now emits `ProtocolLpClaimed` after creating the claimed LP coin. Claim events include pool ID, configured `fee_to`, and LP claimed. The `fee_to` field records the configured protocol-fee policy; because the Sui claim API returns a coin to the `FeeCap` holder, it is not an automatic transfer recipient in the event.
+- Pool-local pause gates now use separate swap and add-liquidity bits. Factory pause still applies to pool creation, but no longer blocks swaps or add-liquidity.
+- Pool-local gate admin setters now emit `PoolGateStateChanged` with pool ID, gate kind, and enabled state. Swap/add-liquidity pause setters keep the existing bool `PauseStateChanged` event for compatibility, while flash enable/disable emits only the explicit pool gate event plus `PoolParametersUpdated`.
+- Swap, add/remove liquidity, quote, router, and oracle-gateway execution APIs no longer take `Factory`. Pool creation still takes `&mut Factory` plus a factory-bound `PoolCreatorCap`.
+- Add-liquidity oracle staleness now reads the pool-local `oracle_max_price_age`, not `factory::min_price_age`, matching the pool-bound oracle policy direction.
+- Direct Pyth add-liquidity now builds a pool-bound `PriceBundle` and delegates to bundle add-liquidity, eliminating the earlier direct `OracleAdapter` source/config bypass and duplicate valuation code. Direct and bundle-based core/router add-liquidity now apply the documented 50/50 dollar-value deposit rule. Bundle adds validate the pool-bound `PriceBundle`, value the deposit under the resolved oracle relative price, value it again under the aggregate AMM relative price when AMM sources are present, mint LP from the lower valuation, round down, deposit under the selected valuation source, and return the greater-side residual.
+- BrownFi-owned source adapters no longer borrow the global `OracleAdapter`. Pyth, Switchboard, Stork, Supra push, and Supra pull source paths read pool-local source type/source ID/source config/max-age policy and validate concrete source objects or proofs directly. Direct `OracleAdapter` wrappers remain as compatibility paths.
+- `FeeCap` and `PauseCap` are minted beside `AdminCap`/`PoolCreatorCap` during factory setup. `FeeCap` gates pool `fee_to` updates and protocol LP claims; `PauseCap` gates pool swap pause, add-liquidity pause, and flash enable/disable.
+- Protocol LP claim still requires `fee_to` to be configured, but caller address is no longer required to equal `fee_to`; possession of `FeeCap` is the claim authority.
+- `RiskCap` is minted beside the other governance caps during factory setup. It gates pool fee, fee split/protocol fee, k, kB, kQ, lambda, gamma, and spreads.
+- `OracleCap` is minted beside the other governance caps during factory setup. It gates pool oracle max price age, quorum/source-mask policy, aggregation policy, pool-local oracle source/config updates, and the current Pyth/oracle-side weight.
+- `AmmCap` is minted beside the other governance caps during factory setup. It gates pool AMM enabled, blend-weight, required-source, and fallback policy.
+- `RouterCap` is minted beside the other governance caps during factory setup. It gates the pool router enabled flag.
+- Risk, oracle, and AMM setters now emit dedicated `ConfigUpdated`, `OraclePolicyUpdated`, and `AmmPolicyUpdated` events alongside legacy `PoolParametersUpdated`. Dedicated event parameter groups follow the Solidity V3 event groups at a Move-friendly granularity; source/config updates use an empty value vector plus the policy version because source IDs and config bytes are already stored in pool state and committed in the policy digest.
+- Gateway bundle construction now emits `OracleQuorumUsed` after successful bundle validation and digest creation, and emits `AmmTwapUsed` when accepted AMM readings contribute to the bundle. Both events carry policy and price digests so indexers can correlate them with later `PriceBundleUsed` / flash receipt events.
+- `set_pool_oracle_aggregation_policy` now rejects `WEIGHTED_MEDIAN` until source-weight state exists. The mode constant remains reserved, but accepting it today would create a pool policy that the gateway cannot execute.
+- `set_pool_spreads` now enforces the documented V3 spread envelope: `fixS <= 1%`, nonzero `disThreshold <= 10%`, and config-time Constraint 2 using `ceil(compress * disThreshold / PRECISION) + fixS + sBuy < PRECISION`. The BrownFi prose says `Sbound <= 0.1`, while the Solidity interface/config encode `[0, 10_000_000)`; Move follows the stricter Solidity parity bound.
+- `set_pool_fee` now enforces the documented/Solidity V3 fee range `[10_000, 50_000_000]` in PRECISION units, so governance cannot set fee to zero and can still use the Solidity-supported 50% upper boundary.
+- `set_pool_k`, `set_pool_k_b`, and `set_pool_k_q` now enforce the documented/Solidity V3 kappa range `[math::q32() / 10000, math::q32() * 2]`, so governance cannot set zero or sub-minimum liquidity concentration.
+- `set_pool_gamma` already enforced the documented/Solidity V3 gamma range `(0, PRECISION]`; the architecture text and config boundary tests now reflect that inclusive upper bound.
+- `set_pool_fee_split` / `set_pool_protocol_fee` now reject nonzero fee split until pool-local `fee_to` is configured, matching Solidity V3's `FEE_TO_UNSET` guard.
+- Protocol LP accrual and inventory checks value base/quote amounts with the direction-selected pre-trade base/quote price (`sell_price` for sell, `buy_price` for buy), matching BrownFi V3 docs/Solidity. Swap output math and gamma cutoff still use the resolved `adj_price`.
+- The Solidity Core Module vector A tx1 SELL fixture is represented on Sui as an exact-output swap from quote token A to base token B. The Solidity test prefunds `242.402` quote tokens and requests `0.1` base output; the Sui test quotes the exact required coin input, verifies it does not exceed the Solidity prefund, and checks protocol LP / total supply within the same scaled `0.002 LP` tolerance used by the Solidity test.
+- The Solidity Core Module vector A tx2 BUY continuation is represented on Sui as exact quote output paid with base token B after applying tx1. The Solidity fixture fee-grosses its sheet base input before prefunding the pair; the Sui fixture passes that grossed amount as caller input and verifies the exact-output API consumes the sheet-sized required amount and returns the explicit change.
+
+- 2026-06-10 SDK Pyth update-fee visibility slice:
+  - Source check: current Pyth Sui docs show client-side Hermes update fetching followed by `SuiPythClient.updatePriceFeeds`; the vendored Pyth Sui contract requires a fee coin for `pyth::update_single_price_feed`, charges the base update fee per selected feed, and exposes `pyth::get_total_update_fee(&PythState, n)`.
+  - Decision: keep BrownFi route updates delegated to `SuiPythClient.updatePriceFeeds` so BrownFi Move does not hard-code Pyth update call-sites, but expose `readPythTotalUpdateFeeInMist` for fee inspection/composition parity with Stork's fee-read helpers.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `readPythTotalUpdateFeeInMist`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 106/106 after adding the Pyth total-fee PTB thunk and argument-order coverage.
+
+- 2026-06-10 SDK Stork REST signed-price fetcher slice:
+  - Source check: current Stork REST docs define `https://rest.jp.stork-oracle.network` and `https://rest.dev.stork-oracle.network`, require `Authorization: Basic <token>`, and expose `GET /v1/prices/latest?assets=...` returning each asset under `data.value[asset].stork_signed_price`.
+  - Decision: expose a dependency-free `createStorkRestSignedPriceFetcher` that returns signed prices in requested feed order and feeds the existing Stork signed-price updater. This avoids hard-coding secrets or live object IDs and keeps Stork on-chain fee/update composition in the existing PTB helpers.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createStorkRestSignedPriceFetcher`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 109/109 after adding Stork REST endpoint helpers, response extraction, and authenticated latest-price request coverage.
+
+- 2026-06-10 SDK Stork REST route-provider wiring slice:
+  - Source check: the Stork REST helper already returns documented signed-price payloads, and the existing Stork signed-price updater already builds update data, reads total fees, splits SUI gas, and calls Stork before BrownFi reads. The missing piece was SDK provider/registry composition.
+  - Decision: add a distinct `stork-rest` route price provider that composes the REST signed-price fetcher with the existing Stork updater and bundle builder, and register it through an explicit `storkRest` standard-registry option. No new oracle confidence/quorum semantics are added in this SDK slice.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createStorkRestRoutePriceProvider`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 110/110 after adding the provider, standard-registry option, direct REST request coverage, and provider ID coverage.
+
+- 2026-06-10 SDK standard-registry FlowX AMM wrapper slice:
+  - Source check: the SDK already exposed provider-independent FlowX direct and two-hop AMM route wrappers, and route price providers already accepted `ammReadings`. The standard registry still required callers to wrap each production provider manually before AMM blending could participate in dynamic routes.
+  - Decision: add explicit `flowxDirectAmm` and `flowxTwoHopAmm` standard-registry flags that wrap every configured provider while preserving provider IDs. Direct FlowX readings execute before two-hop path readings when both are enabled, so AMM-reading order remains deterministic.
+  - RED: `rtk npm test --prefix sdk/router` failed because the standard registry ignored FlowX wrapper options and the Pyth update hook saw zero AMM-reader PTB calls.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 111/111 after adding standard-registry FlowX wrapping and route-level AMM bundle coverage.
+
+- 2026-06-10 SDK Sui dry-run preflight helper slice:
+  - Source check: Sui's TypeScript transaction docs expose PTB byte construction through `tx.build({ provider })`, and the Sui client retains the `dryRunTransactionBlock` RPC method for simulation. Current BrownFi provider builders can construct PTBs locally, but there was no dependency-free helper for callers to preflight the exact built transaction against a live Sui client before signing/execution.
+  - Decision: add structural `dryRunBuiltTransactionBlock` and `buildAndDryRunTransactionBlock` helpers. They do not import `@mysten/sui`, do not inspect oracle-specific response semantics, and do not claim live Stork/Switchboard/Supra validation by themselves; they just expose the documented build-to-dry-run path for caller-provided transaction/client objects.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildAndDryRunTransactionBlock`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 113/113 after adding the structural dry-run helper and byte-forwarding coverage.
+
+- 2026-06-10 SDK exact-input universal route planner slice:
+  - Source check: the accepted architecture treats Sui PTBs as BrownFi's universal router layer. The registered-provider exact-input planner already chained sequential single-hop bundle swaps, but route resolution rejected paths above two hops.
+  - Decision: lift the exact-input registered/Pyth route planner to any positive hop count by resolving each adjacent pair and chaining single-hop bundle swaps. Keep exact-output registered/Pyth routes capped at one/two hops until backward quote propagation and multi-hop change-return semantics are designed.
+  - RED: `rtk npm test --prefix sdk/router` failed because a three-hop registered-provider exact-input route still hit the one/two-hop route planner cap.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 114/114 after moving the hop cap to exact-output routes only and adding mixed-orientation three-hop exact-input coverage.
+
+- 2026-06-10 SDK fail-fast PTB preflight status slice:
+  - Source check: the SDK had structural dry-run helpers, but they returned whatever the Sui client returned. A caller could accidentally treat a failed dry-run or malformed response as validation unless every integration repeated the same status check.
+  - Decision: add dependency-free status extraction plus `assertDryRunTransactionBlockSucceeded`, `preflightBuiltTransactionBlock`, and `buildAndPreflightTransactionBlock`. The assertion requires `effects.status.status == "success"` and includes Sui's dry-run error text when present. It does not claim that any concrete oracle deployment has been live-validated.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `assertDryRunTransactionBlockSucceeded`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 118/118 after adding fail-fast status checks for successful, failed, and missing-status dry-run responses.
+
+- 2026-06-10 SDK registered-route preflight wrapper slice:
+  - Source check: the fail-fast helper still required callers to remember the correct route-building order: provider bundle construction, route PTB calls, transaction byte build, then dry-run status assertion. BrownFi's launch validation scripts should use one wrapper for that sequence.
+  - Decision: add `preflightSwapExactInputWithRegisteredRoute` and `preflightSwapExactOutputWithRegisteredRoute`. They execute the registered-provider route builder against the supplied transaction object, build the exact resulting PTB bytes through the supplied Sui client, then require a successful dry-run effects status. They return both the swap result handle and the dry-run response for caller inspection.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `preflightSwapExactInputWithRegisteredRoute`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 120/120 after adding exact-input success sequencing and exact-output failed-dry-run reporting coverage.
+
+- 2026-06-10 SDK registered-route preflight matrix slice:
+  - Source check: the route preflight wrappers cover one route at a time, but BrownFi still needs a repeatable launch-validation path that runs multiple named route/provider cases against the caller's Sui client and transaction objects. No current repo config proves live V3 package/pool/oracle object IDs, so this slice should add orchestration without pretending live validation has happened.
+  - Decision: add `preflightRegisteredRouteCases` as a dependency-free fail-fast matrix over exact-input and exact-output registered-provider preflight cases. Each case supplies its own transaction builder so PTB state cannot leak between routes; the helper returns the case name, kind, provider ID, swap result handle, and dry-run response.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `preflightRegisteredRouteCases`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 122/122 after adding ordered exact-input/exact-output matrix coverage and failed-case label coverage.
+
+- 2026-06-10 SDK result-aware arbitrary exact-output route slice:
+  - Source check: the existing `swapExactOutputWithRegisteredRoute` helper intentionally uses one/two-hop typed router entrypoints and returns a single PTB result, but an arbitrary exact-output route produces one change coin per hop. Hiding those change coins would make the SDK unsafe for callers composing Sui PTBs. The single-hop bundle quote/swap entrypoints can accept PTB result values as `u64` arguments if the SDK uses its existing `amountArg` helper instead of always wrapping `amountOut` as a fresh pure value.
+  - Decision: keep the compatibility exact-output helper capped at one/two hops and add `swapExactOutputWithRegisteredRouteResults` for arbitrary positive-length registered-provider routes. It quote-chains backward with single-hop bundle quotes, executes exact-output swaps forward, and returns quote results, swap results, all change coins, and the final output coin handle.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `swapExactOutputWithRegisteredRouteResults`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 123/123 after adding mixed-orientation three-hop quote-chain coverage and widening bundle exact-output amount arguments to accept PTB result values.
+
+- 2026-06-10 SDK result-aware exact-output preflight slice:
+  - Source check: `swapExactOutputWithRegisteredRouteResults` made arbitrary exact-output PTB construction possible, but launch validation still could only preflight the old one/two-hop exact-output wrapper. The route matrix also had no way to represent result-aware exact-output cases without losing change-coin handles.
+  - Decision: add `preflightSwapExactOutputWithRegisteredRouteResults` and a distinct `exact-output-results` matrix case kind. The wrapper returns quote results, swap results, change coins, final output, and the dry-run response, while still failing closed on non-success Sui dry-run effects.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `preflightSwapExactOutputWithRegisteredRouteResults`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 125/125 after adding direct result-aware exact-output preflight coverage and matrix coverage.
+
+- 2026-06-10 SDK route-matrix config hydration slice:
+  - Source check: the SDK already had registered-provider preflight execution and result-aware exact-output matrix cases, but the repo still lacks a current V3 deployment config with real package, pool, oracle, and provider object IDs. A launch script needs a serializable route-case shape that can live outside the SDK and hydrate into the existing matrix runner once those IDs are available.
+  - Decision: add dependency-free `buildRegisteredRoutePreflightCases`. It validates exact-input vs exact-output field families before creating transaction builders, attaches a caller-provided provider registry, and creates one caller-provided transaction builder per named case. It does not import `@mysten/sui`, fetch live objects, or claim any route has passed live Sui dry-run validation.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildRegisteredRoutePreflightCases`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 128/128 after adding config hydration, exact-input/exact-output field validation, pre-transaction validation coverage, and compatibility coverage through `preflightRegisteredRouteCases`.
+
+- 2026-06-10 FlowX zero-liquidity AMM skip slice:
+  - Source check: Solidity AMM gateway tests treat illiquid/filtered AMM pools as no AMM contribution rather than an immediate pricing abort. The Sui FlowX adapter could compute a valid spot price with zero active FlowX liquidity, but `AmmReading` construction rejected `liquidity_quote == 0` before gateway fallback policy could apply.
+  - Decision: keep `AmmReading` package-owned and keep positive normalized AMM price required, but allow zero quote liquidity at construction. The gateway aggregation filter now explicitly rejects zero-liquidity readings, so fallback/fail-closed behavior stays policy-driven.
+  - RED: `rtk sui move test test_flowx_zero_liquidity_direct_pool_is_skipped_by_gateway_fallback` failed at `oracle_gateway::new_amm_reading_internal` with `EAmmQuorumNotMet`.
+  - GREEN: `rtk sui move test test_flowx_zero_liquidity_direct_pool_is_skipped_by_gateway_fallback` passed after moving the zero-liquidity rejection into the aggregation filter.
+
+- 2026-06-10 FlowX unavailable-observation skip slice:
+  - Source check: Solidity `OracleGateway` catches Uniswap V3 `observe(secondsAgos)` failures and reports zero TWAP liquidity for the AMM candidate. FlowX `oracle::observe_single` aborts when `seconds_ago` exceeds current pool time or targets history older than the oldest initialized observation, and Move callers cannot catch that abort.
+  - Decision: preflight FlowX public observation timestamps in `amm_flowx` before calling `pool::observe`. If the requested TWAP/TWAL history is unavailable, mint a positive spot-priced, zero-liquidity AMM reading so the existing gateway filter applies oracle-only fallback or fail-closed policy.
+  - RED: `rtk sui move test test_flowx_unavailable_twal_window_is_skipped_by_gateway_fallback` failed with a FlowX `oracle::observe_single` arithmetic underflow at `time - seconds_ago`; the two-hop sibling `test_flowx_unavailable_two_hop_twal_window_is_skipped_by_gateway_fallback` failed the same way when the two-hop preflight block was removed.
+  - GREEN: both unavailable-window tests passed after adding the observation-window preflight and zero-liquidity FlowX fallback reading for direct and two-hop reads.
+  - Follow-up coverage: `test_flowx_oldest_observation_window_is_skipped_by_gateway_fallback` constructs a FlowX observation ring whose oldest initialized timestamp is newer than the requested TWAL target. It passed with the restored preflight and failed with FlowX `E_OLDEST_OBSERVATION` when the oldest-observation predicate was temporarily made permissive.
+
+## Tradeoffs
+
+- The factory hot-path removal now pairs with BrownFi-owned source reads that avoid the global `OracleAdapter`. The remaining `OracleAdapter` dependency is intentionally limited to direct Pyth compatibility wrappers; those paths are useful for migration/testing but should not be treated as the preferred Sui hot path.
+- Protocol LP still accrues inside the pool first. This matches one allowed architecture path; `FeeCap` now controls recipient updates and claims.
+- Pool pause and flash enablement now use `PauseCap`, but emergency/global factory pause still uses `AdminCap`.
+- AMM TWAP policy and generic AMM reading/blend plumbing exist before a source-specific DEX adapter; that is intentional so configured `min_amm_sources > 0` cannot silently downgrade to Pyth-only pricing.
+- Per-source AMM deviation filtering uses the same `Ospread = abs(oracle_rel - amm_rel) / adj_rel` shape as the aggregate AMM spread check, with `adj_rel` computed from the candidate AMM relative price and current `pyth_weight`.
+- Flash keeps `Balance<T>` core APIs to match the swap/liquidity internals, and exposes `Coin<T>` wrappers for PTB callers. This avoids duplicating flash validation while matching the architecture's coin-level flow.
+- The on-chain router intentionally is not a generic command interpreter. Sui PTBs already provide atomic composition; arbitrary route discovery, update-fee payment, provider update calls, and excess-coin handling stay in the SDK builder.
+- The current oracle slices implement primary-with-sanity quorum and odd-source-count median aggregation over BrownFi-owned reading pairs, including the AMM reading blend path. Median mode fails closed on even source counts because the local BrownFi docs do not define tie handling. Weighted median remains reserved but not configurable. For the active Pyth-only scope, non-Pyth source adapters, weighted-median aggregation, provider update-fee orchestration for other providers, full multi-source weighted aggregation, and any stronger flash inventory formula beyond raw token restoration are suspended unless explicitly requested.
+- `OracleQuorumUsed` and `AmmTwapUsed` are emitted when the gateway constructs a valid `PriceBundle`, not when the bundle is later consumed. This avoids storing full source masks and AMM aggregate liquidity in the non-storable bundle; a transaction that constructs but does not consume a bundle can still emit these gateway events.
+- BrownFi docs define add-liquidity LP rounding down, but do not define raw-token residual rounding when an exact 50/50 value amount is fractional after decimal conversion or Q32 relative-price math. Current Move code rounds converted used amounts down to avoid over-consuming user input; protocol review may choose a pool-favoring ceil rule instead.
+- The Solidity `$10` initial-value threshold is represented as `MIN_INITIAL_POOL_VALUE = 10_000_000_000` because Sui initial LP supply is normalized to 9-decimal value units. Shared synthetic test pools that need tiny reserves use a `#[test_only]` constructor that skips only this first-mint floor; production `swap::create_pool` and coin wrappers still enforce it.
+- The token-decimal bound copies the Solidity `<= 18` initialization guard. It intentionally does not reject decimals above the internal normalized 9-decimal math scale, because local docs require a supported internal bound but do not say Sui should forbid common 12/18-decimal assets.
+- Tests may still borrow and return `Factory` in scenario setup because pools are created through the registry path, but the active swap/router/oracle-gateway execution APIs no longer require it.
+- `set_pool_pyth_weight` now uses `OracleCap` and increments `oracle_policy_version` because the current Pyth/oracle-side weight is committed into the oracle policy digest.
+- Core fixture parity tests must distinguish EVM pair-balance delta semantics from Sui coin ownership. For exact-output swaps, EVM tests may overfund the pair and assert the observed input delta, while Sui should quote and consume the exact required input and return change when the caller provides more. The Core Module tx2 BUY fixture follows this rule: Sui consumes the sheet-sized base input and returns the fee-grossed prefund excess.
+
+## Latest docs audit
+
+- Sui `Clock` must be passed as immutable `&Clock`; the timestamp is constant within one transaction and using `Clock` forces consensus. Keep price-bundle validity tied to `&Clock`, and do not require `&mut Clock` outside tests.
+- Sui PTBs can compose `MoveCall`, `SplitCoins`, `MergeCoins`, and object transfers, so the universal router should stay typed and SDK/PTB-first rather than becoming an on-chain bytecode interpreter.
+- Pyth Sui docs say new integrations should use upgraded Sui contracts for the July 31, 2026 Pyth Core upgrade. The current repo uses a local `packages/pyth-crosschain` checkout at `7e9ece078819ba74b1d26f29c39e8f6fd93e91e2`, so launch readiness requires proving that checkout matches the upgraded `sui-pro-compatible-contract-mainnet` or `sui-pro-compatible-contract-testnet` path, or explicitly carrying dual dependencies.
+- Pyth docs explicitly say BrownFi Move code should not hard-code calls to `pyth::update_single_price_feed`; SDK/client PTBs must update Pyth at the latest call site, then call BrownFi consumption functions with the resulting `PriceInfoObject`.
+- Pyth Hermes access now has SDK helpers for the documented upgraded endpoint, binary signed update requests, optional API-key enforcement, and current/upgraded Sui Pyth/Wormhole state IDs. Launch still needs production secret provisioning and environment wiring.
+- Stork Sui is version-gated, requires a `StorkState` object, exposes `get_temporal_numeric_value_unchecked`, state fee reads, and update functions that take `fee: Coin<SUI>`; its update fee is provider/state specific and must not be treated like Pyth. BrownFi SDK exposes PTB thunks for Stork single/total fee reads, gas-coin SUI splitting, single/batch EVM update-data construction, single/batch EVM update calls, update-with-gas-fee wrappers, and a dependency-free REST signed-price fetcher for Stork's documented latest-prices endpoint. The BrownFi repo vendors the exact Stork Sui contract subpackage from `stork-oracle/stork-external` commit `b728e06f26d701d8863642b45820fc5edb7970e1` because the Move package manager's remote fetch of the full upstream repo stalled in a quiet Git clone during verification.
+- Switchboard Sui uses an on-demand Quote Verifier pattern; it needs a separate adapter and SDK flow, not a Pyth-shaped adapter. Current docs and the `switchboard-xyz/sui` `mainnet` branch expose `QuoteVerifier`, `Quotes`, `verify_quotes(&mut verifier, &quotes, &clock)`, `quote_exists`, `get_quote`, `result`, `timestamp_ms`, and 18-decimal `Decimal` values.
+- Supra Sui has separate push and pull oracle paths with holder/proof-specific interfaces. BrownFi supports the push `OracleHolder` path using the verified `SupraSValueFeed::get_price` ABI: source ID is the holder object ID, config data is a BCS-encoded `u32` pair ID, decimal-scaled values normalize to BrownFi 9 decimals, and confidence is zero because the push API exposes no confidence range. BrownFi now also has a pull proof-to-bundle path using the current `dora-interface` source ABI: `DkgState`, mutable `OracleHolder`, mutable `MerkleRootHash`, `Clock`, proof bytes, and `price_data_pull_v2::verify_oracle_proof`. `supra_pull_source.move` verifies once per pool/hop, extracts the two configured BCS `u32` pair IDs, converts inferred Unix-second pull timestamps to milliseconds, normalizes prices to BrownFi 9 decimals, and returns a `PriceBundle` directly, with a separate AMM-reading variant. `sdk/router` exposes `encodeSupraPairIdConfig`, Supra push route helpers, and Supra pull proof-bundle route helpers. The local `packages/supra-sui` dependency is an ABI stub for the official push plus current pull/validator interfaces because native proof validation does not run under local Move tests without chain support. Live Supra pull proof validation remains follow-up work, especially confirming the `price_data_split` timestamp ordering/units against a real payload.
+- `sdk/router` now also has a Supra pull REST proof fetcher for the documented Dora `/get_proof` Sui response shape. It posts `{ pair_indexes, chain_type: "sui" }`, normalizes `dkg_object`, `oracle_holder_object`, `merkle_root_object`, and hex/byte `proof_bytes`, validates the response pair indexes against the request, and exposes a `supra-pull-rest` route price provider that fetches one proof per BrownFi route hop before delegating to the existing Supra pull proof-to-bundle PTB calls. This reduces caller-side proof plumbing but does not prove live on-chain execution yet.
+- Aftermath docs found in this pass are TypeScript SDK price/pool docs, not a reviewed on-chain TWAP adapter spec. Do not enable it as a BrownFi AMM source until the exact on-chain object/API and manipulation bounds are reviewed.
+- Cetus CLMM interface source at commit `74e98b69334ecc84fc419d10a59d3d4e1f832d32` exposes spot CLMM state such as `current_sqrt_price`, `current_tick_index`, and `liquidity`, but no reviewed on-chain observation/TWAP API was found in that interface checkout. Treat Cetus as not yet accepted for production BrownFi AMM TWAP pricing.
+- Turbos Sui Move interface source at commit `cff693265bfc41c7de2233afe31c9d7428adc9e1` exposes spot CLMM state such as `sqrt_price` and `liquidity`. Turbos oracle source at commit `22f926c934e156bc02df9bbbb4f2d699322914f9` is an external price/time oracle path, not a CLMM pool-observation TWAP adapter. Treat Turbos CLMM as not yet accepted for production BrownFi AMM TWAP pricing.
+- FlowX CLMM source at commit `95441b22ca9d5d7420a6e527afcfc1a2639fcc39` exposes a Uniswap-v3-shaped observation path: `pool::observe<X, Y>(pool, seconds_agos, clock)` returns tick cumulatives and seconds-per-liquidity cumulatives, and pool state exposes observation cardinality plus `sqrt_price_current` and active `liquidity`. The upstream package builds locally with `rtk sui move build --path /tmp/brownfi-flowx-clmm-contracts`, with only upstream warnings. FlowX is the first reviewed candidate for a direct source-specific BrownFi AMM TWAP adapter.
+
+## Risks / follow-up
+
+- Pool-local oracle policy now has source count/mask gates, aggregation policy fields, creation-time source type/source ID/source config capture, `OracleCap`-gated source/config and Pyth-weight updates, direct-wrapper validation against the current `OracleAdapter`, BrownFi-owned Pyth/Switchboard/Stork/Supra-push `PriceReading` paths that do not borrow `OracleAdapter`, a Supra-pull proof-to-bundle path that also does not borrow `OracleAdapter`, source-paired primary-with-sanity quorum and odd-count median aggregation over BrownFi readings, config-time rejection of unsatisfiable source-count policy, and digest commitments over those modeled policy fields. Full multi-source weights and weighted-median aggregation still need explicit state; until then weighted-median mode is rejected at configuration time.
+- AMM policy now stores fail-closed source-count/blend gates plus max AMM/oracle spread, quote-liquidity floor, TWAP window bounds, allowed source mask, exact source-ID allowlist, source count limit, advisory oracle-only fallback, and config-time rejection of required-source policies that exceed an explicit allowed mask, nonzero source-count cap, or non-empty exact source-ID allowlist. Generic AMM readings, skip-invalid advisory filtering including per-source spread and source-ID filtering, liquidity-weighted relative-price blending, and the first FlowX direct CLMM adapter are implemented. Additional adapters and production source enablement still need separate review.
+- Flash receipts bind pool ID, policy version, `policy_digest`, and `price_digest`; under BrownFi reading-pair paths, those digests now include resolved bundle fields plus every supplied oracle reading pair's source/feed/timestamp/relative-candidate metadata. Under AMM reading paths, they include accepted AMM candidate metadata. The direct Pyth `OracleAdapter` compatibility path now constructs internal Pyth readings and delegates through the same bundle path, so direct and BrownFi-owned reading bundles have matching policy/price digests for the same Pyth object data. It still preserves the existing direct-wrapper source-type flexibility; `pyth_source.move` remains the stricter BrownFi-owned Pyth adapter path.
+- Flash repayment enforces raw pool balance restoration: the borrowed side must return to pre-borrow balance plus fee, and the non-borrowed side must return to its pre-borrow balance. If BrownFi flash requires a value-based inventory invariant beyond raw token restoration, that formula still needs to be documented before implementation.
+- Direct-adapter router helpers still exist for compatibility. Exact-input quote helpers, exact-input/exact-output swaps, add-liquidity core/router bundle entry points, typed two-hop swap bundle helpers, typed two-hop bundle exact-input quote helpers, typed two-hop bundle exact-output route quote helpers, typed two-hop bundle raw/no-cutoff exact-output quote helpers, and direct/bundle zap-in/zap-out helpers exist. Direct Pyth add-liquidity now delegates through the pool-bound bundle path with V3 50/50 value semantics. Typed two-hop prebuilt-bundle routes now have forward and reverse AMM-active metadata propagation coverage. `sdk/router` now has TypeScript PTB thunks for BrownFi-owned Pyth, Switchboard, Stork, and Supra-push reading construction, Supra-pull proof-to-bundle construction, Pyth Hermes-fetch/update-to-BrownFi bundle orchestration through injected `SuiPriceServiceConnection`- and `SuiPythClient`-compatible objects, Switchboard quote-fetch-to-BrownFi bundle orchestration through an injected `fetchQuoteUpdate`-compatible function plus official-shape `SwitchboardClient`/`fetchQuoteUpdate` provider construction with quote-update options pass-through, Stork update-to-BrownFi bundle orchestration through an injected `updatePriceFeeds`-compatible function, Stork REST endpoint/latest-price fetching, signed-price payload normalization, and stork-rest route-provider wiring, Stork signed-payload fee-read/gas-split/update orchestration, Stork update-data construction plus state fee reads and gas-coin fee splitting/update wrappers, source-backed Pyth Hermes/Sui client configuration helpers, Supra BCS `u32` pair-ID config encoding, route-level Pyth/Switchboard/Stork bundle construction that deduplicates feed updates across typed hops, route-level Supra-push bundle construction without update hooks, route-level Supra-pull proof bundle construction with optional AMM readings, oracle-only and AMM-blended reading-pair bundle construction, FlowX direct and two-hop AMM reading construction, provider-independent FlowX direct/two-hop AMM route wrappers, generic caller-built AMM-reading route wrapping, standard-registry FlowX/generic AMM wrapping, dependency-free Sui PTB dry-run preflight helpers, bundle-native single-hop swaps, direct `OracleAdapter` compatibility swaps/add-liquidity/quotes/zaps, add/remove liquidity, flash coin borrow/repay, single-hop/two-hop quote calls, typed two-hop prebuilt-bundle exact-input/exact-output swap helpers including mixed-orientation exact-output helpers, direct typed two-hop `OracleAdapter` compatibility swap helpers, Pyth-backed typed single-hop/two-hop exact-input/exact-output route swap helpers, provider-registered exact-input/exact-output route planning, registered exact-input and exact-output raw/no-cutoff route quote planning, result-aware registered and Pyth exact-output route quote-chaining and preflight for arbitrary positive-length paths, standard provider registry construction for explicit Pyth/Switchboard/Stork/Stork-REST/Supra-push/Supra-pull config with optional FlowX direct/two-hop AMM or generic caller-built AMM wrapping, dynamic exact-input Pyth PTB route planning for arbitrary positive-length token paths, compatibility dynamic exact-output Pyth planning for all current one/two-hop orientation combinations, and result-aware arbitrary-hop Pyth exact-output planning through `swapExactOutputWithPythRouteResults`. The Pyth, Switchboard, and Stork provider helpers copy caller-supplied feed/update arrays before invoking injected provider-compatible clients, matching mutable-array provider boundaries without mutating caller data. Production Hermes secret management, live Switchboard/Stork quote/update PTB validation, live Supra push holder read validation, live Supra pull proof validation, source-specific non-FlowX AMM adapters, and weighted-median aggregation still need to be wired before production routing.
+- SDK routing update: standard provider registry construction now also accepts explicit `supraPullRest` config, registering `supra-pull-rest` separately from `supra-pull` so callers can choose caller-supplied proof bytes or REST-fetched proof payloads per route.
+- Dependency risk: the vendored Pyth package may be pre-upgrade. Do not ship mainnet/testnet deployment configs until the package rev/state IDs are reconciled with current Pyth docs.
+- Pyth confidence is now carried into the Pyth-only gateway fallback and Pyth `PriceReading` path. Reading-pair APIs enforce `oracle_max_confidence` as a PRECISION-scaled relative `confidence_q / price_q` cap when configured. Pyth-only confidence-derived `Ospread` now has both above-threshold rejection and within-threshold success coverage, and fixed/side spread arithmetic has exact sell/buy price coverage against the Solidity spreadsheet-audit cases.
+- Single-hop state-changing exact-output core/router entry points plus typed forward/reverse two-hop exact-input and exact-output router helpers are now present; bundle-based core, single-hop router, and typed two-hop router exact-input/exact-output entry points are present; typed two-hop bundle exact-input and exact-output route quote helpers are present; and core/router bundle add-liquidity is present. All 12 Solidity periphery `TX_CASES` forward `getAmountOut` raw-output fixtures and backward `getAmountIn` required-input fixtures are now covered in scaled 9-decimal Sui form. All 36 Solidity Core Module symmetric-kappa library data rows across B1/B2/B3 are covered for both forward and backward quote directions. All 48 Solidity periphery/Core Module quote-library round-trip rows are covered under the Solidity suite's 10 bps tolerance. The Solidity Core Module vector A tx1 SELL exact-output/protocol-LP fixture, tx1+tx2 BUY continuation, all 36 Solidity periphery `LP_MINT_B1/B2/B3` Pyth-only protocol-LP sequence rows, the Solidity Pair integration initial/existing-pool balanced mint, imbalanced mint, equal-price `lp1 == lp2` path, burn/remint LP cases, and high-fee exact-output underpayment/sufficient-input cases are also covered in scaled 9-decimal Sui form. Broader shared EVM/core fixture coverage is still pending.
+- Remove liquidity no longer depends on factory pause, matching the architecture requirement that LP exits remain available while swaps/adds can be paused.
+- Initial LP bootstrap now matches the documented value-based `V0 - MINIMUM_LIQUIDITY` shape, locks the minimum LP, and enforces the documented/Solidity `$10` first-mint floor in 9-decimal normalized value units. BrownFi-local LP display helpers now expose Solidity parity values `BrownFi V3`, `BF-V3`, and `18`; official Sui `CoinMetadata`/Currency registration remains a separate launch design choice because it changes supply authority assumptions.
+- Pool creation is permissioned, but no separate delegated creator management flow exists yet; package initialization currently mints the creator cap to the factory publisher/admin.
+- Dynamic Pyth route planning now exists for arbitrary-length exact-input token paths, compatibility one/two-hop exact-output token paths across the current typed orientation combinations, and result-aware arbitrary-hop exact-output paths through `swapExactOutputWithPythRouteResults`; registered-provider exact-output routes now also have a result-aware quote-chain, raw/no-cutoff quote chain, and preflight helper for arbitrary positive-length paths. The SDK route planner now has a provider registry boundary: exact-input and exact-output route execution select a registered route price provider, Pyth, Switchboard, Stork, Stork REST, Supra push, and Supra pull are provider implementations, custom-provider tests prove the dynamic route planner can execute typed routes without Pyth feed metadata, and `createStandardRoutePriceProviderRegistry` wires explicit production provider configs into a single registry without hard-coding secrets or live object IDs. Dependency-free Sui PTB dry-run helpers now let callers preflight a built transaction against their own Sui client, but live Switchboard quote PTB validation, live Stork provider fetch/update PTB validation, live Supra push holder read validation, live Supra pull proof validation, and any future typed-helper registry remain follow-up work; the current `sdk/router` slice covers BrownFi-owned Pyth/Switchboard/Stork/Supra-push/FlowX reading and bundle construction, Supra-pull proof-to-bundle construction, provider-independent FlowX direct and two-hop AMM route-hop wrapping, standard-registry FlowX AMM wrapping, Pyth Hermes fetch/update-to-bundle sequencing via injected `SuiPriceServiceConnection`- and `SuiPythClient`-compatible objects, Switchboard quote fetch-to-bundle sequencing via an injected `fetchQuoteUpdate`-compatible function, official-shape `SwitchboardClient(suiClient)` construction, quote-update options pass-through, Stork REST endpoint/latest-price fetching, Stork REST signed-price payload normalization, stork-rest route-provider wiring, Stork signed-payload update PTB orchestration with state fee reads and gas splits, Stork feed update-to-bundle sequencing via an injected `updatePriceFeeds`-compatible function plus explicit Stork update-data constructor/fee-read/gas-split/update-call thunks, source-backed Pyth Hermes/Sui client configuration, deduped Pyth/Switchboard/Stork route bundle construction for typed hops, Supra-push route bundle construction without update hooks, Supra-pull route bundle construction from caller-supplied proof bytes, plus the implemented bundle-native swap, liquidity, quote, typed route swap calls, and provider-registered dynamic PTB route composition. The current `RouterCap` slice only covers the implemented pool router enabled flag.
+- Solidity `quoteAmountsOutWithUpdate` / `quoteAmountsInWithUpdate` parity is represented as SDK/PTB quote-only route composition, not new Move entrypoints. Registered-provider quote helpers now build route price bundles, chain single-hop bundle quote calls, and return route-order amount handles; Pyth convenience wrappers perform the feed fetch/update before that same quote chain.
+- Dry-run preflight now has five layers: raw `dryRun*` helpers for callers that want the full response, transaction-level `preflight*` helpers that fail closed unless Sui returns `effects.status.status == "success"`, registered-route preflight wrappers that build provider-backed exact-input/exact-output/result-aware exact-output route PTBs before applying the same dry-run gate, a named registered-route matrix helper for swap route launch-validation jobs, and named exact-input/exact-output quote validation case builders for provider live-object checks. Quote validation cases can also be hydrated from serializable configs through `buildLaunchValidationQuoteCases` or preflighted directly through `preflightLaunchValidationQuoteCases`, keeping provider IDs, pools, feed IDs, and object IDs outside SDK source while preserving a common matrix runner. `buildLaunchValidationMatrix` and `preflightLaunchValidationMatrix` now compose the state-changing route section and quote-only section into one dependency-free launch-matrix boundary. The matrix boundary rejects empty route/quote sections so launch validation cannot complete without exercising at least one real case, and it requires route/quote transaction factories only when the matching section is populated. Successful matrix preflight results can be summarized into deterministic route/quote/provider coverage for deployment logs without retaining arbitrary Sui dry-run payloads, and `runLaunchValidationMatrixPreflight` returns both the sectioned dry-run result and that summary from one launch-runner call. Both registered-route case hydration and quote-case hydration validate provider IDs and executable route shape against the supplied registry/pairs before PTB construction, so malformed launch matrices fail before provider fetch/update work or transaction creation. This is the right default for launch validation scripts, but real-object oracle-provider dry-runs remain required evidence before production routing.
+- Full multi-source weight state remains follow-up work; the current pool has a single `pyth_weight` knob, which is `OracleCap`-gated, policy-versioned, and reused as the oracle-side AMM blend weight to preserve Solidity V3 semantics.
+- The first source-specific AMM adapter now targets a direct FlowX CLMM pool. It reads FlowX observations into BrownFi-owned `AmmReading` values, supports Solidity-compatible spot mode when `twap_window = 0`, supports TWAP price via average tick, computes harmonic TWAL liquidity, converts FlowX Q64.64 sqrt price to BrownFi quote-per-base Q32, converts virtual active liquidity to 9-decimal quote notional, and uses the lower of spot and TWAL quote liquidity as gateway weight. The default BrownFi orientation path now has decimal-mismatch coverage for token A as quote at FlowX tick 0 spot and tick 60 TWAP. Remaining AMM adapter work: non-default orientation if quote index becomes configurable, and multi-hop path semantics.
+
+- 2026-06-10 AMM default blend registration slice:
+  - Source check: Solidity `BrownFiV3PairConfig.defaultConfig.pythWeight` defaults to `PRECISION / 2`, and `OracleGateway` blends whenever a registered AMM source returns a nonzero relative price.
+  - Decision: keep fresh Sui pools AMM source-closed with `amm_allowed_source_mask = 0`, but set the default AMM blend gate to `50_000_000` so registering an allowed AMM source policy is enough to activate the Solidity-compatible default blend path. This avoids accepting arbitrary AMM readings before source policy exists.
+  - RED: a default AMM-reading test aborted at `EAmmBlendUnavailable` while `default_amm_blend_weight` was zero.
+  - GREEN: `rtk sui move test test_default_amm_blend_policy_uses_registered_source_without_extra_enable_call` passed after the default gate changed and the test required `AmmCap` source-policy registration.
+  - Focused GREEN: `rtk sui move test v3_config_test` passed 32/32 after updating the default config and zero-Pyth-weight edge tests.
+
+- 2026-06-10 router exact-output Solidity sequence coverage slice:
+  - Source check: Solidity periphery `BrownFiV3Router.spec.ts` includes a tx1-tx12 `swapTokensForExactTokens` dataset sequence that quotes each exact-output swap, applies a 5 bps input buffer, and verifies the sequence executes without inventory reverts.
+  - Test-only change: added the scaled 9-decimal Sui equivalent through the single-hop router bundle helpers, using the same direction/output sequence and explicit returned-change assertions.
+  - Result: `rtk sui move test test_router_exact_output_solidity_tx_sequence_executes_without_inventory_revert` passed without production changes, proving the router helpers already execute this source-backed exact-output sequence.
+- 2026-06-10 documented initial value floor slice:
+  - Source check: `BrownFiV3Pair.sol` requires first mint value `V0 / Q64 >= 10 * 10**decimals`; Sui initial LP supply is already normalized to 9-decimal value units through `PRICE_SCALE = 1_000_000_000`, so the equivalent floor is `10_000_000_000`.
+  - RED: `rtk sui move test test_create_pool_aborts_below_documented_initial_value_floor` failed before production `swap::create_pool` enforced the floor.
+  - RED: `rtk sui move test test_swap_a_for_b_aborts_on_zero_input_a` then failed at setup with `ENoLiquidity`, proving existing tiny shared fixtures needed a test-only creation path instead of weakening the production floor.
+  - Decision: production `create_pool` and coin wrappers enforce the floor; synthetic non-creation tests use `#[test_only] swap::create_pool_for_testing`, which skips only the first-mint floor while preserving the rest of pool initialization.
+  - Focused GREEN: `rtk sui move test factory_test`, `rtk sui move test pool_test`, `rtk sui move test swap_test`, `rtk sui move test v3_config_test`, `rtk sui move test v3_flash_test`, `rtk sui move test v3_router_test`, `rtk sui move test v3_oracle_gateway_test`, and `rtk sui move test v3_amm_flowx_test`.
+  - Full GREEN: `rtk sui move test` passed 254/254; `rtk npm test --prefix sdk/router` passed 103/103.
+- 2026-06-10 Supra pull proof-to-bundle slice:
+  - Source check: current Supra pull docs describe Sui pull proof submission with `DkgState`, `OracleHolder`, proof bytes, and Sui transaction calls; current `dora-interface` `master` source extends the native ABI to `verify_oracle_proof(&DkgState, &mut OracleHolder, &mut MerkleRootHash, &Clock, vector<u8>, &mut TxContext)` and `price_data_split(&PriceData): (u32, u128, u64, u16, u64)`.
+  - Design decision: BrownFi verifies a Supra pull proof once per pool/hop and returns a `PriceBundle` directly instead of exposing separate A/B reading thunks, because the pull ABI mutates Supra objects and proof reuse across two side-specific calls is not source-proven.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildSupraPullRoutePriceBundles`.
+  - RED: `rtk sui move test v3_supra_pull_source_test` failed because `brownfi_amm::supra_pull_source` did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 92/92 after adding Supra pull bundle thunks, route bundle construction, registered provider, and standard registry wiring.
+  - GREEN: `rtk sui move test v3_supra_pull_source_test` passed 4/4 after adding the local pull/validator ABI stubs plus `supra_pull_source.move`.
+- 2026-06-10 SDK Supra pull REST proof-fetch slice:
+  - Source check: current Supra pull docs list Dora REST endpoints at `https://rpc-mainnet-dora-2.supra.com` and `https://rpc-testnet-dora-2.supra.com`; the `oracle-pull-example` `feat/DoraV2` Sui REST client posts to `/get_proof` with `pair_indexes` and `chain_type: "sui"`, then uses `dkg_object`, `oracle_holder_object`, `merkle_root_object`, and hex `proof_bytes` in a Sui move call.
+  - Decision: keep the SDK dependency-free by accepting an injected fetch-compatible function or `globalThis.fetch`, normalize the REST response into BrownFi's existing `SupraPullProofPayload`, and keep REST-fetched routing under the explicit provider ID `supra-pull-rest`.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildSupraPullRestRoutePriceBundles`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 100/100 after adding endpoint helpers, REST response normalization, proof fetcher, REST route bundle builder, REST route provider, standard registry wiring, and pair-index mismatch rejection.
+- 2026-06-10 SDK FlowX AMM route wrapper slice:
+  - Source check: `amm_flowx::read_direct_pool` is the reviewed FlowX direct CLMM AMM-reading adapter, and `sdk/router` already exposed a standalone `readFlowXDirectPool` PTB thunk. Route price providers already accepted `ammReadings`; callers previously had to construct and thread those readings manually.
+  - Decision: keep the wrapper provider-independent. It builds FlowX direct AMM readings per hop, appends them after caller-supplied `ammReadings`, preserves the wrapped provider ID by default, and delegates bundle construction to the selected route price provider.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createFlowXDirectAmmRoutePriceProvider`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 94/94 after adding the wrapper and coverage for one-hop generation plus append-with-existing-readings behavior.
+  - Focused adapter check: `rtk sui move test v3_amm_flowx_test` passed 5/5 with existing deprecation warnings only.
+  - Remaining risk: local tests cannot execute native Supra proof verification; launch still needs a live Sui PTB check with real `dkg_object`, `oracle_holder_object`, `merkle_root_object`, proof bytes, and a confirmation that the inferred timestamp field is Unix seconds.
+- 2026-06-10 BrownFi-owned source `OracleAdapter` hot-path removal slice:
+  - Decision: remove `OracleAdapter` from BrownFi-owned source reads and SDK source-provider builders, while preserving direct `OracleAdapter` compatibility wrappers.
+  - RED: `rtk npm test --prefix sdk/router` failed 90/100 because BrownFi-owned source PTB builders still emitted a leading `options.oracle` argument.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 100/100 after removing `oracle` from BrownFi-owned source SDK option types, PTB argument lists, and source-provider route examples.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 36/36.
+  - GREEN: `rtk sui move test v3_router_test` passed 32/32.
+  - GREEN: `rtk sui move test v3_swap_test` passed 80/80.
+  - GREEN: `rtk sui move test v3_switchboard_source_test` passed 2/2, `rtk sui move test v3_stork_source_test` passed 2/2, `rtk sui move test v3_supra_source_test` passed 3/3, and `rtk sui move test v3_supra_pull_source_test` passed 4/4.
+- 2026-06-10 SDK flash coin PTB builder slice:
+  - Source check: `flash.move` exposes `borrow_a_with_coin`, `borrow_b_with_coin`, `repay_a_with_coin`, and `repay_b_with_coin`; borrow takes `(pool, bundle, clock, amount, ctx)` and repay takes `(pool, bundle, clock, repayment, receipt)`.
+  - Decision: expose only thin PTB builders for the reviewed `Coin<T>` wrappers. The SDK returns the raw transaction result from `tx.moveCall` and leaves borrowed coin/receipt handling to the caller's PTB builder rather than mirroring flash receipt internals off-chain.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `borrowAWithCoin`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 102/102 after adding the four flash coin PTB thunks and argument-order coverage.
+  - Focused Move check: `rtk sui move test v3_flash_test` passed 8/8 with existing unrelated deprecation warnings.
+- 2026-06-10 SDK flash borrow result helper slice:
+  - Source check: current Sui PTB docs state that transaction command results can feed later commands, and multi-result `moveCall` outputs can be accessed by destructuring or array indexes: https://docs.sui.io/develop/transactions/ptbs/building-ptb#passing-transaction-results-as-arguments.
+  - Decision: add `borrowAWithCoinResults` and `borrowBWithCoinResults` as small SDK composition helpers. They expose the raw borrow result plus indexed `borrowed` and `receipt` handles; repayment still uses the existing `repay*WithCoin` thunks and all flash validation stays on-chain.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `borrowAWithCoinResults`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 103/103 after adding `TransactionResult`, indexed-result extraction, flash borrow result helpers, and recorder coverage for same-PTB repay composition.
+- Remaining shared-object caveat: direct `OracleAdapter` compatibility wrappers still borrow the global adapter by design. Production source/provider routing should use BrownFi-owned source reads and pool-bound bundles.
+
+## Verification
+
+- 2026-06-10 exact-output no-cutoff quote parity slice:
+  - Source check: Solidity periphery exposes `getAmountInWithoutCutoff` and `getAmountsInWithoutCutoff` as quote-only paths that skip gamma cutoff iteration and chain required inputs backward.
+  - Decision: expose raw exact-output quote helpers on Sui as separate direct/bundle single-hop functions and typed two-hop bundle route functions, then add `quoteExactOutputWithoutCutoffWithRegisteredRoute` in the SDK to chain the raw single-hop bundle quote results backward through any registered-provider route. State-changing exact-output execution remains cutoff-aware.
+  - RED Move: `rtk sui move test 'quote_.*without_cutoff_surfaces_raw_route'` failed because `router::quote_a_for_exact_c_via_b_without_cutoff_with_bundles` and `router::quote_c_for_exact_a_via_b_without_cutoff_with_bundles` did not exist.
+  - GREEN Move: `rtk sui move test 'quote_.*without_cutoff_surfaces_raw_route'` passed 4/4 after adding the raw exact-output single-hop and typed two-hop quote helpers.
+  - RED SDK: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `quoteAForExactBWithoutCutoff`.
+  - GREEN SDK: `rtk npm test --prefix sdk/router` passed 153/153 after adding direct/bundle/two-hop PTB builders and registered-route raw exact-output quote chaining.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 153/153; `rtk sui move test` passed 271/271 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK registered-route exact-input no-cutoff quote slice:
+  - Source check: Solidity periphery exposes `getAmountsOutWithoutCutoff` for raw exact-input route quotes, and Sui single-hop bundle quotes already return `(effective, raw, cutoff)` while dynamic registered-provider route quotes only chained the cutoff-aware index.
+  - Decision: add `quoteExactInputWithoutCutoffWithRegisteredRoute` as an SDK/PTB composition helper that builds the same registered-provider bundles and chains result index `1` from each single-hop quote.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `quoteExactInputWithoutCutoffWithRegisteredRoute`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 152/152 after adding the helper and route-chaining coverage.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 152/152; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation report runner slice:
+  - Source check: `preflightLaunchValidationMatrix` and `summarizeLaunchValidationMatrixPreflightResult` existed as separate helpers, but a deployment runner still had to wire the successful dry-run evidence and deterministic coverage report manually.
+  - Decision: add `runLaunchValidationMatrixPreflight` as a dependency-free composition helper that returns both the sectioned preflight result and the summary. It still takes caller-supplied Sui clients, transaction factories, provider registry, routes, pools, feeds, and object IDs; no live deployment data or secrets are hard-coded in SDK source.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `runLaunchValidationMatrixPreflight`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 151/151 after adding the report helper and coverage test.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 151/151; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation matrix summary slice:
+  - Source check: `preflightLaunchValidationMatrix` returned sectioned dry-run results, but deployment scripts still had to hand-roll a stable coverage summary and avoid logging arbitrary dry-run payloads.
+  - Decision: add `summarizeLaunchValidationMatrixPreflightResult`, which reports route count, quote count, total count, first-seen provider IDs, route case names/kinds/providers, and quote case names/providers from an already-successful matrix preflight result.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `summarizeLaunchValidationMatrixPreflightResult`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 150/150 after adding the summary helper and deterministic coverage test.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 150/150; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation section factory validation slice:
+  - Source check: the matrix APIs allowed missing transaction factories to leak raw `TypeError`s when a populated section tried to build/preflight, and the type boundary forced callers toward dummy factories for section-empty matrices.
+  - Decision: make route and quote transaction factories section-specific. Missing factories now fail with BrownFi launch-matrix config errors only when the matching section is populated; empty sections skip their factory and preflight loop.
+  - RED: `rtk npm test --prefix sdk/router` failed because missing route/quote factories produced raw `TypeError`s instead of BrownFi-specific validation errors.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 149/149 after adding explicit section factory validation.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 149/149; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation no-op matrix guard slice:
+  - Source check: `buildLaunchValidationMatrix` could hydrate an empty matrix when both `routeCases` and `quoteCases` were omitted or empty, letting a launch validation job complete without exercising any route or quote case.
+  - Decision: reject empty matrices before route/quote section hydration, while preserving the existing dependency-free caller-supplied transaction/provider boundary.
+  - RED: `rtk npm test --prefix sdk/router` failed because `buildLaunchValidationMatrix` did not throw for omitted or empty case sections.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 147/147 after adding the no-op guard.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 147/147; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation matrix composition slice:
+  - Source check: launch validation had separate state-changing registered-route preflight and quote-only provider live-object checks, but no single SDK boundary that a deployment script could use as the launch matrix.
+  - Decision: add `buildLaunchValidationMatrix` and `preflightLaunchValidationMatrix` as dependency-free composition helpers. They hydrate route and quote sections with caller-supplied transaction factories, run state-changing route cases before quote-only cases, and return sectioned results for launch reporting.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildLaunchValidationMatrix`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 146/146 after adding matrix hydration and ordered matrix preflight coverage.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 146/146; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK registered-route preflight provider/route validation slice:
+  - Source check: `buildRegisteredRoutePreflightCases` validated exact-input/exact-output field families before creating transactions, but did not check whether the configured provider ID existed or whether the route path resolved against the provided pairs.
+  - Decision: after kind-specific field validation, reuse the existing provider lookup and route resolver before calling the caller's `txFactory`. This preserves existing field-error precedence while preventing malformed launch matrices from creating PTBs.
+  - RED: `rtk npm test --prefix sdk/router` failed because `buildRegisteredRoutePreflightCases` did not throw for an unregistered provider or unresolved route before creating transactions.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 144/144 after adding registered-route config provider/route validation.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 144/144; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation quote route-shape validation slice:
+  - Source check: `buildLaunchValidationQuoteCases` validated provider IDs during hydration, but unresolved route paths still survived until the quote builder attempted PTB construction.
+  - Decision: reuse the existing registered-route resolver during exact-input/exact-output quote config hydration. This keeps launch-matrix route validation aligned with runtime route planning and does not require `pairs` to be positional or exact-length.
+  - RED: `rtk npm test --prefix sdk/router` failed because `buildLaunchValidationQuoteCases` did not throw for a path whose provided pairs could not resolve `A -> C`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 142/142 after adding route-shape validation to the hydrator path.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 142/142; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation quote provider-config validation slice:
+  - Source check: `buildLaunchValidationQuoteCases` hydrated deployment quote configs without checking whether each `providerId` existed in the supplied registry. The route quote itself would fail later, after a launch job had already moved into PTB/provider construction.
+  - Decision: validate each exact-input/exact-output quote config's `providerId` through the existing registry lookup during hydration, while leaving invalid `kind` errors on the existing kind-validation path.
+  - RED: `rtk npm test --prefix sdk/router` failed because `buildLaunchValidationQuoteCases` did not throw for an unregistered `providerId`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 141/141 after adding provider validation to the hydrator path.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 141/141; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation quote preflight config runner slice:
+  - Source check: `buildLaunchValidationQuoteCases` hydrated serializable quote configs, but launch jobs still had to call a second helper to run the hydrated cases.
+  - Decision: add `preflightLaunchValidationQuoteCases` as a thin composition helper that hydrates config cases, creates a fresh caller-supplied transaction for each case, and delegates to the existing fail-fast launch-validation preflight runner. No provider-specific or live-object data is hard-coded.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `preflightLaunchValidationQuoteCases`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 140/140 after adding the runner helper and config-to-dry-run coverage.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 140/140; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation quote config slice:
+  - Source check: the launch-validation quote case slice produced runnable case objects but still required code to assemble those cases. Production validation needs deployment-specific provider IDs, pools, feed IDs, and object IDs to remain outside SDK source.
+  - Decision: add `buildLaunchValidationQuoteCases` as a generic config hydrator for exact-input and exact-output registered-provider quote validation cases. It preserves provider-specific hop fields in `pairs`, supports custom preflight context, and delegates execution to the existing launch-validation preflight runner.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildLaunchValidationQuoteCases`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 139/139 after adding the config types, hydrator, and runnable hydrated-case coverage.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 139/139; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK launch-validation quote case slice:
+  - Source check: architecture/notes identify live Pyth, Switchboard, Stork, Supra push, and Supra pull dry-runs as the current unproven production-routing gap; the SDK already has registered-provider quote composition and fail-fast Sui dry-run helpers.
+  - Decision: add generic named quote validation cases instead of provider-specific scripts. Provider implementations remain in the existing registry; launch validation cases bind a registered-provider exact-input or exact-output quote route to a fresh caller-supplied transaction and the existing `buildAndPreflightTransactionBlock` dry-run gate.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createExactInputRouteQuoteValidationCase`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 138/138 after adding exact-input/exact-output quote validation case builders plus single-case and matrix preflight helpers.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 138/138; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK quote-with-update route slice:
+  - Source check: Solidity `BrownFiV3Router.sol` exposes `quoteAmountsOutWithUpdate` and `quoteAmountsInWithUpdate`, which update oracle prices and then call the normal multi-hop quote library.
+  - Decision: implement the Sui equivalent as SDK/PTB composition. `quoteExactInputWithRegisteredRoute` and `quoteExactOutputWithRegisteredRoute` build provider bundles and chain existing single-hop bundle quote calls. `quoteExactInputWithPythRoute` and `quoteExactOutputWithPythRoute` add Pyth fetch/update sequencing before the same quote chain. No Move entrypoint is added because Sui quote-with-update is a transaction composition concern.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `quoteExactInputWithPythRoute`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 136/136 after adding registered-provider and Pyth quote route helpers, route-order amount handles, and exact-input/exact-output quote-chain coverage.
+  - Full GREEN: `rtk npm test --prefix sdk/router` passed 136/136; `rtk sui move test` passed 269/269 with existing deprecation warnings; `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 router direct-oracle zap slice:
+  - Source check: Solidity `BrownFiV3Router.sol` exposes `zapIn` and `zapOut`; the Sui router already retained direct `OracleAdapter` compatibility wrappers for swaps and add-liquidity, so direct zap wrappers are compatibility surface rather than the preferred bundle/provider route.
+  - Decision: implement `zap_in_a`, `zap_in_b`, `zap_out_a`, and `zap_out_b` as thin wrappers over existing direct swap/add/remove primitives. They preserve the same Sui return shape as the bundle zaps: zap-in returns residual coins plus LP, and zap-out returns one output coin.
+  - RED: `rtk sui move test test_router_zap_in_a_swaps_half_and_mints_lp` failed because `router::zap_in_a`, `router::zap_in_b`, `router::zap_out_a`, and `router::zap_out_b` were unbound.
+  - GREEN: focused Move tests for all four direct zap directions passed after adding the router entrypoints.
+  - SDK RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `zapInA`.
+  - SDK GREEN: `rtk npm test --prefix sdk/router` passed 132/132 after adding `zapInA`, `zapInB`, `zapOutA`, and `zapOutB` PTB thunks and Move argument-order coverage.
+  - Full GREEN: `rtk sui move test v3_router_test` passed 41/41; `rtk sui move test` passed 269/269; `rtk npm test --prefix sdk/router` passed 132/132.
+
+- 2026-06-10 router bundle zap-out slice:
+  - Source check: Solidity `BrownFiV3Router.sol` exposes `zapOut`, which burns LP, keeps the already-burned output token, swaps the other burned token into the requested output token, sums both amounts, enforces final `amountMin`, and transfers one token to the recipient.
+  - Decision: implement the Sui equivalent as bundle-native `zap_out_a_with_bundle` and `zap_out_b_with_bundle`. The functions burn LP through existing remove-liquidity math, swap the opposite side through the existing bundle swap path, enforce the final minimum by passing the missing amount as the swap minimum when needed, join balances, and return one output coin because Sui has no EVM transfer/refund side channel.
+  - RED: `rtk sui move test test_router_zap_out_a_with_bundle_burns_lp_and_swaps_b_to_a` failed because `router::zap_out_a_with_bundle` and `router::zap_out_b_with_bundle` were unbound.
+  - GREEN: focused Move tests for both zap-out directions passed after adding the router entrypoints.
+  - SDK RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `zapOutAWithBundle`.
+  - SDK GREEN: `rtk npm test --prefix sdk/router` passed 130/130 after adding `zapOutAWithBundle` and `zapOutBWithBundle` PTB thunks and Move argument-order coverage.
+  - Full GREEN: `rtk sui move test v3_router_test` passed 37/37; `rtk sui move test` passed 265/265; `rtk npm test --prefix sdk/router` passed 130/130.
+  - Hygiene: `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 router bundle zap-in slice:
+  - Source check: Solidity `BrownFiV3Router.sol` exposes `zapIn`, which swaps half of the single-sided input, checks the received other token against `amountOtherMin`, adds liquidity with the optimal remaining amounts, enforces `minLiquidity`, and refunds dust.
+  - Decision: implement the Sui equivalent as bundle-native `zap_in_a_with_bundle` and `zap_in_b_with_bundle`. The functions split the input coin in half, route the swap through the existing bundle swap path, route minting through the existing bundle add-liquidity path, and return dust coins plus the LP coin because Sui routers cannot silently refund caller assets like EVM transfers.
+  - RED: `rtk sui move test test_router_zap_in_a_with_bundle_swaps_half_and_mints_lp` failed because `router::zap_in_a_with_bundle` and `router::zap_in_b_with_bundle` were unbound.
+  - GREEN: focused Move tests for both zap directions passed after adding the router entrypoints.
+  - SDK RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `zapInAWithBundle`.
+  - SDK GREEN: `rtk npm test --prefix sdk/router` passed 129/129 after adding `zapInAWithBundle` and `zapInBWithBundle` PTB thunks and Move argument-order coverage.
+  - Full GREEN: `rtk sui move test v3_router_test` passed 35/35; `rtk sui move test` passed 263/263; `rtk npm test --prefix sdk/router` passed 129/129.
+  - Hygiene: `rtk git diff --check` passed; touched-file trailing-whitespace scan produced no matches.
+
+- 2026-06-10 SDK FlowX two-hop AMM route wrapper slice:
+  - Source check: `amm_flowx::read_two_hop_path<A, B, I>` is the reviewed FlowX path AMM-reading adapter for default quote-A/base-B pools, and `sdk/router` already had the direct FlowX AMM thunk/provider pattern.
+  - Decision: expose a standalone `readFlowXTwoHopPath` PTB thunk and a provider-independent `createFlowXTwoHopAmmRoutePriceProvider`. The route source keeps `typeI` and `intermediateDecimals` explicit because the Move adapter requires the intermediate token type and decimal scale.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createFlowXTwoHopAmmRoutePriceProvider`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 105/105 after adding the low-level thunk, route wrapper, and tests for Move argument order, source append order, provider ID preservation, and original-hop immutability.
+  - Full Move regression: `rtk sui move test` passed 256/256 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router/src/index.ts sdk/router/test/router-builder.test.mjs ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check` passed.
+
+- 2026-06-10 FlowX two-hop AMM path slice:
+  - Source check: BrownFi Solidity `OracleGateway.sol` supports both direct Uni V3 pools and two-leg AMM pool paths, weighting path liquidity by the base-equivalent bottleneck across the two legs. The Sui FlowX adapter only handled direct pools before this slice.
+  - Decision: `amm_flowx::read_two_hop_path<A, B, I>` supports the explicit default BrownFi orientation `Pool<A, B>` where A is quote and B is base, using FlowX pools `Pool<B, I>` and `Pool<I, A>`. The intermediate token decimals are an explicit argument because the BrownFi pool stores only A/B decimals.
+  - Policy decision: path readings carry both FlowX pool IDs. Direct readings keep `secondary_source_id = none`; path readings set it to the second leg ID. Gateway exact source-ID allowlists must authorize both IDs when the secondary ID is present, and the AMM digest commits the optional secondary ID.
+  - RED: `rtk sui move test test_flowx_two_hop_path_reading_is_accepted_by_gateway` failed because `amm_flowx::read_two_hop_path` did not exist.
+  - GREEN: `rtk sui move test v3_amm_flowx_test` passed 7/7 after adding two-hop price combination, lower-of spot/TWAL path-liquidity bottleneck weighting, and the two-leg source-ID policy test. Existing deprecation warnings remain.
+  - Gateway regression check: `rtk sui move test v3_oracle_gateway_test` passed 36/36 with existing deprecation warnings.
+  - Full GREEN: `rtk sui move test` passed 256/256 with existing deprecation warnings.
+  - SDK regression check: `rtk npm test --prefix sdk/router` passed 103/103.
+  - Hygiene: `rtk rg -n '[ \t]+$' sources/oracle_gateway.move sources/amm_flowx.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check` passed.
+
+- 2026-06-10 SDK Stork signed-price update orchestration slice:
+  - Source check: Stork Sui update calls require Stork update-data plus a `Coin<SUI>` fee; the vendored `StorkState` exposes single and total update-fee reads. The SDK now composes caller-supplied REST signed payloads through update-data construction, fee read, gas split, and Stork update before BrownFi route bundle reads.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createStorkSignedPriceUpdater`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 88/88 after adding single/batch signed-price update thunks and `createStorkSignedPriceUpdater`.
+
+- 2026-06-10 SDK Stork REST signed-price normalizer slice:
+  - Source check: current Stork REST docs show `stork_signed_price.encoded_asset_id`, decimal-string `price`, `timestamped_signature.timestamp`, signature `r/s/v`, `publisher_merkle_root`, and `calculation_alg.checksum`. Vendored Sui Move signature verification consumes those same values as encoded asset ID, timestamp ns, signed quantized value magnitude/sign, publisher merkle root, value compute alg hash, `r`, `s`, and `v`.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `storkSignedPriceToTemporalNumericValueEvmInputFields`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 85/85 after adding the normalizer, signed-value handling, and hex decoding validation.
+
+- 2026-06-10 SDK Switchboard quote-update options slice:
+  - Source check: `@switchboard-xyz/sui-sdk@0.1.16` declares `fetchQuoteUpdate(client, feedHashes, transaction, options?)`; options include Crossbar URL/client, fee coin/type, oracle count, and Switchboard address/queue overrides. The SDK source resolves queue fees internally and splits SUI from gas when the queue accepts SUI, while non-SUI fees require caller-supplied `feeCoin`/`feeType`.
+  - RED: `rtk npm test --prefix sdk/router` failed 3 tests because `createSwitchboardQuoteUpdateFetcher`, `buildSwitchboardRoutePriceBundles`, and `createSwitchboardSuiRoutePriceProvider` dropped the fourth quote-update options argument.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 81/81 after adding generic quote-update option forwarding.
+
+- 2026-06-10 SDK Switchboard official wiring slice:
+  - Source check: current Switchboard Sui docs describe the Quote Verifier pattern; the upstream `switchboard-xyz/sui` README shows `new SwitchboardClient(suiClient)` and `fetchQuoteUpdate(client, feedIds, tx)` returning a `Quotes` PTB argument for later Move calls. The docs page and repository README list different deployment IDs, so BrownFi SDK helpers keep deployments and live object IDs as runtime configuration.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createSwitchboardQuoteUpdateFetcher`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 78/78 after adding `createSwitchboardSuiClient`, `createSwitchboardQuoteUpdateFetcher`, and `createSwitchboardSuiRoutePriceProvider`.
+  - Move check: `rtk sui move test v3_switchboard_source_test` passed 2/2 with existing deprecation warnings from unrelated files.
+
+- 2026-06-10 SDK Stork update-data constructor slice:
+  - Source check: vendored `packages/stork-sui` exposes `update_temporal_numeric_value_evm_input::new(id, timestamp_ns, magnitude, negative, publisher_merkle_root, value_compute_alg_hash, r, s, v)` and `update_temporal_numeric_value_evm_input_vec::new(...)` over parallel vectors with `ENoUpdates` on empty input.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildStorkTemporalNumericValueEvmInput`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 75/75 after adding optional pure `u8/u128/bool/vector` transaction support and single/batch Stork update-data constructor thunks.
+
+- 2026-06-10 SDK SUI gas split / Stork update-with-fee slice:
+  - Source check: current Sui PTB docs show fee/payment coins split from `tx.gas` with `tx.splitCoins(tx.gas, [tx.pure.u64(amount)])`, and transaction results can feed later PTB commands. This matches the SDK helper shape for literal fee amounts and fee-read results.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `splitSuiFromGas`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 71/71 after adding optional transaction gas/split support, `splitSuiFromGas`, and Stork single/batch update-with-gas-fee wrappers.
+
+- 2026-06-10 SDK Stork fee/update PTB helper slice:
+  - Source check: vendored `packages/stork-sui` exposes `state::get_single_update_fee_in_mist`, `state::get_total_fees_in_mist`, `stork::update_single_temporal_numeric_value_evm`, and `stork::update_multiple_temporal_numeric_values_evm`; the update calls take `StorkState`, update data, and `Coin<SUI>`, with `TxContext` supplied by the PTB.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `readStorkSingleUpdateFeeInMist`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 66/66 after adding Stork fee-read and single/batch update-call PTB thunks.
+  - Move check: `rtk sui move test v3_stork_source_test` passed 2/2 with existing deprecation warnings.
+
+- 2026-06-10 SDK Supra source-config helper slice:
+  - Source check: `supra_source::pair_id_config` uses `bcs::to_bytes(&pair_id)` and `v3_supra_source_test` fixes `0x01020304` as `[4, 3, 2, 1]`.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `encodeSupraPairIdConfig`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 62/62 after adding the SDK encoder and u32 boundary validation.
+
+- 2026-06-10 SDK standard route provider registry slice:
+  - Source check: architecture/notes called out production provider selection/config as pending while Pyth, Switchboard, Stork, and Supra-push provider implementations already existed.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createStandardRoutePriceProviderRegistry`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 60/60 after adding the standard registry constructor, empty-config rejection, and provider-ID coverage.
+
+- 2026-06-10 Stork source/provider slice:
+  - Source check: official Stork Sui docs point to `StorkState` reads and update functions with `Coin<SUI>` fees; `stork-oracle/stork-external` commit `b728e06f26d701d8863642b45820fc5edb7970e1` exposes `stork::stork::get_temporal_numeric_value_unchecked`, `state::get_single_update_fee_in_mist`, `temporal_numeric_value::{get_timestamp_ns, get_quantized_value}`, `i128::{get_magnitude, is_negative}`, and update functions that accept a fee coin. Stork's EVM Pyth adapter uses exponent `-18`, and the chain-pusher tests use `1_000_000_000_000_000_000` as a quantized unit, so BrownFi normalizes Stork values as 18-decimal fixed-point into 9-decimal BrownFi prices.
+  - Design decision: BrownFi uses Stork source ID `2`, source mask `4`, Stork `StorkState` object ID as `source_id`, and encoded asset/feed ID bytes as `config_data`. Stork `TemporalNumericValue` exposes no confidence range, so `stork_source.move` emits zero confidence and relies on BrownFi quorum/deviation policy for cross-source checks.
+  - Dependency decision: `Move.toml` uses a local vendored Stork contract snapshot under `packages/stork-sui` from the upstream commit above. A direct `[dependencies.stork] git = "https://github.com/stork-oracle/stork-external.git"` dependency stalled for more than three minutes inside a quiet full Git clone during `rtk sui move test v3_stork_source_test`, while the vendored subpackage compiles and keeps the exact source provenance explicit.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildStorkRoutePriceBundles`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 54/54 after adding Stork read thunks, update-to-bundle orchestration, and a registered Stork route price provider.
+  - RED: `rtk sui move test v3_stork_source_test` failed because `brownfi_amm::stork_source`, `pool::oracle_source_stork`, and `pool::oracle_source_mask_stork` did not exist.
+  - GREEN: `rtk sui move test v3_stork_source_test` passed 2/2 after adding the vendored Stork dependency, source constants, `stork_source.move`, and quantized-value normalization coverage.
+  - Full BrownFi Move regression: `rtk sui move test` passed 246/246 with existing deprecation warnings.
+  - Vendored Stork package verification: `rtk sui move build` in `packages/stork-sui` passed. `rtk sui move test` in `packages/stork-sui` failed 45/46 because upstream tests hit `UNEXPECTED_VERIFIER_ERROR` rooted in missing `sui::test_utils` under the current Sui CLI/framework combination; BrownFi does not depend on those upstream test helpers.
+
+- 2026-06-09 Switchboard source/provider slice:
+  - Source check: official Switchboard Sui docs describe on-demand Quote Verifier integration, mainnet/testnet package IDs, feed hashes, and SDK quote fetching; the `switchboard-xyz/sui` `mainnet` Move package exposes `QuoteVerifier`, `Quotes`, `verify_quotes`, `quote_exists`, `get_quote`, `result`, `timestamp_ms`, and 18-decimal `Decimal`.
+  - Design decision: BrownFi uses Switchboard queue ID as `source_id`, feed hash bytes as `config_data`, source ID `1`, and source mask `2`. Switchboard `Quote` has no confidence range field, so `switchboard_source.move` emits zero confidence and relies on BrownFi quorum/deviation policy for cross-source checks.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `buildSwitchboardRoutePriceBundles`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 50/50 after adding Switchboard read thunks, quote-fetch-to-bundle orchestration, and a registered Switchboard route price provider.
+  - RED: `rtk sui move test v3_switchboard_source_test` failed because `brownfi_amm::switchboard_source`, `pool::oracle_source_switchboard`, and `pool::oracle_source_mask_switchboard` did not exist.
+  - GREEN: `rtk sui move test v3_switchboard_source_test` passed 2/2 after adding the Switchboard dependency, source constants, `switchboard_source.move`, and decimal normalization coverage.
+  - Full Move regression: `rtk sui move test` passed 244/244 with existing deprecation warnings.
+  - Hygiene: direct trailing-whitespace scan on `Move.toml`, `Move.lock`, `sources/pool.move`, `sources/switchboard_source.move`, `tests/v3_switchboard_source_test.move`, `sdk/router/src/index.ts`, `sdk/router/test/router-builder.test.mjs`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md` produced no matches; `rtk git diff --check -- Move.toml Move.lock sources/pool.move sources/switchboard_source.move tests/v3_switchboard_source_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+  - Remaining gap: runtime PTB validation with real Switchboard `fetchQuoteUpdate` quotes remains pending because Switchboard `Quotes` constructors are package-private, so local unit tests cannot fabricate valid quotes.
+
+- 2026-06-09 SDK route provider registry slice:
+  - Source check: core/router Move entry points already consume provider-neutral `PriceBundle` values; the provider-specific update/build logic lives in `sdk/router`, so the first registry boundary belongs in the PTB route planner, not in new on-chain state.
+  - RED: `rtk npm test --prefix sdk/router` failed because `../dist/index.js` did not export `createRoutePriceProviderRegistry`.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 46/46 after adding `RoutePriceProvider`, provider registry lookup, registered exact-input/exact-output route planners, and a Pyth route provider wrapper.
+  - Full Move regression: `rtk sui move test` passed 242/242 with existing deprecation warnings.
+  - Hygiene: direct trailing-whitespace scan on `sdk/router/src/index.ts`, `sdk/router/test/router-builder.test.mjs`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md` produced no matches; `rtk git diff --check -- ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+
+- 2026-06-09 mixed-orientation exact-output route slice:
+  - Source check: Sui pools are typed, so exact-output two-hop routing needs typed helpers for every supported orientation instead of an EVM-style dynamic address path.
+  - RED: `rtk sui move test v3_router_test` failed because `swap_a_for_exact_c_via_b_with_reversed_second_bundle` and `swap_a_for_exact_c_via_b_with_reversed_first_bundle` did not exist.
+  - GREEN: `rtk sui move test v3_router_test` passed 32/32 after adding the two mixed-orientation exact-output helpers and sorted-pool route coverage for `A -> C -> B` and `C -> A -> B`.
+  - RED: `rtk npm test --prefix sdk/router` failed because `swapExactOutputWithPythRoute` still rejected mixed-orientation two-hop paths.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 43/43 after adding mixed exact-output PTB thunks and planner branches.
+  - Full Move regression: `rtk sui move test` passed 242/242 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router sources/router.move tests/v3_router_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router sources/router.move tests/v3_router_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+
+- 2026-06-09 SDK/PTB dynamic exact-output Pyth route planner slice:
+  - Source check: existing Move exact-output route propagation is typed for single-hop and A-B-C/C-B-A two-hop helpers; mixed-orientation two-hop exact-output requires a separate quote-result strategy and is rejected for now.
+  - RED: `rtk npm test --prefix sdk/router` failed because `swapExactOutputWithPythRoute` did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 42/42 after adding single-hop exact-output route planning, canonical forward/reverse two-hop planning, package-ID validation, and mixed-orientation rejection before provider calls.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+
+- 2026-06-09 SDK/PTB dynamic exact-input Pyth route planner slice:
+  - Source check: the accepted Sui architecture treats the universal router as PTB-first, with Move exposing typed helper calls and the SDK composing routes.
+  - RED: `rtk npm test --prefix sdk/router` failed because `swapExactInputWithPythRoute` did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 39/39 after adding one/two-hop path validation, pair-orientation resolution, deduped Pyth bundle construction, and sequential single-hop bundle PTB swap composition.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+
+- 2026-06-09 SDK/PTB Pyth provider client configuration slice:
+  - Source check: current Pyth Sui docs show `SuiPriceServiceConnection("https://pyth.dourolabs.app/hermes", { accessToken, priceFeedRequestConfig: { binary: true } })`, then `SuiPythClient(suiClient, pythStateId, wormholeStateId)`, and upgraded Sui contract IDs are published separately from current IDs.
+  - RED: `rtk npm test --prefix sdk/router` failed because `buildPythHermesConnectionConfig` and related Pyth config exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 36/36 after adding helpers for Hermes endpoint/API-key/binary request config, current/upgraded Sui Pyth/Wormhole IDs, and injected constructor wiring.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+
+- 2026-06-09 SDK/PTB direct `OracleAdapter` compatibility builder slice:
+  - Source check: `router.move` still exposes direct compatibility entry points for single-hop swaps, add-liquidity, and typed two-hop swaps that accept `OracleAdapter` plus Pyth `PriceInfoObject` inputs; `swap.move` still exposes direct single-hop quote helpers with the same oracle/price-object boundary. These are compatibility paths, not the preferred BrownFi-owned bundle route.
+  - RED: `rtk npm test --prefix sdk/router` failed because direct compatibility SDK exports such as `addLiquidityWithCoins` did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 31/31 after adding PTB thunks for direct single-hop swaps, direct add-liquidity, direct single-hop quotes, and direct typed two-hop swaps.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+
+- 2026-06-09 SDK/PTB typed Pyth route orchestration slice:
+  - Source check: current Pyth Sui docs show the client-side sequence as Hermes `getPriceFeedsUpdateData`, `SuiPythClient.updatePriceFeeds`, then contract consumption; they also require API-key/binary update handling in the `SuiPriceServiceConnection` path and warn Move contracts not to hard-code Pyth update call-sites. BrownFi's architecture keeps the universal router layer PTB-first, with typed Move helpers for current one/two-hop routes.
+  - RED: `rtk npm test --prefix sdk/router` failed because `buildPythRoutePriceBundles`, `swapExactAForBWithPythRoute`, and `swapExactAForCViaBWithPythRoute` exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 21/21 after adding route-level Pyth bundle construction with deduped feed updates plus forward exact-input single-hop/two-hop route swap helpers.
+  - RED: `rtk npm test --prefix sdk/router` failed because reverse exact-input route exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 23/23 after adding reverse single-hop and reverse typed two-hop exact-input route swap helpers.
+  - RED: `rtk npm test --prefix sdk/router` failed because exact-output route exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 27/27 after adding single-hop and typed two-hop exact-output route swap helpers in both directions.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+
+- 2026-06-09 SDK/PTB Pyth Hermes fetch orchestration slice:
+  - Source check: the vendored `SuiPriceServiceConnection.getPriceFeedsUpdateData` fetches latest price updates from Hermes and returns binary update payloads; the Pyth Sui README shows the client flow as fetch update data, call `SuiPythClient.updatePriceFeeds`, then consume the resulting `PriceInfoObject` values in contract calls.
+  - RED: `rtk npm test --prefix sdk/router` failed because the Hermes fetch-to-BrownFi bundle exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 18/18 after adding fetch-to-bundle helpers for oracle-only and AMM-reading bundle paths.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+
+- 2026-06-09 SDK/PTB Pyth provider update orchestration slice:
+  - Source check: current Pyth Sui docs require client-side PTBs that call `SuiPythClient.updatePriceFeeds` before contract consumption; the vendored Pyth Sui SDK reads `base_update_fee`, splits gas coins per feed, resolves the latest package ID, and calls `pyth::update_single_price_feed`. BrownFi Move should not hard-code that Pyth update call-site.
+  - RED: `rtk npm test --prefix sdk/router` failed because Pyth update-to-BrownFi bundle orchestration exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 16/16 after adding Pyth update-to-reading-pair bundle helpers for oracle-only and AMM-reading bundle paths.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 SDK/PTB bundle-native swap, liquidity, and quote builder slice:
+  - Source check: `router.move` exposes bundle-native single-hop exact-input/exact-output swaps, add/remove liquidity, and typed two-hop quote helpers; `swap.move` exposes single-hop bundle quote helpers. The direct `OracleAdapter` router wrappers remain compatibility paths and were intentionally not added to this SDK slice.
+  - RED: `rtk npm test --prefix sdk/router` failed because bundle-native single-hop swap, liquidity, and quote SDK exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 14/14 after adding PTB thunks for those Move entry points and existing two-hop swap/read/bundle builders.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 SDK/PTB reading and bundle construction slice:
+  - Source check: `pyth_source.move` exposes `read_price_a/b`; `oracle_gateway.move` exposes single reading-pair, multi-source reading-pair, and AMM reading bundle constructors; `amm_flowx.move` exposes the reviewed `read_direct_pool` AMM adapter. Current Sui SDK docs expose `tx.makeMoveVec({ type, elements })` for vector arguments in PTBs.
+  - RED: `rtk npm test --prefix sdk/router` failed because SDK exports for BrownFi Pyth reading construction, FlowX AMM reading construction, and gateway bundle construction did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 9/9 after adding PTB thunks for Pyth reading A/B, single reading-pair bundle construction, FlowX direct AMM reading construction, AMM-blended vector bundle construction, and the existing two-hop swap thunks.
+  - RED: `rtk npm test --prefix sdk/router` failed because the multi-source oracle-only vector bundle export did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 10/10 after adding `getSwapPriceBundleFromReadingPairs`.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 SDK/PTB typed two-hop router builder slice:
+  - Source check: current Sui TypeScript transaction docs use `Transaction`, `tx.moveCall`, `tx.object`, `tx.pure.u64`, and composable transaction thunks; BrownFi's architecture keeps the universal router layer in the PTB SDK rather than a dynamic Move route interpreter.
+  - RED: `rtk node --test sdk/router/test/router-builder.test.mjs` failed because `sdk/router/dist/index.js` did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed after adding a minimal TypeScript SDK package and the A->B->C bundled exact-input builder.
+  - RED: `rtk npm test --prefix sdk/router` failed because the reverse exact-input and exact-output two-hop builder exports did not exist.
+  - GREEN: `rtk npm test --prefix sdk/router` passed 4/4 after adding typed PTB thunks for forward/reverse exact-input and exact-output two-hop prebuilt-bundle swap calls.
+  - Full Move regression: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sdk/router ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 typed two-hop AMM bundle route propagation coverage:
+  - Source check: the accepted Sui architecture treats PTBs plus pool-bound `PriceBundle` values as the universal router layer, with Move exposing typed helpers for common routes rather than an EVM-style dynamic route interpreter.
+  - Test-only change: added forward and reverse exact-input two-hop router tests where both hops consume AMM-active prebuilt bundles. Each test asserts nonzero AMM source counts, per-hop adjusted price movement, quote/execution parity, and the two emitted `PriceBundleUsed` events' pool IDs, token directions, digests, prices, pre-trade price, oracle source count, and AMM source count.
+  - Result: the new tests passed without production changes, proving existing typed bundle routes already propagate AMM-active per-hop metadata. Remaining router work is SDK/PTB construction for arbitrary routes and provider update orchestration.
+  - Focused verification: `rtk sui move test test_router_two_hop_` passed 6/6.
+  - Module verification: `rtk sui move test v3_router_test` passed 30/30.
+  - Full GREEN: `rtk sui move test` passed 240/240 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' tests/v3_router_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- tests/v3_router_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 FlowX direct CLMM AMM adapter slice:
+  - Dependency: root `Move.toml` now pins `flowx_clmm` to `https://github.com/FlowX-Finance/clmm-contracts.git` rev `95441b22ca9d5d7420a6e527afcfc1a2639fcc39`.
+  - RED: `rtk sui move test v3_amm_flowx_test` failed because `brownfi_amm::amm_flowx` did not exist.
+  - GREEN: `rtk sui move test v3_amm_flowx_test` passed 1/1 after `sources/amm_flowx.move` minted a FlowX-backed `AmmReading` accepted by the gateway.
+  - RED: `rtk sui move test v3_amm_flowx_test` failed because the adapter rejected `twap_window = 0`, while Solidity direct-pool logic treats zero window as spot price plus spot liquidity.
+  - GREEN: `rtk sui move test v3_amm_flowx_test` passed 2/2 after adding the zero-window spot branch.
+  - Full GREEN: `rtk sui move test` passed 233/233 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' Move.toml sources/amm_flowx.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- Move.toml sources/amm_flowx.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 AMM source-ID allowlist hardening slice:
+  - RED: `rtk sui move test test_gateway_filters_amm_readings_by_allowed_source_id` first failed because `admin::set_pool_amm_source_ids` did not exist.
+  - GREEN: `rtk sui move test test_gateway_filters_amm_readings_by_allowed_source_id` passed 1/1 after pool/admin/gateway/policy-digest support filtered AMM readings by exact source object ID when configured.
+  - RED: `rtk sui move test test_amm_cap_rejects_required_sources_above_allowed_source_ids` failed because `set_pool_amm_policy` could raise `min_sources` above a non-empty exact source-ID allowlist length.
+  - GREEN: `rtk sui move test test_amm_cap_rejects_required_sources_above_allowed_source_ids` passed 1/1 after `set_pool_amm_policy` rejected impossible exact-ID quorum settings.
+  - Focused verification: `rtk sui move test v3_config_test` passed 32/32; `rtk sui move test v3_oracle_gateway_test` passed 36/36; `rtk sui move test v3_amm_flowx_test` passed 2/2.
+  - Full GREEN: `rtk sui move test` passed 235/235 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' Move.toml Move.lock sources/admin.move sources/pool.move sources/oracle_gateway.move sources/amm_flowx.move tests/v3_config_test.move tests/v3_oracle_gateway_test.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- Move.toml Move.lock sources/admin.move sources/pool.move sources/oracle_gateway.move sources/amm_flowx.move tests/v3_config_test.move tests/v3_oracle_gateway_test.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 FlowX negative average-tick rounding fixture:
+  - RED: `rtk sui move test test_flowx_average_tick_rounds_negative_remainder_down` failed because the adapter had no test-only access point for its private average-tick rounding helper.
+  - GREEN: `rtk sui move test test_flowx_average_tick_rounds_negative_remainder_down` passed 1/1 after adding a `#[test_only]` wrapper over the production helper and asserting `-61 / 60` rounds down to tick `-2`.
+  - Focused verification: `rtk sui move test v3_amm_flowx_test` passed 3/3.
+  - Full GREEN: `rtk sui move test` passed 236/236 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' Move.toml Move.lock sources/admin.move sources/pool.move sources/oracle_gateway.move sources/amm_flowx.move tests/v3_config_test.move tests/v3_oracle_gateway_test.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- Move.toml Move.lock sources/admin.move sources/pool.move sources/oracle_gateway.move sources/amm_flowx.move tests/v3_config_test.move tests/v3_oracle_gateway_test.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 FlowX decimal/orientation rounding fixture:
+  - Source-backed target: `swap::create_pool` stores token A as quote and token B as base by default. FlowX tick 0 represents raw B-per-A price 1. With token A at 6 decimals and token B at 9 decimals, normalized quote-per-base is exactly `1000 * Q32`.
+  - RED: `rtk sui move test test_flowx_zero_window_normalizes_decimal_mismatch_to_quote_per_base` failed because the adapter decimal-adjusted B-per-A first, then inverted the already-rounded Q32 value.
+  - GREEN: `rtk sui move test test_flowx_zero_window_normalizes_decimal_mismatch_to_quote_per_base` passed 1/1 after the quote-token-index-0 path inverted the raw FlowX price with decimal scale still in `u256` precision and only divided once.
+  - Focused verification: `rtk sui move test v3_amm_flowx_test` passed 4/4.
+  - Full GREEN: `rtk sui move test` passed 237/237 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sources/amm_flowx.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sources/amm_flowx.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 FlowX non-1-tick decimal TWAP fixture:
+  - Source-backed target: FlowX tick 60 is produced through the pinned `flowx_clmm::tick_math::get_sqrt_price_at_tick` path, then read back through `pool::observe` over a 60-second TWAP window. With token A at 6 decimals, token B at 9 decimals, and token A as BrownFi quote, expected normalized quote-per-base is `4_269_275_928_815` Q32 units.
+  - RED: the first fixture failed setup because the FlowX tick-60 full-range liquidity add needed larger test balances, not because of adapter pricing. After fixing fixture funding, temporarily restoring the old early-rounding quote path failed the new assertion, proving the regression target.
+  - GREEN: `rtk sui move test test_flowx_twap_normalizes_non_one_tick_decimal_mismatch_to_quote_per_base` passed 1/1 with the production `u256` inversion path.
+  - Focused verification: `rtk sui move test v3_amm_flowx_test` passed 5/5.
+  - Full GREEN: `rtk sui move test` passed 238/238 with existing deprecation warnings.
+  - Hygiene: `rtk rg -n '[ \t]+$' sources/amm_flowx.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` produced no matches; `rtk git diff --check -- sources/amm_flowx.move tests/v3_amm_flowx_test.move ARCHITECTURE_v3_SUI.md implementation-notes.md` passed.
+- 2026-06-09 Solidity real-Berachain AMM-active event numeric slice:
+  - Source check: Solidity core `BrownFiV3.spec.ts` real tx fixture `0xec5b7d` configures `kB = kQ = 0.005`, `lambda = 0.002`, `fee = 0.003`, zero fixed/side/dynamic spread, 50/50 Pyth/AMM weight, BERA Pyth price `0.41018693`, Honey Pyth price `0.99970293`, AMM BERA/Honey relative price `0.4105484119`, and expects adjusted relative price around `0.4104286162`.
+  - Sui mapping: token A is the quote/Honey side and token B is the base/BERA side. Prices are encoded as 9-decimal BrownFi readings, and the AMM value is supplied as a BrownFi-owned `AmmReading` rather than through a source-specific DEX adapter.
+  - Test-only change: added `test_swap_a_for_b_with_amm_bundle_matches_berachain_event_price_components`, checking Pyth absolute prices, oracle relative price, AMM relative price, adjusted price, exact-output swap execution, and `PriceBundleUsed` / `SwapExecuted` event equality to the produced bundle.
+  - Result: the fixture passed without production changes, so the BrownFi-owned reading/gateway/event path already matched the Solidity numeric case.
+  - Follow-up: source-specific AMM adapter parity remains pending; this fixture does not validate a Sui DEX TWAP/sqrt-price adapter.
+  - Focused verification: `rtk sui move test test_swap_a_for_b_with_amm_bundle_matches_berachain_event_price_components` passed 1/1.
+  - Module verification: `rtk sui move test v3_swap_test` passed 80/80.
+  - Full verification: `rtk sui move test` passed 231/231 with only pre-existing deprecation warnings.
+- 2026-06-09 Solidity swap event logging AMM-active slice:
+  - Source check: Solidity core `BrownFiV3.spec.ts` verifies `Swap` event Pyth, AMM, and adjusted-price fields match `factory.getSwapPrices`; its AMM-active fixture also asserts `ammPrice > 0`, and a separate real Berachain fixture checks non-equal AMM numeric sanity.
+  - RED: changing the first AMM-active event fixture to a non-equal AMM price while retaining the tiny default `1_000_000` raw-unit pool / `100` raw-unit output aborted in `check_inventory_v3` with `EInvalidInventory`.
+  - Root cause check: the abort was fixture-granularity-specific. The same non-equal AMM path with Solidity-shaped scale (`1000` token reserves at 9 decimals and `10` token exact output) executes from its own quote and returns explicit Sui change.
+  - Test-only change: `test_swap_a_for_b_with_amm_bundle_emits_price_components` now enables AMM policy, supplies an accepted BrownFi-owned non-equal `AmmReading`, verifies adjusted price is between oracle and AMM, executes an exact-output bundle swap with explicit Sui change, and asserts `PriceBundleUsed` / `SwapExecuted` carry the bundle's AMM source count, AMM relative price, adjusted price, sell/buy prices, and `Ospread`.
+  - Result: the scaled non-equal AMM-active event-propagation fixture passed without production changes.
+  - Follow-up: tiny raw-unit non-equal AMM exact-output quoting may need separate policy/rounding discussion before changing production math.
+  - Focused verification: `rtk sui move test test_swap_a_for_b_with_amm_bundle_emits_price_components` passed 1/1.
+- 2026-06-09 Solidity spreadsheet-audit spread pipeline slice:
+  - Source check: Solidity core `BrownFiV3.spec.ts` covers exact spread-pipeline pricing for `fixS` raising sell price, `fixS + sBuy` lowering buy price, and the sell-price-above-buy-price invariant when `fixS`, `sSell`, and `sBuy` are configured.
+  - Existing coverage check: protocol fee LP already had exact Move coverage for the fee-inclusive post-trade pool value denominator and direction-selected price in `test_protocol_fee_lp_uses_direction_pre_trade_price`.
+  - Test-only change: added `test_gateway_spread_pipeline_matches_solidity_fix_and_side_spreads`, using equal zero-confidence Pyth feeds so `Ospread = 0` and the fixed/side spread terms are isolated.
+  - Result: the new fixture passed without production changes, so the gateway already had the source-backed spread behavior.
+  - Focused verification: `rtk sui move test test_gateway_spread_pipeline_matches_solidity_fix_and_side_spreads` passed 1/1.
+  - Regression verification: `rtk sui move test v3_oracle_gateway_test` passed 35/35 and `rtk sui move test` passed 229/229.
+- 2026-06-09 Solidity spreadsheet-audit Pyth `disThreshold` success slice:
+  - Source check: Solidity core `BrownFiV3.spec.ts` covers Pyth confidence-derived `Ospread` rejection above a configured `disThreshold` and success when confidence-derived `Ospread` is within the threshold.
+  - Test-only change: added `test_gateway_accepts_pyth_confidence_ospread_within_dis_threshold`, configuring a 2% `disThreshold` and equal Pyth feeds with 0.25% confidence on each side.
+  - Result: the new fixture passed without production changes, so the gateway already had the source-backed success behavior.
+  - Focused verification: `rtk sui move test test_gateway_accepts_pyth_confidence_ospread_within_dis_threshold` passed 1/1.
+  - Regression verification: `rtk sui move test v3_oracle_gateway_test` passed 34/34 and `rtk sui move test` passed 228/228.
+- 2026-06-09 Solidity Pair integration exact-output underpayment slice:
+  - Source check: Solidity core `BrownFiV3.spec.ts` covers high-fee exact-output underpayment in both directions, expecting `INVALID_INVENTORY`, and a sufficient-input case that succeeds when the actual input covers the fee-normalized inventory requirement.
+  - Sui mapping: exact-output Move APIs compute the required input before mutating pool state and treat the caller coin as a max-input bound. Underpayment therefore aborts with BrownFi `EExcessiveSlippage` before pool mutation, rather than relying on an EVM-style post-transfer inventory failure. Solidity's `WRONG_INPUT_TOKEN` same-token prefund guard has no direct runtime equivalent because the Sui APIs are typed by input coin and users cannot raw-transfer tokens into pool balances.
+  - Test-only change: added scaled 9-decimal Move coverage for both underpaid exact-output directions and the sufficient-input high-fee case.
+  - Result: the new fixtures passed without production changes, so no swap execution fix was justified by this source-backed slice.
+  - Focused verification: `rtk sui move test "underpaid_max_input|quoted_max_input"` passed 3/3.
+  - Regression verification: `rtk sui move test v3_swap_test` passed 78/78 and `rtk sui move test` passed 227/227.
+- 2026-06-09 Solidity Pair integration existing-pool LP mint slice:
+  - Source check: Solidity core `BrownFiV3.spec.ts` covers existing-pool balanced mint (`totalSupply / 10`), existing-pool imbalanced mint capped by the minimum side (`totalSupply / 20`), and burn/remint after the owner burns all recoverable LP while `MINIMUM_LIQUIDITY` remains locked.
+  - Test-only change: added scaled 9-decimal Move coverage for the three cases through `add_liquidity_with_bundle` and `remove_liquidity`, using a Pyth-only $1/$1 bundle. The imbalanced Sui test asserts the greater-side residual is returned, because Sui coin-owned add-liquidity does not retain arbitrary prefunded surplus like the EVM pair.
+  - Result: the new fixtures passed without production changes, so no liquidity formula fix was justified by this source-backed slice.
+  - Focused verification: `rtk sui move test core_pair_mint` passed 3/3.
+  - Regression verification: `rtk sui move test v3_swap_test` passed 75/75 and `rtk sui move test` passed 224/224.
+- 2026-06-09 Solidity periphery/Core Module quote round-trip fixture slice:
+  - Source check: Solidity periphery `BrownFiV3Library.spec.ts` verifies `getAmountOut(getAmountIn(expectedOut))` against the requested output with `10 bps` tolerance for the 12 asymmetric periphery `TX_CASES` and the 36 symmetric Core Module B1/B2/B3 rows.
+  - Test-only change: added scaled 9-decimal Move aggregate tests for the 12 asymmetric and 36 symmetric quote-library round-trip rows. These tests quote exact output first, then feed the required input into the matching raw exact-input quote path and assert the output stays within 10 bps.
+  - Result: the new fixtures passed without production changes, so no additional math fix was justified by this source-backed slice.
+  - Focused verification: `rtk sui move test round_trip` passed 4/4.
+  - Regression verification: `rtk sui move test v3_swap_test` passed 72/72 and `rtk sui move test` passed 221/221.
+- 2026-06-09 Solidity periphery LP_MINT_B1/B2/B3 protocol-LP sequence slice:
+  - Source check: Solidity periphery `BrownFiV3Library.spec.ts` defines `LP_MINT_B1`, `LP_MINT_B2`, and `LP_MINT_B3` with 12 rows each, `kB = kQ = 0.01`, `lambda = 0.005`, `fee = 0.003`, `feeSplit = 0.2`, initial reserves `1 base / 2415 quote`, initial LP supply `4830`, Pyth-only/no-AMM pool setup, and `200 bps` tolerance because the spreadsheet source blended Pyth and AMM while the Solidity periphery suite uses Pyth-only pricing.
+  - Harness decision: the Sui exact-output tests quote the exact required input, execute with that exact coin amount, and verify zero change. This is intentionally different from the EVM fixture's balance-prefund style, where the pair receives `max(required, spreadsheetAmtIn) + 1` before `swap`.
+  - RED: after adding all 12 rows, `rtk sui move test test_periphery_lp_mint_b1_pyth_only_sequence_protocol_lp_parity` failed on tx4 SELL with `EInvalidInventory`, proving the Move state-changing swap inventory check still valued inventory at `adj_price`.
+  - Fix: state-changing exact-input and exact-output swap paths now pass the direction-selected pre-trade base price into `check_inventory_v3` (`sell_price` for sell, `buy_price` for buy). Gamma cutoff and output math still use `adj_price`.
+  - Test-only extension: `LP_MINT_B2` and `LP_MINT_B3` were added with the same harness and required no production change after the B1 inventory-price fix.
+  - Focused verification: `rtk sui move test test_periphery_lp_mint_b` passed 3/3.
+  - Regression verification: `rtk sui move test v3_swap_test` passed 68/68 and `rtk sui move test` passed 217/217.
+- 2026-06-09 Solidity Core Module symmetric-kappa library fixture slice:
+  - Source check: Solidity periphery `BrownFiV3Library.spec.ts` defines Core Module fixture sets `CORE_MODULE_CASES`, `CORE_MODULE_CASES_B2`, and `CORE_MODULE_CASES_B3` with 12 rows each, `kB = kQ = 0.01`, `fee = 0.003`, and `100 bps` tolerance for forward `getAmountOut` and backward `getAmountIn` checks.
+  - Test-only change: added scaled 9-decimal Move coverage for all 36 Core Module library data rows in both quote directions. The harness creates one test pool per aggregate fixture set and resets test-only balances between rows to avoid duplicate pair registration while preserving the fixture reserves.
+  - Harness decision: the shared library fixture setup sets gamma to `100_000_000` because these Solidity library fixtures compare quote math, not pool gamma cutoff behavior.
+  - Focused verification: `rtk sui move test core_module_library` passed 6/6.
+  - Regression verification: `rtk sui move test periphery_library_forward` passed 12/12, `rtk sui move test periphery_library_backward` passed 12/12, `rtk sui move test v3_swap_test` passed 65/65, and `rtk sui move test` passed 214/214.
+- 2026-06-09 Solidity periphery exact-input forward fixture slice:
+  - Source check: Solidity periphery `BrownFiV3Library.spec.ts` defines 12 `TX_CASES` for `getAmountOut`, using direction-specific sell/buy prices, `kB = 0.01`, `kQ = 0.008`, `fee = 0.003`, and default `50 bps` tolerance.
+  - Test-only change: added scaled 9-decimal Move fixtures for all 12 periphery forward raw-output cases. SELL cases quote `quote_a_for_b_with_bundle` raw output against base reserve; BUY cases quote `quote_b_for_a_with_bundle` raw output against quote reserve.
+  - Result: the new fixtures passed without production changes, so no math fix was justified by this source-backed slice.
+  - Focused verification: `rtk sui move test periphery_library_forward` passed 12/12.
+- 2026-06-09 Solidity periphery exact-output backward fixture slice:
+  - Source check: Solidity periphery `BrownFiV3Library.spec.ts` defines the same 12 `TX_CASES` for backward `getAmountIn(expectedOut)`, comparing required input to the spreadsheet `amountIn` with default `50 bps` tolerance.
+  - Test-only change: added scaled 9-decimal Move fixtures for all 12 periphery backward required-input cases. SELL cases quote `quote_a_for_exact_b_with_bundle`; BUY cases quote `quote_b_for_exact_a_with_bundle`; each asserts `effective_out` still equals the requested output.
+  - Result: the new fixtures passed without production changes, so no backward quote math fix was justified by this source-backed slice.
+  - Focused verification: `rtk sui move test periphery_library_backward` passed 12/12.
+
+- 2026-06-09 Core Module vector A exact-output fixture slice:
+  - Source check: Solidity `BrownFiV3.spec.ts` configures Core Module vector state with `kB = kQ = 0.01`, `lambda = 0.005`, `fee = 0.003`, `feeSplit = 0.2`, initial base/quote reserves `1 / 2415`, row-12 Pyth base price `241542218406`, AMM base-pool price `2415.4185448946614`, base output `0.1`, quote prefund `242.402`, expected protocol LP `0.1449890259`, and `0.002 LP` tolerance.
+  - RED: `rtk sui move test test_core_module_vector_a_sell_exact_output_protocol_lp_parity` first failed at the quote assertion with actual required input `242401044297`, proving the fixture exercises Sui exact-output quote math rather than a broad passing test.
+  - RED: after exposing the quote, the same focused test failed at protocol LP with actual minted LP `144971617`, which is inside the Solidity test's scaled `0.002 LP` tolerance.
+  - Focused GREEN: `rtk sui move test test_core_module_vector_a_sell_exact_output_protocol_lp_parity` passed 1/1 after the test asserted Sui exact-output input against the Solidity prefund and mirrored Solidity LP tolerance.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 34/34.
+  - Full GREEN: `rtk sui move test` passed 183/183.
+- 2026-06-09 Core Module vector A tx1+tx2 BUY fixture slice:
+  - Source check: Solidity `BrownFiV3.spec.ts` first applies row-12 SELL, then row-13 BUY with sheet base input `0.1036693476`, fee-grossed pair prefund, quote output `250`, expected tx2 protocol LP `0.142523029`, expected cumulative protocol LP `0.2875120549`, expected total supply `4830.287512`, and `0.01 LP` tolerance.
+  - RED: `rtk sui move test test_core_module_vectors_sell_then_buy_exact_output_protocol_lp_parity` failed at the tx2 base-input assertion with actual required input `103669364`, showing the Sui exact-output API consumes the sheet-sized required input instead of absorbing the Solidity fee-grossed prefund as pair balance delta.
+  - Focused GREEN: `rtk sui move test test_core_module_vectors_sell_then_buy_exact_output_protocol_lp_parity` passed 1/1 after the test passed the Solidity fee-grossed amount as input, asserted Sui returned the prefund excess as change, and mirrored Solidity LP/supply tolerance.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 35/35.
+  - Full GREEN: `rtk sui move test` passed 184/184.
+- 2026-06-09 typed two-hop bundle exact-output route quote helper slice:
+  - Source check: Solidity periphery `getAmountsIn` computes route input amounts in reverse and propagates each hop's `effectiveOut` when gamma cutoff clips output; the Sui router already had typed two-hop bundle exact-output execution helpers but no typed bundle quote helpers for this route shape.
+  - RED: `rtk sui move test test_router_quote_a_for_exact_c_via_b_with_bundles_matches_execution` failed because `router::quote_a_for_exact_c_via_b_with_bundles` did not exist.
+  - Focused GREEN: `rtk sui move test test_router_quote_a_for_exact_c_via_b_with_bundles_matches_execution` passed 1/1 after the forward helper chained existing single-hop exact-output bundle quote math.
+  - RED: `rtk sui move test test_router_quote_c_for_exact_a_via_b_with_bundles_matches_execution` failed because `router::quote_c_for_exact_a_via_b_with_bundles` did not exist.
+  - Focused GREEN: `rtk sui move test test_router_quote_c_for_exact_a_via_b_with_bundles_matches_execution` passed 1/1 after the reverse helper chained existing single-hop exact-output bundle quote math.
+  - Focused GREEN: `rtk sui move test v3_router_test` passed 28/28.
+  - Full GREEN: `rtk sui move test` passed 182/182.
+- 2026-06-09 typed two-hop bundle quote helper slice:
+  - Source check: Solidity periphery exposes cutoff-aware multi-hop quotes through `getAmountsOut` and raw/no-cutoff route quotes through `getAmountsOutWithoutCutoff`; the Sui router only had state-changing typed two-hop bundle execution helpers before this slice.
+  - RED: `rtk sui move test test_router_quote_exact_a_for_c_via_b_with_bundles_matches_execution` failed because `router::quote_exact_a_for_c_via_b_with_bundles` did not exist.
+  - Focused GREEN: `rtk sui move test test_router_quote_exact_a_for_c_via_b_with_bundles_matches_execution` passed 1/1 after the forward typed two-hop bundle quote helper chained existing single-hop cutoff-aware bundle quote math.
+  - RED: `rtk sui move test test_router_quote_exact_c_for_a_via_b_with_bundles_matches_execution` failed because `router::quote_exact_c_for_a_via_b_with_bundles` did not exist.
+  - Focused GREEN: `rtk sui move test test_router_quote_exact` passed 2/2 after the reverse typed two-hop bundle quote helper was added.
+  - RED: `rtk sui move test without_cutoff_surfaces_raw_route` failed because the forward/reverse raw-no-cutoff typed two-hop bundle quote helpers did not exist.
+  - Focused GREEN: `rtk sui move test without_cutoff_surfaces_raw_route` passed 2/2 after the raw helpers threaded each hop's raw output into the next hop.
+  - Focused GREEN: `rtk sui move test v3_router_test` passed 26/26.
+  - Full GREEN: `rtk sui move test` passed 180/180.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/router.move`, `tests/v3_router_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-09 direct Pyth bundle digest parity slice:
+  - RED: `rtk sui move test test_direct_pyth_bundle_digest_matches_reading_bundle_digest` failed because direct `OracleAdapter` bundle construction did not include the same oracle reading metadata digest as the BrownFi-owned Pyth reading path.
+  - Focused GREEN: `rtk sui move test test_direct_pyth_bundle_digest_matches_reading_bundle_digest` passed 1/1 after the direct Pyth compatibility wrapper constructed internal readings and delegated to `get_swap_price_bundle_from_readings`.
+  - Debug note: an intermediate gateway run failed after over-tightening the compatibility path to require source type `b"pyth"`; that assertion was removed because existing direct-wrapper tests intentionally configure mock source type `b"test"` while still using Pyth `PriceInfoObject` fixtures. The stricter source-type check remains in `pyth_source.move`.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test` passed 33/33.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 33/33.
+  - Focused GREEN: `rtk sui move test v3_router_test` passed 22/22.
+  - Focused GREEN: `rtk sui move test v3_flash_test` passed 8/8.
+  - Focused GREEN: `rtk sui move test pool_test` passed 12/12.
+  - Focused GREEN: `rtk sui move test swap_test` passed 50/50.
+  - Full GREEN: `rtk sui move test` passed 176/176.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/oracle_gateway.move`, `tests/v3_oracle_gateway_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-09 pool gate event observability slice:
+  - RED: `rtk sui move test test_pause_cap_emits_pool_gate_state_events` failed because `events::PoolGateStateChanged`, gate helpers, and the event assertion helper did not exist.
+  - Focused GREEN: `rtk sui move test test_pause_cap_emits_pool_gate_state_events` passed 1/1 after pool-local swap/add-liquidity/flash gate setters emitted `PoolGateStateChanged`.
+  - Focused GREEN: `rtk sui move test v3_config_test` passed 31/31.
+  - Focused GREEN: `rtk sui move test v3_flash_test` passed 8/8.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 33/33.
+  - Focused GREEN: `rtk sui move test pool_test` passed 12/12.
+  - Full GREEN: `rtk sui move test` passed 175/175.
+- 2026-06-09 protocol-fee accounting event slice:
+  - RED: `rtk sui move test test_protocol_fee_lp_uses_direction_pre_trade_price` failed because `events::assert_protocol_lp_accrued_for_testing` expected 4 arguments while the test required the event to carry the post-trade pool value used by the protocol LP mint formula.
+  - Focused GREEN: `rtk sui move test test_protocol_fee_lp` passed 2/2 after `ProtocolLpAccrued` carried the fee-inclusive post-trade pool value.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 33/33.
+  - Full GREEN: `rtk sui move test` passed 174/174.
+- 2026-06-09 sync event parity slice:
+  - RED: `rtk sui move test test_swap_a_for_b_with_bundle_emits_sync_event` failed because `events::Sync` and `events::assert_sync_for_testing` did not exist.
+  - Focused GREEN: `rtk sui move test test_swap_a_for_b_with_bundle_emits_sync_event` passed 1/1 after reserve mutations emitted `Sync`.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 33/33.
+  - Focused GREEN: `rtk sui move test pool_test` passed 12/12.
+  - Focused GREEN: `rtk sui move test factory_test` passed 9/9.
+  - Full GREEN: `rtk sui move test` passed 174/174.
+- 2026-06-09 add-liquidity price event parity slice:
+  - RED: `rtk sui move test test_add_liquidity_with_bundle_emits_pricing_event_fields` failed because `events::assert_add_liquidity_for_testing` and the add-liquidity pricing event fields did not exist.
+  - Focused GREEN: `rtk sui move test test_add_liquidity_with_bundle_emits_pricing_event_fields` passed 1/1 after `AddLiquidity` carried bundle price/source fields.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 32/32.
+  - Focused GREEN: `rtk sui move test pool_test` passed 12/12.
+  - Full GREEN: `rtk sui move test` passed 173/173.
+- 2026-06-09 direct add-liquidity bundle-policy slice:
+  - RED: `rtk sui move test test_direct_add_liquidity_rejects_oracle_config_changed_after_pool_creation` failed because direct add-liquidity accepted a changed `OracleAdapter` config after pool creation.
+  - Focused GREEN: `rtk sui move test test_direct_add_liquidity_rejects_oracle_config_changed_after_pool_creation` passed 1/1 after direct add-liquidity delegated through the pool-bound bundle path.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test` passed 32/32.
+  - Focused GREEN: `rtk sui move test pool_test` passed 12/12.
+  - Full GREEN: `rtk sui move test` passed 172/172.
+- 2026-06-09 price-affecting policy digest slice:
+  - RED: `rtk sui move test v3_oracle_gateway_test` failed 29/31 because old bundles still validated after `lambda` and `fee` changed.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test` passed 31/31 after `fee` and `lambda` were committed into the bundle policy digest.
+  - Full GREEN: `rtk sui move test` passed 171/171.
+- 2026-06-09 gateway skewness parity slice:
+  - RED: `rtk sui move test v3_oracle_gateway_test` failed 27/29 because base-heavy and quote-heavy pools returned unskewed `sell_price`/`buy_price`.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test` passed 29/29 after bundle construction applied skewness before spread.
+  - Full GREEN: `rtk sui move test` passed 169/169.
+- 2026-06-09 protocol LP price-source parity slice:
+  - RED: `rtk sui move test v3_swap_test` failed because protocol LP was accrued with blended `adj_price` under fixed spread instead of the direction-selected pre-trade price.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 31/31 after protocol LP valuation used `sell_price`/`buy_price`.
+  - Full GREEN: `rtk sui move test` passed 167/167.
+- 2026-06-09 fee-split fee_to parity slice:
+  - RED: `rtk sui move test v3_config_test` failed because `set_pool_fee_split` accepted a nonzero fee split while pool-local `fee_to` was unset.
+  - Focused GREEN: `rtk sui move test v3_config_test` passed 30/30 after nonzero fee split required a configured pool `fee_to`.
+  - Full GREEN: `rtk sui move test` passed 166/166.
+- 2026-06-09 kappa bound parity slice:
+  - RED: `rtk sui move test v3_config_test` failed because `set_pool_k`, `set_pool_k_b`, and `set_pool_k_q` accepted values below the documented/Solidity minimum `Q32 / 10000`.
+  - Focused GREEN: `rtk sui move test v3_config_test` passed 24/24 after the kappa setters enforced `[Q32 / 10000, 2 * Q32]`.
+  - Full GREEN: `rtk sui move test` passed 160/160.
+- 2026-06-09 gamma bound parity/coverage slice:
+  - Source check: BrownFi docs and Solidity config define gamma as `(0, 1]`; current Move `set_pool_gamma` already enforced `new_gamma > 0 && new_gamma <= PRECISION`.
+  - Focused GREEN: `rtk sui move test v3_config_test` passed 27/27 after adding gamma boundary tests and correcting the architecture validation text.
+  - Full GREEN: `rtk sui move test` passed 163/163.
+- 2026-06-09 fee bound parity slice:
+  - RED: `rtk sui move test v3_config_test` failed because `set_pool_fee` rejected the documented 50% upper boundary and accepted a fee below the documented 0.01% minimum.
+  - Focused GREEN: `rtk sui move test v3_config_test` passed 20/20 after `set_pool_fee` enforced `[10_000, 50_000_000]`.
+  - Full GREEN: `rtk sui move test` passed 156/156.
+- 2026-06-08 spread validation parity slice:
+  - RED: `rtk sui move test v3_config_test` failed because four expected-failure tests did not abort for missing spread constraints.
+  - Focused GREEN: `rtk sui move test v3_config_test` passed 17/17 after `set_pool_spreads` enforced fixed-spread, discrepancy-threshold, Sbound, and ceil-compressed Constraint 2 bounds.
+  - Full GREEN: `rtk sui move test` passed 153/153.
+- 2026-06-08 exact-input quote analytics slice:
+  - RED: `rtk sui move test v3_swap_test` failed because `swap::quote_a_for_b_with_bundle` and `swap::quote_b_for_a_with_bundle` did not exist.
+  - Focused GREEN: `rtk sui move test v3_swap_test` passed 30/30.
+  - Full GREEN: `rtk sui move test` passed 149/149.
+- 2026-06-08 unsatisfiable source-count config guard:
+  - RED: `rtk sui move test v3_config_test` failed because `set_pool_oracle_quorum` and `set_pool_amm_policy` accepted required source counts above their configured allowed source masks.
+  - GREEN: `rtk sui move test v3_config_test` passed 13/13 after admin config counted allowed source-mask bits and rejected unsatisfiable oracle/AMM source-count policies.
+  - Regression check: the first full-suite run exposed that AMM required-source policy can intentionally be configured before an AMM source mask exists so the gateway fails closed until adapters/source policy are configured; the guard was narrowed to explicit AMM masks/caps, and the oracle gateway missing-source test now uses a satisfiable allowed mask while omitting the second reading.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 27/27.
+  - GREEN: `rtk sui move test` passed 144/144.
+- 2026-06-08 unsupported token-decimals pool-creation guard:
+  - RED: `rtk sui move test factory_test` failed because `test_create_pool_aborts_on_unsupported_token_decimals` did not abort when pool creation used `19` token decimals.
+  - GREEN: `rtk sui move test factory_test` passed 9/9 after `swap::create_pool` rejected token decimals greater than `18`.
+  - GREEN: `rtk sui move test` passed 142/142.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `ARCHITECTURE_v3_SUI.md`, `implementation-notes.md`, `sources/swap.move`, and `tests/factory_test.move`.
+- 2026-06-08 typed two-hop exact-output cutoff guard:
+  - RED: `rtk sui move test v3_router_test` failed because typed two-hop exact-output routes ignored a final-hop quote with `effective_out = 0` and aborted later with `EInsufficientOutputAmount`.
+  - GREEN: `rtk sui move test v3_router_test` passed 22/22 after direct and bundle routes asserted the final-hop quote before first-hop execution.
+  - GREEN: `rtk sui move test` passed 141/141.
+- 2026-06-08 AMM blend nonzero oracle-weight guard:
+  - RED: `rtk sui move test v3_config_test` failed because `set_pool_pyth_weight` and `set_pool_amm_policy` allowed a pool to activate AMM blend pricing with `pyth_weight = 0`.
+  - GREEN: `rtk sui move test v3_config_test` passed 11/11.
+  - GREEN: `rtk sui move test` passed 139/139.
+- 2026-06-08 unsupported weighted-median policy guard:
+  - RED: `rtk sui move test v3_config_test` failed because `set_pool_oracle_aggregation_policy` accepted `WEIGHTED_MEDIAN` even though no source-weight state exists.
+  - GREEN: `rtk sui move test v3_config_test` passed 8/8 after the admin setter rejected weighted-median mode.
+  - GREEN: `rtk sui move test` passed 136/136.
+- 2026-06-08 oracle quorum / AMM TWAP event observability slice:
+  - RED: `rtk sui move test v3_oracle_gateway_test` failed because `events::OracleQuorumUsed`, `events::AmmTwapUsed`, and their assertion helpers did not exist.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 27/27.
+  - GREEN: `rtk sui move test` passed 135/135.
+- 2026-06-08 config/policy event observability slice:
+  - RED: `rtk sui move test v3_config_test` failed because `events::ConfigUpdated`, `events::OraclePolicyUpdated`, `events::AmmPolicyUpdated`, and their assertion helpers did not exist.
+  - GREEN: `rtk sui move test v3_config_test` passed 7/7.
+  - GREEN: `rtk sui move test` passed 135/135.
+- 2026-06-08 protocol LP event observability slice:
+  - RED: `rtk sui move test test_protocol_fee_lp_accrues_in_pool` failed because `events::ProtocolLpAccrued`, `events::ProtocolLpClaimed`, and their test assertion helpers did not exist.
+  - GREEN: `rtk sui move test test_protocol_fee_lp_accrues_in_pool` passed 1/1 after protocol LP accrual and claim emitted events.
+  - GREEN: `rtk sui move test v3_swap_test` passed 27/27.
+  - GREEN: `rtk sui move test` passed 134/134.
+- 2026-06-08 swap execution event observability slice:
+  - RED: `rtk sui move test test_swap_a_for_b_with_bundle_emits_swap_executed_event` failed because `events::SwapExecuted`, its test assertion helper, direction helpers, and `oracle_gateway::bundle_o_spread` did not exist.
+  - GREEN: `rtk sui move test test_swap_a_for_b_with_bundle_emits_swap_executed_event` passed 1/1 after state-changing bundle swap paths emitted `SwapExecuted`.
+  - GREEN: `rtk sui move test v3_swap_test` passed 27/27.
+  - GREEN: `rtk sui move test v3_router_test` passed 20/20.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 27/27.
+  - GREEN: `rtk sui move test v3_flash_test` passed 6/6.
+  - GREEN: `rtk sui move test` passed 134/134.
+- 2026-06-08 flash event observability slice:
+  - RED: `rtk sui move test test_flash_borrow_and_repay_a_emit_events` failed because `events::FlashBorrowed`, `events::FlashRepaid`, and their test assertion helpers did not exist.
+  - GREEN: `rtk sui move test test_flash_borrow_and_repay_a_emit_events` passed 1/1 after flash borrow/repay emitted receipt-bound events.
+  - GREEN: `rtk sui move test v3_flash_test` passed 6/6.
+  - GREEN: `rtk sui move test` passed 133/133.
+- 2026-06-08 price-bundle event observability slice:
+  - RED: `rtk sui move test test_swap_a_for_b_with_bundle_emits_price_bundle_used_event` failed because `events::PriceBundleUsed` and `events::assert_price_bundle_used_for_testing` did not exist.
+  - GREEN: `rtk sui move test test_swap_a_for_b_with_bundle_emits_price_bundle_used_event` passed 1/1 after state-changing bundle swap paths emitted `PriceBundleUsed`.
+  - GREEN: `rtk sui move test v3_swap_test` passed 26/26.
+  - GREEN: `rtk sui move test v3_router_test` passed 20/20.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 27/27.
+  - GREEN: `rtk sui move test` passed 132/132.
+- 2026-06-08 bundle add-liquidity valuation slice:
+  - RED: `rtk sui move test test_add_liquidity_with_bundle_uses_amm_valuation_floor` failed because `swap::add_liquidity_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_add_liquidity_with_bundle_uses_amm_valuation_floor` passed 1/1 after core add-liquidity consumed a `PriceBundle` and minted against the lower of oracle and AMM valuations.
+  - RED: `rtk sui move test test_router_add_liquidity_with_bundle_uses_amm_valuation_floor` failed because `router::add_liquidity_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_router_add_liquidity_with_bundle_uses_amm_valuation_floor` passed 1/1.
+  - RED: `rtk sui move test test_add_liquidity_with_bundle_keeps_greater_side_residual_by_value` failed because bundle add-liquidity minted from V3 value but still deposited by pool reserve ratio.
+  - GREEN: `rtk sui move test test_add_liquidity_with_bundle_keeps_greater_side_residual_by_value` passed 1/1 after bundle add-liquidity deposited the selected valuation's 50/50 value amount and returned the greater-side residual.
+  - RED: `rtk sui move test test_add_liquidity_uses_pyth_value_residual_on_imbalanced_pool` failed because direct Pyth add-liquidity still used ratio-style residuals.
+  - GREEN: `rtk sui move test test_add_liquidity_uses_pyth_value_residual_on_imbalanced_pool` passed 1/1 after direct add-liquidity computed the Pyth relative price and used the V3 value rule.
+  - GREEN: `rtk sui move test pool_test` passed 12/12.
+  - GREEN: `rtk sui move test v3_swap_test` passed 25/25.
+  - GREEN: `rtk sui move test v3_router_test` passed 20/20.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 27/27.
+  - GREEN: `rtk sui move test` passed 131/131.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/oracle_gateway.move`, `sources/swap.move`, `sources/router.move`, `tests/pool_test.move`, `tests/v3_swap_test.move`, `tests/v3_router_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-08 median reading-pair aggregation slice:
+  - RED: `rtk sui move test test_gateway_median_mode_uses_middle_relative_candidate` failed because `get_swap_price_bundle_from_reading_pairs` accepted only `PRIMARY_WITH_SANITY`.
+  - GREEN: `rtk sui move test test_gateway_median_mode_uses_middle_relative_candidate` passed 1/1 after resolving odd-count median mode to the middle relative candidate.
+  - RED: `rtk sui move test test_gateway_median_mode_rejects_even_source_count_without_tie_policy` failed because the gateway silently accepted even source counts with implicit upper-median behavior.
+  - GREEN: `rtk sui move test test_gateway_median_mode_rejects_even_source_count_without_tie_policy` passed 1/1 after median mode failed closed on even source counts.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 26/26.
+  - GREEN: `rtk sui move test` passed 126/126.
+- 2026-06-08 AMM path median oracle reference slice:
+  - RED: `rtk sui move test test_gateway_blends_amm_reading_with_median_oracle_relative_price` failed because `get_swap_price_bundle_from_reading_pairs_and_amm_readings` accepted only `PRIMARY_WITH_SANITY`.
+  - GREEN: `rtk sui move test test_gateway_blends_amm_reading_with_median_oracle_relative_price` passed 1/1 after AMM filtering/blending used the resolved median oracle relative price.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 27/27.
+  - GREEN: `rtk sui move test` passed 127/127.
+- 2026-06-08 AMM per-source deviation filtering slice:
+  - RED: `rtk sui move test test_gateway_skips_advisory_amm_reading_outside_ospread_policy` failed because an outlier advisory AMM reading poisoned the aggregate and tripped aggregate `amm_max_ospread`.
+  - GREEN: `rtk sui move test test_gateway_skips_advisory_amm_reading_outside_ospread_policy` passed 1/1 after filtering per-source AMM `Ospread` before liquidity-weighted aggregation.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 24/24.
+  - GREEN: `rtk sui move test` passed 124/124.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/admin.move`, `sources/oracle_gateway.move`, `tests/v3_oracle_gateway_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-08 advisory AMM fallback slice:
+  - RED: `rtk sui move test test_gateway_oracle_only_fallback_ignores_invalid_advisory_amm_reading` failed because `admin::set_pool_amm_policy` rejected advisory nonzero AMM blend with `min_sources = 0`.
+  - GREEN: `rtk sui move test test_gateway_oracle_only_fallback_ignores_invalid_advisory_amm_reading` passed 1/1 after allowing advisory AMM blend policy and falling back to oracle-only when no valid advisory AMM reading remains.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 23/23.
+  - GREEN: `rtk sui move test` passed 123/123.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/admin.move`, `sources/oracle_gateway.move`, `tests/v3_oracle_gateway_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-08 oracle candidate price-digest slice:
+  - RED: `rtk sui move test test_oracle_candidate_makeup_changes_price_digest` failed because two BrownFi reading-pair bundles with the same resolved primary price but different secondary candidates produced the same `price_digest`.
+  - GREEN: `rtk sui move test test_oracle_candidate_makeup_changes_price_digest` passed 1/1 after committing BrownFi oracle reading-pair metadata into the bundle price digest input.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 22/22.
+  - GREEN: `rtk sui move test` passed 122/122.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/oracle_gateway.move`, `tests/v3_oracle_gateway_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-08 AMM candidate price-digest slice:
+  - RED: `rtk sui move test test_amm_candidate_makeup_changes_price_digest` failed because two AMM reading sets with the same aggregate price produced the same `price_digest`.
+  - GREEN: `rtk sui move test test_amm_candidate_makeup_changes_price_digest` passed 1/1 after committing AMM aggregate/candidate metadata into the bundle price digest input.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 21/21.
+  - GREEN: `rtk sui move test` passed 121/121.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/oracle_gateway.move`, `tests/v3_oracle_gateway_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-08 AMM reading blend gateway slice:
+  - RED: `rtk sui move test test_gateway_blends_weighted_amm_readings_with_oracle_relative_price` failed because `AmmReading`, `oracle_gateway::new_amm_reading`, and `oracle_gateway::get_swap_price_bundle_from_reading_pairs_and_amm_readings` did not exist.
+  - GREEN: `rtk sui move test test_gateway_blends_weighted_amm_readings_with_oracle_relative_price` passed 1/1.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 20/20.
+  - GREEN: `rtk sui move test` passed 120/120.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/oracle_gateway.move`, `tests/v3_oracle_gateway_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-08 primary-with-sanity multi-reading quorum slice:
+  - RED: `rtk sui move test test_gateway_primary_with_sanity_accepts_multi_source_reading_quorum` failed because `oracle_gateway::get_swap_price_bundle_from_reading_pairs` did not exist.
+  - GREEN: `rtk sui move test test_gateway_primary_with_sanity_accepts_multi_source_reading_quorum` passed 1/1.
+  - RED: `rtk sui move test test_gateway_rejects_reading_pair_confidence_above_policy` failed because the multi-reading path accepted a reading with confidence above `oracle_max_confidence`.
+  - GREEN: `rtk sui move test test_gateway_rejects_reading_pair_confidence_above_policy` passed 1/1.
+  - RED: `rtk sui move test test_gateway_rejects_single_reading_pair_confidence_above_policy` failed because the existing single-pair reading path accepted a reading with confidence above `oracle_max_confidence`.
+  - GREEN: `rtk sui move test test_gateway_rejects_single_reading_pair_confidence_above_policy` passed 1/1.
+  - GREEN: `rtk sui move test test_pyth_source_readings_feed_gateway_bundle` passed 1/1 after sharing reading-pair validation.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 19/19.
+  - GREEN: `rtk sui move test` passed 119/119.
+  - Hygiene: `rtk git diff --check`; direct trailing-whitespace scan on `sources/oracle_gateway.move`, `tests/v3_oracle_gateway_test.move`, `ARCHITECTURE_v3_SUI.md`, and `implementation-notes.md`.
+- 2026-06-08 two-hop router bundle slice:
+  - RED: `rtk sui move test test_router_two_hop_a_to_c_via_b_with_bundles_uses_prebuilt_bundles` failed because `router::swap_exact_a_for_c_via_b_with_bundles` did not exist.
+  - GREEN: `rtk sui move test test_router_two_hop_a_to_c_via_b_with_bundles_uses_prebuilt_bundles` passed 1/1.
+  - RED: `rtk sui move test test_router_two_hop_c_to_a_via_b_with_bundles_uses_prebuilt_bundles` failed because `router::swap_exact_c_for_a_via_b_with_bundles` did not exist.
+  - GREEN: `rtk sui move test test_router_two_hop_c_to_a_via_b_with_bundles_uses_prebuilt_bundles` passed 1/1.
+  - RED: `rtk sui move test test_router_swap_a_for_exact_c_via_b_with_bundles_returns_change` failed because `router::swap_a_for_exact_c_via_b_with_bundles` did not exist.
+  - GREEN: `rtk sui move test test_router_swap_a_for_exact_c_via_b_with_bundles_returns_change` passed 1/1.
+  - RED: `rtk sui move test test_router_swap_c_for_exact_a_via_b_with_bundles_returns_change` failed because `router::swap_c_for_exact_a_via_b_with_bundles` did not exist.
+  - GREEN: `rtk sui move test test_router_swap_c_for_exact_a_via_b_with_bundles_returns_change` passed 1/1.
+  - GREEN: `rtk sui move test v3_router_test` passed 19/19.
+  - GREEN: `rtk sui move test` passed 116/116.
+- 2026-06-08 single-hop router bundle slice:
+  - RED: `rtk sui move test test_router_swap_exact_a_for_b_with_bundle_uses_prebuilt_bundle` failed because `router::swap_exact_a_for_b_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_router_swap_exact_a_for_b_with_bundle_uses_prebuilt_bundle` passed 1/1.
+  - RED: `rtk sui move test test_router_swap_exact_b_for_a_with_bundle_uses_prebuilt_bundle` failed because `router::swap_exact_b_for_a_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_router_swap_exact_b_for_a_with_bundle_uses_prebuilt_bundle` passed 1/1.
+  - RED: `rtk sui move test test_router_swap_a_for_exact_b_with_bundle_returns_change` failed because `router::swap_a_for_exact_b_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_router_swap_a_for_exact_b_with_bundle_returns_change` passed 1/1.
+  - RED: `rtk sui move test test_router_swap_b_for_exact_a_with_bundle_returns_change` failed because `router::swap_b_for_exact_a_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_router_swap_b_for_exact_a_with_bundle_returns_change` passed 1/1.
+  - GREEN: `rtk sui move test v3_router_test` passed 15/15.
+  - GREEN: `rtk sui move test` passed 112/112.
+- 2026-06-08 exact-output bundle swap slice:
+  - RED: `rtk sui move test test_swap_a_for_exact_b_with_bundle_returns_change` failed because `swap::swap_a_for_exact_b_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_swap_a_for_exact_b_with_bundle_returns_change` passed 1/1.
+  - RED: `rtk sui move test test_swap_b_for_exact_a_with_bundle_returns_change` failed because `swap::swap_b_for_exact_a_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_swap_b_for_exact_a_with_bundle_returns_change` passed 1/1.
+  - GREEN: `rtk sui move test v3_swap_test` passed 23/23.
+  - GREEN: `rtk sui move test` passed 108/108.
+- 2026-06-08 exact-input bundle swap slice:
+  - RED: `rtk sui move test test_swap_a_for_b_with_bundle_uses_pyth_reading_bundle` failed because `swap::swap_a_for_b_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_swap_a_for_b_with_bundle_uses_pyth_reading_bundle` passed 1/1.
+  - RED: `rtk sui move test test_swap_b_for_a_with_bundle_uses_pyth_reading_bundle` failed because `swap::swap_b_for_a_with_bundle` did not exist.
+  - GREEN: `rtk sui move test test_swap_b_for_a_with_bundle_uses_pyth_reading_bundle` passed 1/1.
+  - GREEN: `rtk sui move test v3_swap_test` passed 21/21.
+  - GREEN: `rtk sui move test` passed 106/106.
+- 2026-06-08 Pyth `PriceReading` path slice:
+  - RED: `rtk sui move test test_pyth_source_readings_feed_gateway_bundle` failed because `brownfi_amm::pyth_source`, `oracle_gateway::get_swap_price_bundle_from_readings`, and reading getters did not exist.
+  - GREEN: `rtk sui move test test_pyth_source_readings_feed_gateway_bundle` passed 1/1.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 16/16.
+  - GREEN: `rtk sui move test` passed 104/104.
+- 2026-06-08 oracle aggregation-policy state slice:
+  - RED: `rtk sui move test test_oracle_cap_updates_aggregation_policy_version` failed because aggregation policy getters/constants and `admin::set_pool_oracle_aggregation_policy` did not exist.
+  - GREEN: `rtk sui move test test_oracle_cap_updates_aggregation_policy_version` passed.
+  - GREEN: `rtk sui move test test_bundle_validation_rejects_oracle_aggregation_policy_update` passed.
+  - GREEN: `rtk sui move test v3_config_test` passed 6/6.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 15/15.
+  - GREEN: `rtk sui move test` passed 103/103.
+- 2026-06-08 AMM source-policy authority slice:
+  - RED: `rtk sui move test test_amm_cap_updates_twap_source_policy_version` failed because AMM source-policy getters and `admin::set_pool_amm_source_policy` did not exist.
+  - GREEN: `rtk sui move test test_amm_cap_updates_twap_source_policy_version` passed.
+  - GREEN: `rtk sui move test test_bundle_validation_rejects_amm_source_policy_update` passed.
+  - GREEN: `rtk sui move test v3_config_test` passed 5/5.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 14/14.
+  - GREEN: `rtk sui move test` passed 101/101.
+- 2026-06-08 Pyth source-weight authority slice:
+  - RED: `rtk sui move test test_oracle_cap_updates_pyth_weight_policy_version` failed because `admin::set_pool_pyth_weight` still required `AdminCap`.
+  - GREEN: `rtk sui move test test_oracle_cap_updates_pyth_weight_policy_version` passed.
+  - GREEN: `rtk sui move test test_bundle_validation_rejects_pyth_weight_policy_update` passed.
+  - GREEN: `rtk sui move test v3_config_test` passed 4/4.
+  - GREEN: `rtk sui move test v3_oracle_gateway_test` passed 13/13.
+  - GREEN: `rtk sui move test` passed 99/99.
+- 2026-06-05 fixed 80% guard removal slice:
+  - RED: `rtk sui move test v3_swap_test` failed at the old `swap_a_for_b`, `swap_b_for_a`, `swap_a_for_exact_b`, and `swap_b_for_exact_a` fixed-size assertions before each corresponding guard was removed.
+  - GREEN: `rtk sui move test v3_swap_test`
+- 2026-06-05 value-based initial LP slice:
+  - RED: `rtk sui move test factory_test` failed before the first-mint path used oracle value and locked minimum liquidity.
+  - Focused GREEN: `rtk sui move test factory_test`, `rtk sui move test pool_test`, `rtk sui move test swap_test`, `rtk sui move test v3_router_test`
+  - Full GREEN: `rtk sui move test` passed 87/87, `rtk git diff --check`
+- 2026-06-05 pool-creator cap slice:
+  - RED: `rtk sui move test factory_test` failed before `PoolCreatorCap` and the new create-pool signature existed.
+  - Focused GREEN: `rtk sui move test factory_test`, `rtk sui move test v3_router_test`
+  - Full GREEN: `rtk sui move test` passed 88/88, `rtk git diff --check`
+- 2026-06-05 pool-local fee recipient slice:
+  - RED: `rtk sui move test v3_swap_test` failed before `admin::set_pool_fee_to` existed and before `admin::claim_protocol_lp` used pool-local `fee_to`.
+  - Focused GREEN: `rtk sui move test v3_swap_test`
+  - Full GREEN: `rtk sui move test` passed 88/88, `rtk git diff --check`
+- 2026-06-05 pool-local pause slice:
+  - RED: `rtk sui move test v3_swap_test` / `rtk sui move test pool_test` failed before pool-local swap/add-liquidity pause admin APIs existed.
+  - Focused GREEN: `rtk sui move test v3_swap_test`, `rtk sui move test pool_test`
+  - Full GREEN: `rtk sui move test` passed 91/91, `rtk git diff --check`
+- 2026-06-05 factory hot-path API removal slice:
+  - RED: `rtk sui move test v3_swap_test` failed when a swap test used the intended no-factory `swap_a_for_b` signature while production still required `&Factory`.
+  - Focused GREEN: `rtk sui move test v3_swap_test`, `rtk sui move test pool_test`, `rtk sui move test v3_router_test`, `rtk sui move test v3_oracle_gateway_test`, `rtk sui move test v3_flash_test`, `rtk sui move test swap_test`, `rtk sui move test factory_test`
+  - Full GREEN: `rtk sui move test` passed 91/91, `rtk git diff --check`
+- 2026-06-08 fee/pause capability split slice:
+  - RED: `rtk sui move test v3_swap_test` failed before `FeeCap`/`PauseCap` existed and before `claim_protocol_lp` accepted `FeeCap`.
+  - RED: `rtk sui move test test_protocol_fee_lp_accrues_in_pool` failed with `ENotFeeTo` before protocol LP claim authority moved from caller address to `FeeCap`.
+  - Focused GREEN: `rtk sui move test test_protocol_fee_lp_accrues_in_pool`, `rtk sui move test v3_swap_test`, `rtk sui move test pool_test`, `rtk sui move test v3_flash_test`, `rtk sui move test factory_test`
+  - Full GREEN: `rtk sui move test` passed 91/91, `rtk git diff --check`
+- 2026-06-08 risk capability split slice:
+  - RED: `rtk sui move test v3_swap_test` failed before `RiskCap` existed and before risk setters accepted it.
+  - Focused GREEN: `rtk sui move test v3_swap_test`, `rtk sui move test v3_config_test`, `rtk sui move test factory_test`
+  - Full GREEN: `rtk sui move test` passed 91/91
+  - Hygiene: `rtk git diff --check`, direct trailing-whitespace check on edited markdown files
+- 2026-06-08 oracle capability split slice:
+  - RED: `rtk sui move test v3_oracle_gateway_test` failed before `OracleCap` existed and before pool oracle-policy setters accepted it.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test`, `rtk sui move test v3_flash_test`, `rtk sui move test factory_test`
+  - Full GREEN: `rtk sui move test` passed 91/91
+- 2026-06-08 AMM capability split slice:
+  - RED: `rtk sui move test v3_config_test` failed before `AmmCap` existed and before `set_pool_amm_policy` accepted it.
+  - Focused GREEN: `rtk sui move test v3_config_test`, `rtk sui move test v3_oracle_gateway_test`, `rtk sui move test factory_test`
+  - Full GREEN: `rtk sui move test` passed 91/91
+- 2026-06-08 router capability split slice:
+  - RED: `rtk sui move test v3_router_test` failed before `RouterCap` existed and before `set_pool_router_enabled` accepted it.
+  - Focused GREEN: `rtk sui move test v3_router_test`, `rtk sui move test factory_test`
+  - Full GREEN: `rtk sui move test` passed 91/91
+- 2026-06-08 flash receipt bundle binding slice:
+  - RED: `rtk sui move test v3_flash_test` failed because `test_flash_repay_rejects_different_price_bundle` did not abort when repayment used a different resolved price bundle.
+  - Focused GREEN: `rtk sui move test v3_flash_test` passed 5/5
+  - Full GREEN: `rtk sui move test` passed 92/92
+- 2026-06-08 bundle policy/price digest slice:
+  - RED: `rtk sui move test test_bundle_validation_rejects_spread_policy_digest_change` failed because an old bundle still validated after a spread-policy change.
+  - RED: `rtk sui move test test_bundle_digests_commit_to_policy_and_resolved_prices` failed before `bundle_price_digest` existed.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test` passed 9/9, `rtk sui move test v3_flash_test` passed 5/5
+  - Full GREEN: `rtk sui move test` passed 94/94
+- 2026-06-08 pool-local oracle source/config binding slice:
+  - RED: `rtk sui move test test_gateway_rejects_oracle_config_changed_after_pool_creation` failed with `Test did not error as expected` after a pool accepted a post-creation Pyth feed/source config change.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test` passed 10/10, `rtk sui move test v3_flash_test` passed 5/5
+  - Full GREEN: `rtk sui move test` passed 95/95
+- 2026-06-08 OracleCap source/config update slice:
+  - RED: `rtk sui move test test_bundle_validation_rejects_oracle_source_config_update` failed because `admin::set_pool_oracle_sources` did not exist.
+  - Focused GREEN: `rtk sui move test v3_oracle_gateway_test` passed 12/12, `rtk sui move test v3_flash_test` passed 5/5
+  - Full GREEN: `rtk sui move test` passed 97/97
+- 2026-06-08 flash Coin wrapper slice:
+  - RED: `rtk sui move test v3_flash_test` failed because `flash::borrow_a_with_coin`, `flash::repay_a_with_coin`, `flash::borrow_b_with_coin`, and `flash::repay_b_with_coin` did not exist.
+  - Focused GREEN: `rtk sui move test v3_flash_test` passed 8/8
+  - Full GREEN: `rtk sui move test` passed 146/146
+- 2026-06-05 exact-output execution slice:
+  - `rtk sui move test v3_swap_test`
+  - `rtk sui move test v3_router_test`
+  - `rtk sui move test`
+  - `rtk git diff --check`
+- 2026-06-05 typed two-hop exact-output router slices:
+  - `rtk sui move test v3_router_test`
+- 2026-06-05 typed reverse exact-input router slice:
+  - `rtk sui move test v3_router_test`
+- 2026-06-05 remove-liquidity pause slice:
+  - `rtk sui move test pool_test`
+- Current swap math slices:
+  - `rtk sui move test math_v3_test`
+  - `rtk sui move test v3_swap_test`
+  - `rtk sui move test swap_test`
+  - `rtk sui move test v3_router_test`
+  - `rtk sui move test`
+  - `rtk git diff --check`
+- Previous V3 slices also verified targeted config, oracle gateway, flash, router, and Pyth adapter tests during their implementation.
+- 2026-06-12 devnet live smoke slice:
+  - RED: devnet `test-publish` failed with `VMVerificationOrDeserializationError`; bisection proved current Sui devnet accepts structs with 32 fields but rejects 33, while `Pool` had 54 fields and `PolicyDigestInput` had 40.
+  - Fix: nested pool oracle/AMM policy state into `OraclePolicy`/`AmmPolicy`, and nested oracle/AMM policy digest input under `PolicyDigestInput`; public pool getters/setters remain externally shaped the same, but the unpublished policy digest BCS shape changed.
+  - GREEN: reduced devnet smoke package dry-run passed, then real devnet publish/create/add/swap/remove landed.
+  - Devnet txs: publish `5wrbXvqLZ64pButEQdyFgDuP6MK1DKCzhPyCFMPoKT6Q`, create pool `BBd1SUH8v6Jq3McwhYp4NDPe2jkv9n7NHn1Um5ggZXeV`, add liquidity `558dzdm9Lg29nkiXbivixHPuFdZdFFQk2F5aJYugyEZk`, swap `EFW43r9HC2Wq8HsFcKLB9s9br3WsVHv3KJ9K6mg5Ui3K`, remove liquidity `EzVCeddLjrRpSXj2dFaB6RNaXunsxMgpqARTVJfBGnbo`.
+  - Verification: `rtk sui client test-publish --build-env testnet --pubfile-path /private/tmp/brownfi-devnet-smoke.vC1FWJ/DevnetDeps.toml --dry-run --json --silence-warnings --gas-budget 2000000000`; `rtk sui move test --build-env testnet` passed 273/273.
+- 2026-06-12 struct-width invariant slice:
+  - Decision: locally published Move structs must stay at or below 32 fields because current Sui devnet rejects 33-field structs at publish verification.
+  - Audit: `Pool` is now 29 fields, `PolicyDigestInput` is 16 fields, and no local BrownFi/Oracle/Stork/Supra struct exceeds 32 fields.
+  - Guardrail: added `tools/check-move-struct-fields.mjs`; it fails on a generated 33-field temp struct and passes on local plus referenced Pyth/FlowX/Switchboard/Wormhole/Stork/Supra source roots.
+  - Verification: `node tools/check-move-struct-fields.mjs`; broad dependency-root checker invocation; generated 33-field negative fixture; `rtk sui move build --build-env testnet`; `rtk sui move test --build-env testnet` passed 273/273.
+- 2026-06-12 launch oracle-source selection slice:
+  - Decision: pool runtime config can select enabled oracle sources, but Sui still verifies every module included in a published package. Therefore a deployment package must include only selected verifier-clean source adapters; disabled or unverified adapters are not publish-safe merely because policy can keep them inactive.
+  - Finding: a disposable full-source package dry-run reached `VMVerificationOrDeserializationError`. Bisection isolated the current blocker to the Supra source modules or their local/live ABI shape; core, router, flash, Pyth, Stork, Switchboard, and FlowX modules dry-ran successfully without Supra.
+  - Design implication: splitting adapters into separate BrownFi-owned packages is not just a file move because `oracle_gateway` constructors are package-only to prevent forged readings. A future external adapter package needs a capability-guarded public adapter API before it is safe.
+  - GREEN: launch-shaped no-Supra devnet package published with modules `admin`, `amm_flowx`, `events`, `factory`, `flash`, `library`, `math`, `oracle_gateway`, `pool`, `pyth_source`, `router`, `stork_source`, `swap`, and `switchboard_source`.
+  - Launch package tx: publish `H9Cgyz8vTMRmBpPNYRWrafBkMztmQVoBQKnoB5d49TG3`, package `0xbb97d5e93957a2caa8c7f1b2c7b28bf8e84c1adfeac048cf9d28cc9f5bb8b3a8`, factory `0xec5874a029e6e636f60211118a60ee4eb996ab8ad855d8f1138370f027b46ebb`.
+- 2026-06-12 launch-shaped devnet smoke tx slice:
+  - Purpose: prove real devnet add/remove/swap transactions against the launch-shaped module set while using a temporary `devnet_smoke` source helper for deterministic pricing.
+  - Smoke package tx: publish `Bz12WPCeGHtVqjoTuJ3eEnT3WdKdVzKyU9pNCJ1acPMA`, package `0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc`, factory `0x8b58b9422efa90c603476ec7e02a3dc3b5178a84a64bae5a2ea328d0c7e52e3f`.
+  - Landed txs: create pool `8JyZwJPmqvKoB3M6ZEMdr23UEybCiqzuomqJfrF2D6gQ`, add liquidity `8WHyQ1qo2vdNJvy33CczXg9uzXhErVyoEXnraSszZMaR`, swap `5otmGQH838V8yNucRv7CPNPczDkTvJtW9MzdrNFXHyQx`, remove liquidity `9ogGTqGLsM461dZozHsG6Ep5BrYKAH2ReCV2tyd2SzwJ`.
+  - Pool: `0xd2b5a249f7667f8c16cf22f1378658d4d16d3bc5d62a4220a07890ac3e490874`.
+  - Observed events: add emitted `OracleQuorumUsed`, `Sync`, and `AddLiquidity`; swap emitted `OracleQuorumUsed`, `Sync`, `PriceBundleUsed`, `SwapExecuted`, and `Swap`; remove emitted `Sync` and `RemoveLiquidity`.
+- 2026-06-12 reproducible launch package generator slice:
+  - RED: `node --test tools/build-launch-package.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the generator existed.
+  - GREEN: `tools/build-launch-package.mjs` now builds a package variant from `configs/launch/no-supra.json`, copies only selected source modules, omits stale `Move.lock`, strips `SupraOracle` and `supra_validator`, and can rewrite selected dependencies to local paths for devnet dry-runs without changing the repo manifest.
+  - Config: `configs/launch/no-supra.json` selects `admin`, `amm_flowx`, `events`, `factory`, `flash`, `library`, `math`, `oracle_gateway`, `pool`, `pyth_source`, `router`, `stork_source`, `swap`, and `switchboard_source`; it excludes `supra_source` and `supra_pull_source`.
+  - Dry-run command shape: generate to `/private/tmp/brownfi-launch-no-supra-pubfiledeps` with local dependency overrides for `Pyth`, `brownfi_oracle`, `stork`, `Switchboard`, and `flowx_clmm`, then run `rtk sui client test-publish --build-env testnet --pubfile-path /private/tmp/brownfi-full-devnet/DevnetDeps.toml --dry-run --json --silence-warnings --gas-budget 2000000000 --allow-dirty`.
+  - Verification: generated package dry-run returned Sui `effects.status.status = success`, simulated digest `AzAzr3PQrDwAoFE8g4EcatACrxacytp8nfQsRuCFWRnD`, simulated package `0x13d56b87bf69c5688663ae7eb5f502a2a9ba655108d34211889030897f9b10e7`, and the same 14-module launch set.
+- 2026-06-12 SDK launch route-limit gate slice:
+  - Source check: architecture milestone 7 requires route limits to be enforced for launch validation, while the SDK's registered-provider planner intentionally supports arbitrary positive-length exact-input/result-aware exact-output routes.
+  - Decision: add an optional launch-validation `routeLimits.maxHops` guard instead of hard-capping the generic registered-provider planner. This lets deployment configs enforce the launch hop cap while preserving PTB composition flexibility for non-launch usage.
+  - RED: `npm test --prefix sdk/router` failed in `buildLaunchValidationMatrix enforces configured max route hops` because the oversized 3-hop route reached the transaction factory.
+  - GREEN: launch matrix, direct quote-case hydration, and quote preflight now pass `routeLimits` into route resolution and reject oversized state-changing or quote-only cases before transaction factories, provider fetch/update hooks, or dry-runs run.
+  - Verification: `npm test --prefix sdk/router` passed 154/154.
+- 2026-06-12 SDK launch AMM-source limit slice:
+  - Decision: DEX/pool/route configs can choose enabled oracle/AMM sources, but launch validation should still enforce the deployment profile's selected route caps. This is separate from package source selection: Sui verifies shipped modules at publish time, while runtime policy/provider config chooses active sources.
+  - RED: `npm test --prefix sdk/router` failed in `buildLaunchValidationMatrix enforces configured max AMM sources per hop` because a hop with two `ammReadings` reached the transaction factory under `routeLimits.maxAmmSourcesPerHop: 1`.
+  - GREEN: `routeLimits.maxAmmSourcesPerHop` now rejects state-changing and quote-only launch cases whose resolved hop carries too many AMM readings before transaction factories, provider fetch/update hooks, or dry-runs run. A value of `0` is valid and means no AMM readings in launch validation.
+  - Verification: `npm test --prefix sdk/router` passed 155/155.
+- 2026-06-12 SDK launch oracle-source limit slice:
+  - Decision: launch validation must not infer oracle source counts from provider internals or feed ID count. Two feed IDs represent one oracle source pair for Pyth/Switchboard/Stork-style providers, and custom providers are opaque until PTB construction. When `routeLimits.maxOracleSourcesPerHop` is configured, each resolved route hop must explicitly declare `oracleSourceCount`.
+  - RED: `npm test --prefix sdk/router` failed in `buildLaunchValidationMatrix enforces configured max oracle sources per hop`, `buildLaunchValidationMatrix requires oracle source counts when the cap is configured`, and `buildLaunchValidationMatrix rejects invalid oracle source counts` because the cases reached the transaction factory.
+  - GREEN: `routeLimits.maxOracleSourcesPerHop` now rejects missing, non-positive, or oversized per-hop oracle source counts for state-changing and quote-only launch cases before transaction factories, provider fetch/update hooks, or dry-runs run.
+  - Verification: `npm test --prefix sdk/router` passed 158/158.
+- 2026-06-12 SDK launch update-payload limit slice:
+  - Decision: launch validation must not infer provider update payload size. Pyth, Switchboard, Stork, and Supra pull materialize update/proof payloads through different route-level or hop-level provider flows, while Supra push can be zero-payload. When `routeLimits.maxUpdatePayloadBytes` is configured, each resolved route hop must explicitly declare `updatePayloadByteLength`; `0` is valid for no-update paths.
+  - RED: `npm test --prefix sdk/router` failed in `buildLaunchValidationMatrix enforces configured max update payload bytes`, `buildLaunchValidationMatrix requires update payload byte lengths when the cap is configured`, and `buildLaunchValidationMatrix rejects invalid update payload byte lengths` because the cases reached the transaction factory.
+  - GREEN: `routeLimits.maxUpdatePayloadBytes` now rejects missing, negative, or oversized route-total update payload byte lengths for state-changing and quote-only launch cases before transaction factories, provider fetch/update hooks, or dry-runs run.
+  - Verification: `npm test --prefix sdk/router` passed 161/161.
+- 2026-06-12 SDK offline launch-matrix validation slice:
+  - Decision: before live provider PTB dry-runs, launch configs need a deterministic offline gate that reuses the same matrix hydration path without provider fetch/update work or PTB construction. This does not prove live provider objects; it catches config/provider/route-limit mistakes earlier.
+  - RED: `npm test --prefix sdk/router` failed because `validateLaunchValidationMatrixConfig` was not exported.
+  - GREEN: `validateLaunchValidationMatrixConfig` now builds an offline provider registry from declared `providerIds`, hydrates route/quote cases through `buildLaunchValidationMatrix`, enforces provider IDs, executable route shape, and launch route limits, and returns deterministic route/quote/provider coverage via `summarizeLaunchValidationMatrix`.
+  - Verification: `npm test --prefix sdk/router` passed 163/163.
+- 2026-06-12 launch-matrix CLI/config slice:
+  - Decision: expose the offline SDK matrix validator as a file-based CLI so launch configs can be checked before live provider/Sui work. Keep real package, pool, coin, feed, and verifier IDs outside SDK source.
+  - RED: `node --test tools/validate-launch-matrix.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before `tools/validate-launch-matrix.mjs` existed.
+  - GREEN: `tools/validate-launch-matrix.mjs --config <file>` now reads JSON config, delegates to `validateLaunchValidationMatrixConfig`, and prints deterministic coverage JSON. `configs/launch/no-supra.matrix.example.json` validates as an offline template for one Pyth route case plus Stork REST and Switchboard quote cases.
+  - Verification: `node --test tools/validate-launch-matrix.test.mjs`; `node tools/validate-launch-matrix.mjs --config configs/launch/no-supra.matrix.example.json`; `npm test --prefix sdk/router` passed 163/163.
+- 2026-06-12 launch provider coverage invariant slice:
+  - Decision: `providerIds` in a launch matrix is not just an allowlist; it is the configured source set for that launch profile, so every declared provider must have at least one route or quote case. Known providers that are not enabled for the DEX/profile should stay out of `providerIds`.
+  - Clarification: supported adapters in the codebase are not implicitly enabled. A Pyth-only, Pyth+Stork, or no-Supra profile is valid as long as the published package, pool source masks, SDK provider registry, and matrix `providerIds` all agree on the selected subset.
+  - RED: `npm test --prefix sdk/router` failed in `validateLaunchValidationMatrixConfig rejects declared providers without coverage`, and `node --test tools/validate-launch-matrix.test.mjs` failed in `validateLaunchMatrixConfigFile rejects declared providers without coverage` because an uncovered declared `stork-rest` provider was accepted.
+  - GREEN: `validateLaunchValidationMatrixConfig` now rejects any declared provider ID missing from deterministic route/quote coverage before live provider fetch/update work or PTB construction.
+  - Verification: `npm test --prefix sdk/router` passed 164/164; `node --test tools/validate-launch-matrix.test.mjs` passed 3/3.
+- 2026-06-12 live-ready launch matrix value gate slice:
+  - Decision: keep offline template validation permissive, but add an explicit `--require-live-values` gate before live provider fetch/update work or Sui PTB construction. This lets example configs retain placeholders while real launch configs must replace package, pool, coin, feed, and verifier IDs before dry-run.
+  - RED: `node --test tools/validate-launch-matrix.test.mjs` failed because `validateLaunchMatrixConfigFile({ requireLiveValues: true })` accepted placeholder values and the CLI rejected `--require-live-values` as an unknown argument.
+  - GREEN: `tools/validate-launch-matrix.mjs` now accepts `--require-live-values` and rejects known template placeholder tokens or placeholder-looking `0x...` values before delegating to SDK matrix hydration.
+  - Verification: `node --test tools/validate-launch-matrix.test.mjs` passed 5/5.
+- 2026-06-12 live launch-matrix preflight runner boundary slice:
+  - Decision: add a dependency-injected live-runner CLI instead of hard-coding Sui SDK clients, provider secrets, or deployment object IDs into repo tooling. The runtime module supplies `providerRegistry`, `suiClient`, and transaction factories; the matrix file supplies route/quote cases and route limits.
+  - RED: `node --test tools/run-launch-matrix-preflight.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before `tools/run-launch-matrix-preflight.mjs` existed.
+  - GREEN: `tools/run-launch-matrix-preflight.mjs --config <file> --runtime <module>` now requires live-ready matrix values, imports `createLaunchMatrixRuntime`, runs `runLaunchValidationMatrixPreflight`, and prints deterministic coverage. Tests prove the runner exercises the SDK dry-run path through injected runtime wiring.
+  - Verification: `node --test tools/run-launch-matrix-preflight.test.mjs` passed 2/2.
+- 2026-06-12 devnet smoke launch-matrix artifact slice:
+  - Decision: capture the landed devnet smoke package/pool evidence in a live-value-clean launch matrix, while keeping it clearly separate from real Pyth/Stork/Switchboard live-provider validation. The smoke matrix uses provider ID `devnet-smoke` because the landed package routes through the temporary `devnet_smoke` wrapper.
+  - RED: `node --test tools/validate-launch-matrix.test.mjs` failed with `ENOENT` because `configs/launch/devnet-smoke.matrix.json` did not exist.
+  - GREEN: `configs/launch/devnet-smoke.matrix.json` now records the devnet package `0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc`, pool `0xd2b5a249f7667f8c16cf22f1378658d4d16d3bc5d62a4220a07890ac3e490874`, smoke/SUI type path, and landed tx digests for publish/create/add/swap/remove.
+  - Verification: `node --test tools/validate-launch-matrix.test.mjs` passed 6/6; `node tools/validate-launch-matrix.mjs --config configs/launch/devnet-smoke.matrix.json --require-live-values` returned deterministic `devnet-smoke` quote coverage.
+- 2026-06-12 devnet smoke state-changing dry-run evidence slice:
+  - Source state: active Sui env was `devnet`; wallet `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04` owned smoke coin `0xd2ca4564a797ca09b78e373e9eb0976a8a3df9e4cc32c856ba2641d4d8196237` with balance `324999999`.
+  - RED: after updating the expected devnet-smoke launch coverage, `node --test tools/validate-launch-matrix.test.mjs` failed because the matrix still had no state-changing route case.
+  - GREEN: `configs/launch/devnet-smoke.matrix.json` now includes a live-value-clean exact-input route case for `devnet_smoke::swap_smoke_for_sui`, using the current smoke coin as `input`, plus the successful dry-run digest.
+  - Live dry-run command: `rtk sui client call --package 0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc --module devnet_smoke --function swap_smoke_for_sui --args 0xd2b5a249f7667f8c16cf22f1378658d4d16d3bc5d62a4220a07890ac3e490874 0xd2ca4564a797ca09b78e373e9eb0976a8a3df9e4cc32c856ba2641d4d8196237 0 0x6 --dry-run --gas-budget 100000000 --json`.
+  - Verification: Sui dry-run returned `effects.status.status = success`, simulated digest `ANsCMsZv1ytu1yBoVD8TiJygtUVtRmaLYT2zDMZ9dryE`, and emitted `OracleQuorumUsed`, `Sync`, `PriceBundleUsed`, `SwapExecuted`, and `Swap`; `node --test tools/validate-launch-matrix.test.mjs` passed 6/6 after the matrix update.
+- 2026-06-12 Sui CLI dry-run evidence verifier slice:
+  - Decision: store smoke-route dry-run command shape in the matrix and add a verifier that reruns the Sui CLI dry-run and checks expected BrownFi event types. This makes devnet smoke evidence refreshable without adding a Sui SDK dependency or hard-coding runtime secrets.
+  - RED: `node --test tools/verify-sui-cli-dry-run-evidence.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the verifier existed; a follow-up red test proved `useRtk` was not honored.
+  - GREEN: `tools/verify-sui-cli-dry-run-evidence.mjs` loads live-value-clean matrix configs, finds a named route case, runs its `suiCliDryRun` command, requires `effects.status.status == "success"`, and checks all expected event types. `--use-rtk` is supported for this Codex workspace because direct nested `sui` from Node hit `NativeCertsNotFound`.
+  - Live verification: `rtk node tools/verify-sui-cli-dry-run-evidence.mjs --config configs/launch/devnet-smoke.matrix.json --case "devnet smoke exact input swap dry-run" --use-rtk` returned status `success`, digest `ANsCMsZv1ytu1yBoVD8TiJygtUVtRmaLYT2zDMZ9dryE`, and the expected `OracleQuorumUsed`, `PriceBundleUsed`, `SwapExecuted`, and `Swap` events.
+- 2026-06-12 launch-matrix network guard slice:
+  - Decision: live launch-matrix preflight should reject a runtime whose declared Sui network differs from the matrix `network` before provider fetch/update work, PTB construction, or dry-run. Network metadata remains optional for legacy/offline matrices, but live-ready matrices should declare it.
+  - RED: `node --test tools/run-launch-matrix-preflight.test.mjs` failed because a `devnet` matrix reached quote PTB construction with a `testnet` runtime.
+  - GREEN: `tools/run-launch-matrix-preflight.mjs` now checks `runtime.network` against matrix `network` when present, and `loadLaunchMatrixConfigFile` preserves validated network metadata for the runner.
+  - Verification: `node --test tools/run-launch-matrix-preflight.test.mjs` passed 3/3.
+- 2026-06-13 Pyth Sui contract manifest guard slice:
+  - Decision: keep documented Pyth Sui contract IDs in a small manifest outside SDK code, then verify the manifest against exported SDK constants. This catches stale current/upgraded Pyth state/package or Wormhole state/package IDs before launch runtime wiring.
+  - RED: `node --test tools/validate-pyth-sui-contracts.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the validator existed.
+  - GREEN: `configs/oracles/pyth-sui-contracts.json` records documented mainnet/testnet current and upgraded Pyth Sui IDs, defaults BrownFi SDK configuration to `upgraded`, and `tools/validate-pyth-sui-contracts.mjs` validates shape plus SDK parity.
+  - Caveat: this is a config drift guard only. It does not prove live Pyth Hermes fetch/update execution or a live Pyth-backed BrownFi swap dry-run.
+  - Verification: `node --test tools/validate-pyth-sui-contracts.test.mjs` passed 1/1.
+- 2026-06-13 Pyth Sui update-fee live-read slice:
+  - Finding: active address `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04` currently has no testnet gas objects, and `sui client faucet` redirects to the web faucet. State-changing testnet publish/swap work is therefore not funded yet.
+  - Decision: use Sui dev-inspect for `pyth::get_total_update_fee` because it can read the Pyth testnet contract without a real gas object and returns command output values, unlike dry-run status output alone.
+  - RED: `node --test tools/read-pyth-sui-update-fee.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the verifier existed.
+  - GREEN: `tools/read-pyth-sui-update-fee.mjs` validates the Pyth contract manifest, forces `--client.env <network>` in the Sui CLI command, dev-inspects the selected Pyth contract set, and returns the live `u64` update fee.
+  - Live evidence: testnet upgraded Pyth returned `updateFeeInMist = 0` for `numUpdates = 2`; testnet current Pyth returned `updateFeeInMist = 2` for `numUpdates = 2`.
+  - Caveat: this proves live Pyth fee readability for the selected contract set, not a BrownFi Pyth-backed route. That still needs testnet gas, a published BrownFi package/pool, and a real provider runtime.
+  - Verification: `node --test tools/read-pyth-sui-update-fee.test.mjs` passed 2/2; live reads with `--use-rtk` succeeded for testnet `upgraded` and `current`.
+- 2026-06-13 Pyth-upgraded testnet launch profile slice:
+  - Finding: `configs/launch/no-supra.json` still pulls Switchboard, and the cached Switchboard dependency in `~/.move` is dirty. That blocks a broad testnet dry-run before BrownFi bytecode verification. A Pyth-only profile is valid because launch/provider source sets are configurable.
+  - Finding: Sui does not auto-select Pyth's `Move.pro_compatible.sui_testnet.toml` from the BrownFi root `--build-env testnet`; the profile must copy that manifest over Pyth's `Move.toml` explicitly. The pro-compatible Pyth manifest also needs the dependency key `pyth` and must not duplicate the `wormhole` named address already owned by WormholeSimpleMajority.
+  - RED: `node --test tools/build-launch-package.test.mjs` failed before support for copied dependency manifest overrides, config-level local dependency insertion, and manifest-local address removal.
+  - GREEN: `tools/build-launch-package.mjs` now supports `manifestOverrides`, optional per-override `removeAddresses`, and config-level `localDependencies`, while preserving CLI `--local-dependency` precedence. `configs/launch/pyth-upgraded-testnet.json` uses those knobs to generate a Pyth-upgraded testnet package variant without Switchboard/Stork/FlowX/Supra.
+  - RED: `node --test tools/verify-launch-package-publish-dry-run.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before a refreshable publish dry-run verifier existed.
+  - GREEN: `tools/verify-launch-package-publish-dry-run.mjs` now regenerates a launch package, runs `sui client publish --dry-run --with-unpublished-dependencies`, checks Sui effects success, extracts the simulated package/modules/dependencies, and can assert expected dependency IDs/modules for a selected launch profile.
+  - Verification: generated `/private/tmp/brownfi-launch-pyth-upgraded-testnet-20260613e` and ran `sui move build --path ... --build-env testnet --pubfile-path ... --silence-warnings --allow-dirty`; build succeeded against `PythProCompatible` and `WormholeSimpleMajority`.
+  - Testnet publish dry-run: `sui client --client.env testnet publish --allow-dirty --with-unpublished-dependencies --dry-run --json --silence-warnings --gas-budget 2000000000 /private/tmp/brownfi-launch-pyth-upgraded-testnet-20260613e` returned `effects.status.status = success`, simulated digest `JCktjbxmpgSJwsGn4STMBpbWKv8NDcCLwNgdRsP4Tafa`, and published package `0x709b6f0a1cbb99fa67f4d4c47aef60c2a346b05be895cc41952338490d8cfa0d` in dry-run output.
+  - Live verifier: `rtk node tools/verify-launch-package-publish-dry-run.mjs --config configs/launch/pyth-upgraded-testnet.json --network testnet --out /private/tmp/brownfi-launch-pyth-upgraded-testnet-verify-20260613a --expected-dependency 0xd1ac23e1582080e2e5d43dbad1cf463ea2337cdbbb1a9ca669e470cefb74d8fd --expected-dependency 0xe79f4e3e02ce132f40f39e73220493a802329d3cb6ad7f789e98a78910fc0053 --expected-module pyth_source --expected-module oracle_gateway --expected-module swap --use-rtk` returned status `success`, simulated digest `JCktjbxmpgSJwsGn4STMBpbWKv8NDcCLwNgdRsP4Tafa`, modules `admin`, `events`, `factory`, `flash`, `library`, `math`, `oracle`, `oracle_gateway`, `pool`, `pyth_adapter`, `pyth_source`, `router`, and `swap`, and dependencies `0x1`, upgraded testnet Pyth, `0x2`, and upgraded testnet Wormhole simple majority. The first sandboxed run hit a `~/.move/git` lock permission error; the rerun succeeded after approving the scoped `rtk node tools/verify-launch-package-publish-dry-run.mjs` prefix.
+  - Caveat: `--with-unpublished-dependencies` bundles BrownFi-owned `brownfi_oracle` modules (`oracle`, `pyth_adapter`) into the simulated publish; external Pyth/Wormhole are linked through the real upgraded testnet package IDs. This is verifier evidence, not a landed transaction.
+- 2026-06-13 launch profile/provider-set consistency slice:
+  - Decision: launch package profiles now declare their selected oracle provider IDs. This keeps "supported adapter" separate from "enabled for this DEX/profile" and gives tooling a concrete source set to compare with matrix `providerIds`.
+  - RED: `node --test tools/validate-launch-matrix.test.mjs` failed in `validateLaunchMatrixConfigFile rejects provider sets that differ from launch config` because the matrix validator ignored the launch package profile.
+  - GREEN: `tools/validate-launch-matrix.mjs --launch-config <file>` now loads launch-profile `providerIds` and rejects matrices whose provider set differs. `configs/launch/no-supra.json` declares `pyth`, `stork-rest`, and `switchboard`; `configs/launch/pyth-upgraded-testnet.json` declares only `pyth`.
+  - RED: `node --test tools/validate-launch-matrix.test.mjs` failed with `ENOENT` before the Pyth-upgraded testnet profile had a matching matrix template.
+  - GREEN: `configs/launch/pyth-upgraded-testnet.matrix.example.json` now records a Pyth-only state-changing route case plus quote case, with launch limits capped to one oracle source per hop and zero AMM readings.
+- 2026-06-13 live runner launch-profile guard slice:
+  - Finding: active address `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04` still has no testnet gas; `rtk sui client --client.env testnet gas --json` returned `[]`. The same address has funded devnet gas, but the repo does not yet have a verified real-Pyth devnet contract profile, so devnet smoke remains smoke-only rather than real oracle evidence.
+  - RED: `node --test tools/run-launch-matrix-preflight.test.mjs` failed in `runLaunchMatrixPreflightConfigFile rejects launch provider mismatch before runtime load` because the live runner imported the runtime before comparing matrix provider IDs against the launch profile.
+  - GREEN: `tools/run-launch-matrix-preflight.mjs --launch-config <file>` now passes the launch profile through live-ready matrix validation and load, so a provider-set mismatch fails before runtime import, provider fetch/update work, PTB construction, or Sui dry-run.
+- 2026-06-13 launch package provider/source gate slice:
+  - Decision: launch package generation should reject provider/source drift before copying a publish package. A launch profile can choose only a subset of supported oracles, but every declared provider must have its corresponding BrownFi source module selected.
+  - RED: `node --test tools/build-launch-package.test.mjs` failed in `buildLaunchPackage rejects provider IDs whose source modules are not selected` because a profile could declare `switchboard` without selecting `switchboard_source`.
+  - GREEN: `tools/build-launch-package.mjs` now maps known oracle provider IDs to required source modules, rejects unknown provider IDs when `providerIds` is present, returns sorted `providerIds` in the build summary, and the real no-Supra plus Pyth-upgraded launch profiles pass the coherence check.
+- 2026-06-13 launch package selected-source exactness slice:
+  - Decision: selected launch source modules should not imply hidden provider enablement. When `providerIds` is declared, any known BrownFi oracle source module included in `sources` must have at least one matching selected provider ID.
+  - RED: `node --test tools/build-launch-package.test.mjs` failed in `buildLaunchPackage rejects selected provider source modules without matching provider IDs` because a Pyth-only profile could still include `supra_source`.
+  - GREEN: `tools/build-launch-package.mjs` now rejects known provider source modules selected without a matching provider ID, while still allowing shared source modules such as `stork_source` for either `stork` or `stork-rest`.
+- 2026-06-13 Pyth launch runtime config gate slice:
+  - Decision: before a live Pyth matrix preflight runs provider fetch/update work, validate the runtime's selected network/contract-set/provider against the documented Pyth Sui manifest and validate live matrix Pyth feed shape. This is a pre-live gate only; it does not execute Hermes, Pyth Sui updates, or BrownFi swaps.
+  - RED: `node --test tools/validate-pyth-launch-runtime.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the validator existed, then failed with `ENOENT` before the Pyth-upgraded runtime example existed.
+  - GREEN: `tools/validate-pyth-launch-runtime.mjs` now validates Pyth runtime config, selected manifest contract IDs, optional live matrix/launch-profile provider consistency, and two 32-byte feed IDs per Pyth route hop. `configs/launch/pyth-upgraded-testnet.runtime.example.json` records the selected `testnet/upgraded` runtime contract set without storing secrets.
+- 2026-06-13 current Sui Move warning gate slice:
+  - Decision: keep the Move package warning-clean against the current Sui CLI instead of relying on deprecated stdlib aliases. This is a build-health gate, not a behavior change.
+  - RED: `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` failed on deprecated `std::vector::empty`, `std::type_name::borrow_string`, and `std::type_name::get` usage.
+  - GREEN: replaced those call sites with `vector[]`, `type_name::as_string`, and `type_name::with_defining_ids`. The same warnings-as-errors command now passes 273/273 Move tests.
+- 2026-06-13 landed devnet smoke tx evidence verifier slice:
+  - Decision: landed transaction digests in the smoke matrix should be refreshable evidence, not copied terminal notes. The verifier checks chain `tx-block` output for success, expected Move calls, and expected BrownFi event types.
+  - RED: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the verifier existed. Follow-up RED tests proved pre-fetched tx JSON was ignored and digest mismatches were not rejected.
+  - GREEN: `tools/verify-sui-cli-tx-evidence.mjs` now loads live-value-clean matrix configs, finds named `txEvidence`, queries `sui client tx-block --json` or reads `--tx-json <file>`, requires `effects.status.status == "success"`, verifies the configured digest, and checks expected Move call/event coverage. `configs/launch/devnet-smoke.matrix.json` now records add-liquidity, swap, and remove-liquidity `txEvidence` entries.
+  - Live evidence: direct `rtk sui client --client.env devnet tx-block <digest> --json` succeeded for add-liquidity `8WHyQ1qo2vdNJvy33CczXg9uzXhErVyoEXnraSszZMaR`, swap `5otmGQH838V8yNucRv7CPNPczDkTvJtW9MzdrNFXHyQx`, and remove-liquidity `9ogGTqGLsM461dZozHsG6Ep5BrYKAH2ReCV2tyd2SzwJ`. The chain responses showed `effects.status.status = success`, the expected `devnet_smoke` Move calls, and the expected BrownFi events.
+  - Caveat: in this Codex runtime, spawning Sui CLI from Node or through shell redirection/pipes hits `NativeCertsNotFound`, while direct top-level `rtk sui ... tx-block --json` succeeds. The verifier keeps `--tx-json` so prefetched evidence can be checked without nesting Sui under Node.
+  - Verification: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` passed 6/6.
+- 2026-06-13 Sui JSON-RPC tx evidence verifier slice:
+  - Decision: add a Sui JSON-RPC path to the tx-evidence verifier so landed transaction evidence can be checked without spawning the Sui binary from Node. This avoids the local `NativeCertsNotFound` child-process failure while preserving the same digest/status/Move-call/event assertions.
+  - RED: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` failed because `rpcUrl` was ignored and JSON-RPC error envelopes were treated as missing transaction status.
+  - GREEN: `tools/verify-sui-cli-tx-evidence.mjs --rpc-url <url>` now calls `sui_getTransactionBlock` with `showInput`, `showEffects`, and `showEvents`, rejects JSON-RPC errors, and verifies the returned tx through the existing evidence assertions.
+  - Live evidence: `rtk node tools/verify-sui-cli-tx-evidence.mjs --config configs/launch/devnet-smoke.matrix.json --tx add-liquidity --rpc-url https://fullnode.devnet.sui.io:443 --use-rtk`, the same command for `swap`, and the same command for `remove-liquidity` all returned `status = success`, expected checkpoints/timestamps, expected `devnet_smoke` Move calls, and expected BrownFi events. The first sandboxed DNS attempt failed; rerunning with approved network access succeeded.
+  - Verification: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` passed 8/8.
+- 2026-06-13 typed router bundle round-trip coverage slice:
+  - Source check: architecture still called router/PTB round-trip coverage pending. Existing Move tests already covered typed two-hop quote-vs-execution paths, but did not assert that an exact-output route quote's required input round-trips through the corresponding exact-input route quote.
+  - Decision: add test-only coverage in `tests/v3_router_test.move` for the typed `A -> B -> C` bundle route. The test quotes exact-output C, feeds the required A into the exact-input quote, and requires the round-trip route to produce at least the requested C without changing production code.
+  - Verification: `rtk sui move test test_router_bundle_quote_round_trip_a_to_c_via_b --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.
+- 2026-06-13 SDK registered-route quote round-trip composition slice:
+  - Source check: SDK registered-route tests covered exact-input and exact-output quote amount chains independently. They did not prove the exact-output required-input PTB handle can be reused as the starting amount for the matching exact-input quote chain in one composed transaction.
+  - Decision: add SDK test-only coverage in `sdk/router/test/router-builder.test.mjs`. The test runs `quoteExactOutputWithRegisteredRoute`, passes `amounts[0]` into `quoteExactInputWithRegisteredRoute` on the same transaction recorder, and asserts the resulting Move calls use the expected bundle and amount handles.
+  - Verification: `rtk npm run build --prefix sdk/router` passed; `rtk node --test --test-name-pattern "registered route quote builders compose" sdk/router/test/router-builder.test.mjs` passed 1/1.
+- 2026-06-13 Sui gas readiness launch gate slice:
+  - Finding: direct top-level `rtk sui client --client.env testnet gas --json` returned `[]`, while devnet has funded gas. Spawning Sui CLI from Node still hits the local `NativeCertsNotFound` issue, so live tooling needs the same JSON-RPC/curl escape hatch used by tx evidence verification.
+  - RED: `rtk node --test tools/check-sui-gas-readiness.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the gas-readiness helper existed. Follow-up RED tests proved the initial helper only used `sui client gas` and had no JSON-RPC path.
+  - GREEN: `tools/check-sui-gas-readiness.mjs` now checks SUI gas through either `sui client gas --json` or JSON-RPC `suix_getCoins`, validates at least one gas coin plus an optional minimum total mist, and emits the Sui testnet faucet URL when testnet gas is empty.
+  - Live evidence: testnet JSON-RPC check for `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04` failed with zero gas and printed the faucet URL. Devnet JSON-RPC check for the same address passed with 7 gas coins and `totalMist = 14866171805`.
+  - Verification: `rtk node --test tools/check-sui-gas-readiness.test.mjs` passed 5/5.
+- 2026-06-13 launch-matrix gas gate ordering slice:
+  - Decision: make gas readiness an optional live-runner gate, not only a standalone diagnostic. It must run after live matrix validation but before runtime import, provider fetch/update work, PTB construction, or dry-run.
+  - RED: `rtk node --test tools/run-launch-matrix-preflight.test.mjs` failed because a missing runtime module was imported before the gas-readiness failure surfaced.
+  - GREEN: `tools/run-launch-matrix-preflight.mjs --check-gas --active-address <address> [--rpc-url <url>] [--min-gas-mist <n>] [--use-rtk]` now calls `checkSuiGasReadiness` with the matrix network before loading the runtime module.
+  - Verification: `rtk node --test tools/run-launch-matrix-preflight.test.mjs` passed 5/5.
+- 2026-06-13 Pyth Hermes API-key readiness gate slice:
+  - Finding: `configs/launch/pyth-upgraded-testnet.runtime.example.json` already models `requirePythApiKey` and `pythApiKeyEnv`, and the SDK helper enforces `apiKey` when requested. The runtime validator only checked that an env var name existed, not that the env var was set before live provider work.
+  - RED: `rtk node --test tools/validate-pyth-launch-runtime.test.mjs` failed because `requirePythApiKey: true` with an empty injected `env` still validated successfully.
+  - GREEN: `tools/validate-pyth-launch-runtime.mjs` now accepts an injectable `env` map, defaults to `process.env`, and fails early when `requirePythApiKey` is true but the configured env var is missing or empty.
+  - Verification: `rtk node --test tools/validate-pyth-launch-runtime.test.mjs` passed 5/5.
+- 2026-06-13 launch live-placeholder hardening slice:
+  - Finding: `tools/validate-launch-matrix.mjs --require-live-values` rejected the current template tokens but could still accept generic provider placeholders such as `SUPRA_HOLDER_ID`.
+  - RED: `rtk node --test --test-name-pattern "generic provider placeholders" tools/validate-launch-matrix.test.mjs` failed because the validator did not throw for `SUPRA_HOLDER_ID`.
+  - GREEN: `tools/validate-launch-matrix.mjs` now rejects uppercase snake-case placeholder sentinels containing words such as `ID`, `HASH`, `PACKAGE`, `POOL`, `FEED`, `HOLDER`, `OBJECT`, `STATE`, `PROOF`, or `VERIFIER`, while preserving existing permissive offline validation.
+  - Follow-up: the full tool suite exposed that tx-evidence unit fixtures used `SWAP_DIGEST`, which is no longer acceptable in live-value-clean matrix configs. Those fixtures now use the already-recorded devnet smoke swap/remove digests while keeping the same verifier assertions.
+  - Verification: `rtk node --test tools/validate-launch-matrix.test.mjs` passed 10/10; `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` passed 8/8.
+- 2026-06-13 provider-backed add-liquidity SDK slice:
+  - Decision: add-liquidity is pair-local, so the SDK should not invent route semantics. The provider-backed helper builds one price bundle for one pair through the selected provider registry entry, then calls `router::add_liquidity_with_bundle`.
+  - RED: `rtk node --test --test-name-pattern "addLiquidityWithRegisteredRoute" sdk/router/test/router-builder.test.mjs` failed because `sdk/router/dist/index.js` did not export `addLiquidityWithRegisteredRoute`.
+  - GREEN: `sdk/router/src/index.ts` now exports `AddLiquidityWithRegisteredRouteOptions` and `addLiquidityWithRegisteredRoute`, reusing `getRoutePriceProvider`, `routeBundleAt`, and `addLiquidityWithBundle`.
+  - Verification: `rtk npm run build --prefix sdk/router` passed; `rtk node --test --test-name-pattern "addLiquidityWithRegisteredRoute" sdk/router/test/router-builder.test.mjs` passed 1/1.
+- 2026-06-13 launch-matrix add-liquidity preflight slice:
+  - Finding: the live launch-matrix runner could preflight provider-backed swaps and quotes but could not express provider-backed add-liquidity, even though landed launch evidence needs add/remove/swap coverage.
+  - Decision: add `add-liquidity` to the registered route preflight case set as a single-pair provider-backed case. The existing `input` field is token A, `inputB` is token B, and `minLpOut` maps to `router::add_liquidity_with_bundle`; reversed paths and multi-hop liquidity configs are rejected instead of inventing unsupported semantics.
+  - RED: `rtk node --test --test-name-pattern "provider-backed add-liquidity cases" sdk/router/test/router-builder.test.mjs` failed with `Unsupported BrownFi registered route preflight case kind: add-liquidity`.
+  - GREEN: `sdk/router/src/index.ts` now hydrates and preflights `add-liquidity` route cases through `addLiquidityWithRegisteredRoute`, and the Pyth-upgraded plus no-Supra launch matrix templates include add-liquidity cases.
+  - Verification: `rtk npm test --prefix sdk/router` passed 168/168; `rtk node --test tools/validate-launch-matrix.test.mjs` passed 10/10.
+- 2026-06-13 launch-matrix remove-liquidity preflight slice:
+  - Finding: `router::remove_liquidity_with_coins` and the SDK `removeLiquidityWithCoins` PTB builder already existed, and devnet smoke evidence already records a landed remove-liquidity transaction. The registered launch-matrix route preflight layer could not express remove-liquidity, so live add/remove/swap launch matrices were still asymmetric.
+  - Decision: add `remove-liquidity` as a single-pair registered route preflight case. It validates provider ID and route limits for launch coverage, requires the path to match pair type order so `minAOut`/`minBOut` are unambiguous, and calls `router::remove_liquidity_with_coins` directly without building oracle/provider bundles because LP burns do not consume price bundles.
+  - RED: `rtk node --test --test-name-pattern "remove-liquidity cases" sdk/router/test/router-builder.test.mjs` failed with `Unsupported BrownFi registered route preflight case kind: remove-liquidity`.
+  - GREEN: `sdk/router/src/index.ts` now exports `removeLiquidityWithRegisteredRoute` and `preflightRemoveLiquidityWithRegisteredRoute`, hydrates `remove-liquidity` route cases, and dry-runs them through the same registered route preflight gate. The Pyth-upgraded and no-Supra launch matrix templates now include remove-liquidity route cases.
+  - Verification: `rtk npm test --prefix sdk/router` passed 169/169; `rtk node --test tools/validate-launch-matrix.test.mjs` passed 10/10; `rtk node --test tools/*.test.mjs` passed 49/49; `rtk node tools/check-move-struct-fields.mjs` passed with max Move struct fields <= 32; `rtk git diff --check` passed; `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 274/274.
+- 2026-06-13 launch-matrix submit runner slice:
+  - Finding: the launch tooling could dry-run provider-backed route matrices and verify already-known tx digests, but did not have a tested boundary that composes configured state-changing route cases, submits them through a caller-supplied runtime, and emits tx-evidence-ready digests. That left the add/remove/swap landed-tx workflow manual.
+  - Decision: keep submission runtime-specific. The repo should validate live-ready matrix values, provider sets, runtime network, and optional gas readiness, then reuse the SDK registered-route case composition path and call a runtime-provided `executeTransaction`. The runtime remains responsible for Sui signer/client construction and provider secrets; the tool requires successful execution effects and returns `txEvidence` entries with BrownFi event expectations inferred from route kind and package ID.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "buildRegisteredRouteCaseTransactions"` failed because `sdk/router/dist/index.js` did not export `buildRegisteredRouteCaseTransactions`. `rtk node --test tools/run-launch-matrix-submit.test.mjs` then failed with `ERR_MODULE_NOT_FOUND` before the submit tool existed.
+  - GREEN: `sdk/router/src/index.ts` now exports `buildRegisteredRouteCaseTransaction` and `buildRegisteredRouteCaseTransactions`, which compose hydrated exact-input, exact-output, result-aware exact-output, add-liquidity, and remove-liquidity route cases without dry-running. `tools/run-launch-matrix-submit.mjs` now loads a live-ready matrix/runtime, checks optional gas readiness, composes each route case, calls runtime `executeTransaction`, requires `effects.status.status == "success"`, and prints submitted route coverage plus `txEvidence` entries.
+  - Verification: `rtk npm test --prefix sdk/router` passed 170/170; `rtk node --test tools/*.test.mjs` passed 53/53; `rtk node tools/check-move-struct-fields.mjs` passed with max Move struct fields <= 32; `rtk git diff --check` passed; `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 274/274.
+- 2026-06-13 launch-matrix submitted tx Move-call evidence slice:
+  - Finding: the submit runner produced event expectations, but not `expectedMoveCalls`. That would make generated landed tx evidence weaker than the existing devnet smoke matrix because `verify-sui-cli-tx-evidence.mjs` can check both Move targets and event types.
+  - Decision: infer deterministic Move-call targets from each submitted route case. Exact-input routes map every resolved hop to the single-hop bundle swap target; add/remove liquidity map to their router liquidity targets; exact-output result-aware routes include the quote calls plus the single-hop exact-output swaps; typed exact-output routes infer the one-hop or two-hop router helper target. This keeps tx evidence independent from runtime internals while matching the SDK route builder shapes.
+  - RED: `rtk node --test tools/run-launch-matrix-submit.test.mjs` failed because generated `txEvidence` lacked `expectedMoveCalls`.
+  - GREEN: `tools/run-launch-matrix-submit.mjs` now emits `expectedMoveCalls` alongside `expectedEventTypes`; tests cover exact-input, add-liquidity, remove-liquidity, one-hop exact-output, and result-aware two-hop exact-output evidence.
+  - Verification: `rtk node --test tools/run-launch-matrix-submit.test.mjs` passed 5/5.
+- 2026-06-13 launch-matrix post-submit verification slice:
+  - Finding: successful runtime `executeTransaction` effects are weaker than landed evidence unless the digest is re-read from Sui and checked for expected BrownFi Move calls/events. The existing verifier only worked from persisted matrix `txEvidence`, but the submit runner generates new evidence in memory.
+  - Decision: expose a direct `verifySuiTxEvidence` API for generated evidence and make submit verification opt-in with `--verify-tx-evidence`. The submit runner still does not persist configs or secrets; when requested, it verifies each submitted digest through Sui CLI or JSON-RPC and returns `txVerification` summaries.
+  - RED: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` failed because `verifySuiTxEvidence` was not exported, and `rtk node --test tools/run-launch-matrix-submit.test.mjs` failed because submit verification made zero chain queries.
+  - GREEN: `verify-sui-cli-tx-evidence.mjs` now verifies either config-backed or generated tx evidence, and `run-launch-matrix-submit.mjs --verify-tx-evidence` verifies generated add/remove/swap evidence immediately after submission.
+  - Verification: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` passed 9/9; `rtk node --test tools/run-launch-matrix-submit.test.mjs` passed 6/6.
+- 2026-06-13 Pyth launch runtime scaffold slice:
+  - Finding: the launch runners could preflight, submit, and verify matrix cases, but the repo still required a hand-written runtime module to wire Sui client/transaction construction, Pyth clients, provider registry, and signer-backed execution.
+  - Decision: add a Pyth-only runtime module with dependency injection. The default live path dynamically imports current Sui/Pyth JS packages and reads RPC URL, submit key, optional sender, and optional Hermes token from env; tests inject fake constructors so the repo does not add hard dependencies or secrets. The runtime exposes the exact contract the existing runners expect: `network`, `suiClient`, `providerRegistry`, route/quote transaction factories, and `executeTransaction`.
+  - RED: `rtk node --test tools/pyth-launch-runtime.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the runtime existed.
+  - GREEN: `tools/pyth-launch-runtime.mjs` now builds a Pyth provider registry via `createPythSuiClients` / `createStandardRoutePriceProviderRegistry`, sets transaction sender when configured or derivable, and signs submissions through `suiClient.signAndExecuteTransaction`.
+  - Verification: `rtk node --test tools/pyth-launch-runtime.test.mjs` passed 2/2.
+- 2026-06-13 Pyth launch runtime dependency boundary slice:
+  - Source check: npm registry metadata for the current packages shows `@mysten/sui@2.17.0` and `@pythnetwork/pyth-sui-js@3.0.0`. The current `pyth-sui-js` package exports both `SuiPythClient` and `SuiPriceServiceConnection`; `@pythnetwork/price-service-client` does not export `SuiPriceServiceConnection`.
+  - Decision: declare a dedicated `tools/package.json` / `tools/package-lock.json` for live launch tooling dependencies and keep the runtime's Pyth imports inside `@pythnetwork/pyth-sui-js`. The lockfile currently resolves a Pyth stack that declares Node `^24.0.0`; launch runs should use Node 24 even though the local dependency-injected tests run under Node 25.
+  - RED: `rtk node --test tools/pyth-launch-runtime.test.mjs` failed while the runtime tried to import `@pythnetwork/price-service-client` for `SuiPriceServiceConnection`. `rtk npm test --prefix tools` then failed because the initial tools test script ran from `tools/` while existing tests expect repo-root-relative config paths.
+  - GREEN: `tools/pyth-launch-runtime.mjs` now imports `SuiPriceServiceConnection` from `@pythnetwork/pyth-sui-js`, the tools manifest/lockfile declare only direct runtime dependencies, and the tools package test script runs from the repo root.
+  - Verification: `rtk node --test tools/pyth-launch-runtime.test.mjs` passed 4/4; `rtk npm test --prefix tools` passed 60/60.
+- 2026-06-13 Pyth launch readiness checker slice:
+  - Finding: the live Pyth preflight/submit path had separate guards for runtime config, matrix live values, gas, and dependency imports, but no single fail-fast command that launch operators could run before provider fetch/update work.
+  - Decision: add a Pyth-only readiness checker that composes existing validation instead of duplicating rules. It validates runtime/manifest/matrix/launch-profile consistency, defaults to live-value matrix checks, enforces the current Pyth JS Node 24 engine boundary, verifies required JS imports are available, optionally requires the submit private-key env, and optionally checks Sui gas with the existing gas readiness helper.
+  - RED: `rtk node --test tools/check-pyth-launch-readiness.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the checker existed.
+  - GREEN: `tools/check-pyth-launch-readiness.mjs` now returns a readiness summary with runtime, node, dependency, signer, and gas sections; tests cover the happy path plus unsupported Node and missing submit signer failures.
+  - Verification: `rtk node --test tools/check-pyth-launch-readiness.test.mjs` passed 3/3.
+- 2026-06-13 Sui CLI dry-run network selection slice:
+  - Finding: `tools/verify-sui-cli-dry-run-evidence.mjs` loaded the launch matrix network but did not pass it to `sui client call`, so dry-run evidence could silently use the active local Sui environment instead of the matrix network.
+  - RED: `rtk node --test tools/verify-sui-cli-dry-run-evidence.test.mjs` failed because the Sui CLI args omitted `--client.env devnet`.
+  - GREEN: the dry-run verifier now adds `--client.env <network>` when the matrix declares a network, including the `--use-rtk` path.
+  - Live evidence: `rtk node tools/verify-sui-cli-dry-run-evidence.mjs --config configs/launch/devnet-smoke.matrix.json --case "devnet smoke exact input swap dry-run" --use-rtk` passed with digest `ANsCMsZv1ytu1yBoVD8TiJygtUVtRmaLYT2zDMZ9dryE`.
+- 2026-06-13 live launch-package publish runner slice:
+  - Finding: the repo could build a launch package and prove publish dry-run shape, but did not have a tested command that performs the real publish and returns the package ID needed to replace `0xBROWNFI_PACKAGE` in live matrices.
+  - RED: `rtk node --test tools/publish-launch-package.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the runner existed.
+  - GREEN: `tools/publish-launch-package.mjs` now builds the selected launch package, optionally gates gas, publishes with explicit `--client.env <network>`, requires successful effects, verifies expected modules/dependencies, and prints package ID evidence.
+  - Verification: `rtk node --test tools/publish-launch-package.test.mjs` passed 3/3. `rtk node tools/verify-launch-package-publish-dry-run.mjs --config configs/launch/pyth-upgraded-testnet.json --network testnet --use-rtk --expected-dependency 0xd1ac23e1582080e2e5d43dbad1cf463ea2337cdbbb1a9ca669e470cefb74d8fd --expected-module router --expected-module oracle_gateway --expected-module pyth_source` passed and confirmed the generated package links to upgraded Pyth. The real publish runner with `--check-gas --rpc-url https://fullnode.testnet.sui.io:443` stopped before publish because the active testnet address has no gas.
+- 2026-06-13 launch-matrix materialization slice:
+  - Finding: after a real publish, live matrices still needed manual placeholder replacement for package, pool, coin, LP, and feed IDs before readiness/preflight/submit could run. Manual editing is too easy to get wrong because the same pair values appear across swap/add/remove/quote cases.
+  - RED: `rtk node --test tools/materialize-launch-matrix.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the materializer existed.
+  - GREEN: `tools/materialize-launch-matrix.mjs` now consumes a matrix template, explicit replacement values, and an optional publish result package ID, replaces only known launch placeholders, validates with `--require-live-values` semantics before writing, and rejects package-ID conflicts.
+  - Verification: `rtk node --test tools/materialize-launch-matrix.test.mjs` passed 3/3. A CLI run against `configs/launch/pyth-upgraded-testnet.matrix.example.json` plus a temporary values fixture produced a Pyth-only materialized matrix summary with 3 route cases and 1 quote case.
+- 2026-06-13 launch pool-creation setup slice:
+  - Finding: live launch setup after publish needs a pool creation PTB before add/remove/swap matrix cases can use a real pool and LP coin. The SDK had direct add/remove/swap builders, but not `swap::create_pool_with_coins` or the transfer-to-sender variant.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "create-pool builders"` failed because `sdk/router/dist/index.js` did not export `createPoolWithCoins`.
+  - GREEN: `sdk/router/src/index.ts` now exports `CreatePoolWithCoinsOptions`, `createPoolWithCoins`, and `createPoolWithCoinsAndTransferLpToSender`, matching `swap.move` argument order and using real `u8` pure values for token decimals.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "create-pool builders"` passed.
+- 2026-06-13 launch publish-object extraction slice:
+  - Finding: Sui publish creates the shared `Factory`, shared `OracleAdapter`, and transferred caps needed for pool creation. Without a parser, those object IDs would be copied manually from publish output.
+  - RED: `rtk node --test tools/extract-launch-publish-objects.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the extractor existed.
+  - GREEN: `tools/extract-launch-publish-objects.mjs` now validates successful publish JSON, extracts the published package ID, `Factory`, `OracleAdapter`, `PoolCreatorCap`, and known factory cap object IDs, and can write that launch object summary to JSON.
+  - Verification: `rtk node --test tools/extract-launch-publish-objects.test.mjs` passed 4/4.
+- 2026-06-13 launch pool-create object extraction slice:
+  - Finding: after pool creation, the live matrix needs the shared pool object ID and the sender-owned LP coin object ID. The pool ID is emitted in `events::PoolCreated`; the LP coin is a created `0x2::coin::Coin<...::pool::LP<...>>` object when using the transfer-to-sender create-pool entrypoint.
+  - RED: `rtk node --test tools/extract-launch-pool-create-objects.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the extractor existed.
+  - GREEN: `tools/extract-launch-pool-create-objects.mjs` now validates successful create-pool tx JSON, requires exactly one `PoolCreated` event, extracts `POOL`, finds the created LP coin object, and emits `POOL`/`LP_COIN` replacements for matrix materialization.
+  - Verification: `rtk node --test tools/extract-launch-pool-create-objects.test.mjs` passed 4/4.
+- 2026-06-13 pre-pool Pyth price-info update SDK slice:
+  - Finding: `swap::create_pool_with_coins` needs Pyth `PriceInfoObject` IDs before a BrownFi pool exists, but the SDK's Pyth fetch/update helpers returned BrownFi `PriceBundle` values that require an existing pool.
+  - Decision: expose a narrow pre-pool helper that only fetches Hermes update data and calls `SuiPythClient.updatePriceFeeds`, returning the updated `PriceInfoObject` IDs. It does not construct BrownFi readings, bundles, or pool-dependent calls.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "fetchAndUpdatePythPriceInfoObjectsFromFeeds"` failed because `sdk/router/dist/index.js` did not export `fetchAndUpdatePythPriceInfoObjectsFromFeeds`.
+  - GREEN: `sdk/router/src/index.ts` now exports `FetchAndUpdatePythPriceInfoObjectsFromFeedsOptions` and `fetchAndUpdatePythPriceInfoObjectsFromFeeds`.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "fetchAndUpdatePythPriceInfoObjectsFromFeeds"` passed; `rtk npm test --prefix sdk/router` passed 172/172.
+- 2026-06-13 Pyth live pool-create runner slice:
+  - Finding: the live path had publish extraction, Pyth price-info updating, create-pool PTB builders, and pool-create object extraction, but no checked-in runner that composes them into a real Pyth-backed pool creation transaction before launch-matrix materialization.
+  - Decision: add a Pyth-only pool-create runner. It accepts a pool config, loads a runtime, updates Pyth in the same PTB, calls `swap::create_pool_with_coins_and_transfer_lp_to_sender`, requires successful execution, extracts `POOL`/`LP_COIN`, and emits tx-evidence-ready expectations. The checked-in Pyth runtime now exposes `priceFeedConnection`, `pythClient`, `poolTransactionFactory`, and `showObjectChanges` execution output.
+  - RED: `rtk node --test tools/create-pyth-launch-pool.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before `tools/create-pyth-launch-pool.mjs` existed.
+  - GREEN: `tools/create-pyth-launch-pool.mjs` and `configs/launch/pyth-upgraded-testnet.pool.example.json` now cover the pool-create setup step.
+  - Verification: `rtk node --test tools/create-pyth-launch-pool.test.mjs` passed 2/2; `rtk node --test tools/pyth-launch-runtime.test.mjs` passed 4/4.
+- 2026-06-13 launch matrix token-type placeholder slice:
+  - Finding: launch matrix templates referenced `0xBROWNFI_PACKAGE::coin_a::COIN_A` and `coin_b`, but the selected BrownFi launch package does not publish sample token modules. Replacing only `BROWNFI_PACKAGE` could therefore produce a live-value-clean matrix with impossible token types.
+  - Decision: model token types as separate `TYPE_A`/`TYPE_B` live replacements. BrownFi package ID remains a package replacement for BrownFi calls only; launch token package IDs must be supplied explicitly.
+  - RED: `rtk node --test tools/materialize-launch-matrix.test.mjs` failed with `Unknown launch matrix replacement key: TYPE_A`, and the focused validate test did not recognize `TYPE_A` as a live-value placeholder.
+  - GREEN: `tools/materialize-launch-matrix.mjs` accepts `TYPE_A`/`TYPE_B`, `tools/validate-launch-matrix.mjs` rejects unresolved `TYPE_A`/`TYPE_B`, and launch/pool templates use explicit token-type placeholders.
+  - Verification: `rtk node --test tools/materialize-launch-matrix.test.mjs` passed 3/3; `rtk node --test --test-name-pattern "live-ready values|CLI can require" tools/validate-launch-matrix.test.mjs` passed 2/2.
+- 2026-06-13 Pyth pool config placeholder gate slice:
+  - Finding: after adding `TYPE_A`/`TYPE_B`, `tools/create-pyth-launch-pool.mjs` could still be called with an unresolved pool template and would reach runtime construction/PTB building before failing.
+  - Decision: make the pool-create runner always require live-value-clean pool config. It rejects BrownFi package, token type, factory/cap/oracle, feed, and init-coin placeholders before touching Pyth or the runtime.
+  - RED: `rtk node --test --test-name-pattern "unresolved live-value placeholders" tools/create-pyth-launch-pool.test.mjs` failed because the runtime fixture was called before placeholder validation.
+  - GREEN: `tools/create-pyth-launch-pool.mjs` now rejects unresolved placeholders at config load time, and the pool-create tests use lowercase hex-shaped object IDs for valid live fixtures.
+  - Verification: `rtk node --test tools/create-pyth-launch-pool.test.mjs` passed 3/3.
+- 2026-06-13 Pyth pool config materializer slice:
+  - Finding: after publish-object extraction, the live Pyth pool-create config still required manual stitching of package/factory/oracle/cap IDs, token types, feed IDs, init coin IDs, and token decimals before the pool runner could be used.
+  - Decision: add a dedicated pool-config materializer rather than overloading the matrix materializer. Pool creation has publish-derived BrownFi object IDs plus live token/feed/coin/decimal inputs, and it should validate through the pool-create config gate before output.
+  - RED: `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the materializer existed.
+  - GREEN: `tools/materialize-pyth-launch-pool.mjs` now merges publish-object extraction output with live pool values, supports token decimal overrides, rejects conflicts/placeholders, and writes a live-value-clean pool config.
+  - Verification: `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` passed 3/3; `rtk node --test tools/create-pyth-launch-pool.test.mjs` passed 3/3.
+- 2026-06-13 launch matrix pool-result handoff slice:
+  - Finding: after `create-pyth-launch-pool.mjs`, `tools/materialize-launch-matrix.mjs` still required manually copying `POOL` and `LP_COIN` from the pool-create result into a values file before submit/preflight.
+  - Decision: add an optional `poolResult` / `--pool-result` input to the matrix materializer. It contributes `POOL` and `LP_COIN` replacements from either top-level fields or the runner's `replacements` object and rejects conflicts with explicit values.
+  - RED: `rtk node --test tools/materialize-launch-matrix.test.mjs` failed because `poolResult` was ignored and `0xPOOL` / `0xLP_COIN` placeholders remained.
+  - GREEN: `tools/materialize-launch-matrix.mjs` now consumes pool-create output directly.
+  - Verification: `rtk node --test tools/materialize-launch-matrix.test.mjs` passed 4/4.
+- 2026-06-13 publish-result object handoff slice:
+  - Finding: the live publish runner returned package ID/modules/dependencies but discarded the publish-created `Factory`, `OracleAdapter`, and `PoolCreatorCap`, so operators still needed raw publish JSON plus a separate extractor before pool materialization.
+  - Decision: embed the existing publish-object extraction summary in `publishLaunchPackage` output as `publishObjects`, and allow `materialize-pyth-launch-pool.mjs` to accept either standalone publish-object extraction output or the publish-runner summary shape.
+  - RED: `rtk node --test tools/publish-launch-package.test.mjs` failed because `publishObjects` was missing; `rtk node --test --test-name-pattern "publish runner summaries" tools/materialize-pyth-launch-pool.test.mjs` failed because the materializer only accepted top-level publish objects.
+  - GREEN: `tools/publish-launch-package.mjs` includes `publishObjects`, and `tools/materialize-pyth-launch-pool.mjs` unwraps `publishObjects` when present.
+  - Verification: `rtk node --test tools/publish-launch-package.test.mjs` passed 3/3; `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` passed 4/4.
+- 2026-06-13 shared Pyth launch values slice:
+  - Finding: the live Pyth launch path had separate pool and matrix materializers, but no checked-in shared values template. Operators could still drift token types, feed IDs, init coins, and route input coins across pool creation and add/remove/swap matrix materialization.
+  - Decision: add one Pyth-upgraded testnet values example for the explicit live replacements shared by both materializers, and rename the pool materializer CLI handoff to the clearer `--publish-result` while keeping `--publish-objects` as an alias.
+  - RED: `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` failed with `Unknown argument: --publish-result`; `rtk node --test tools/materialize-launch-matrix.test.mjs` failed because `configs/launch/pyth-upgraded-testnet.values.example.json` did not exist.
+  - GREEN: `tools/materialize-pyth-launch-pool.mjs` accepts `--publish-result`, and `configs/launch/pyth-upgraded-testnet.values.example.json` declares the shared token/feed/coin/decimal replacement shape.
+  - Verification: `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` passed 5/5; `rtk node --test tools/materialize-launch-matrix.test.mjs` passed 5/5; `rtk npm test --prefix tools` passed 87/87.
+- 2026-06-13 launch test-coin package slice:
+  - Finding: the BrownFi launch package intentionally does not publish sample token modules, so real Pyth-backed pool creation still needs externally supplied `TYPE_A`, `TYPE_B`, init coins, and route input coins. The existing devnet smoke evidence used a temporary `devnet_smoke` wrapper and is not real Pyth-provider evidence.
+  - Decision: add a separate launch-only Sui package for test/dev validation tokens instead of adding sample coins to BrownFi core. The package publishes 9-decimal `coin_a::COIN_A` and `coin_b::COIN_B`, uses the current `coin_registry::new_currency_with_otw` API, mints two coins per token during publish, and transfers treasury caps to the publisher.
+  - RED: `rtk node --test tools/extract-launch-test-coins.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the extractor existed, then failed again when the extractor still required legacy `CoinMetadata` objects.
+  - GREEN: `packages/launch-test-coins` builds with current Sui coin-registry APIs, `tools/extract-launch-test-coins.mjs` extracts token types, treasury caps, init coins, input coins, and launch replacements, and `tools/publish-launch-test-coins.mjs` composes publish plus extraction with optional gas readiness.
+  - Verification: `rtk node --test tools/extract-launch-test-coins.test.mjs` passed 4/4; `rtk node --test tools/publish-launch-test-coins.test.mjs` passed 3/3; `rtk sui move build --path packages/launch-test-coins --build-env testnet --warnings-are-errors` passed; `rtk sui client --client.env testnet publish --dry-run --json --silence-warnings --gas-budget 1000000000 packages/launch-test-coins` passed with dry-run digest `D3JaqbJh74oLwGrN1Ruj9pqALn4apwiESPP1e6nGpeKM`.
+- 2026-06-13 split launch values materialization slice:
+  - Finding: test-coin publish output supplies token/coin values, while Pyth feed IDs are a separate live source. Requiring operators to hand-merge those files before materializing pool and matrix configs creates avoidable launch drift.
+  - Decision: let both materializers accept repeated values files and merge replacements through the existing per-key conflict checks.
+  - RED: `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` and `rtk node --test tools/materialize-launch-matrix.test.mjs` failed because both tools treated `values` as a single path.
+  - GREEN: `tools/materialize-pyth-launch-pool.mjs` and `tools/materialize-launch-matrix.mjs` now accept multiple values files through both programmatic arrays and repeated `--values` CLI flags.
+  - Verification: `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` passed 6/6; `rtk node --test tools/materialize-launch-matrix.test.mjs` passed 6/6; `rtk npm test --prefix tools` passed 96/96.
+- 2026-06-13 Pyth launch artifact assembly proof slice:
+  - Finding: even with multi-value materialization, the repo did not have one checked proof that the actual Pyth-upgraded pool and matrix templates can be assembled from the intended artifact chain: BrownFi publish output, launch test-coin publish output, Pyth feed values, and pool-create output.
+  - Decision: add a feed-only values example and an offline assembly test that uses the existing materializers rather than adding another orchestration layer. The pool materializer now tolerates shared route input coin keys from test-coin output, and the matrix materializer ignores known pool-only init/decimal keys while still rejecting arbitrary unknown replacements.
+  - RED: `rtk node --test tools/launch-assembly.test.mjs` failed because the pool materializer rejected `INPUT_COIN`, the matrix materializer rejected `INIT_COIN_A`, and `configs/launch/pyth-upgraded-testnet.feeds.example.json` did not exist.
+  - GREEN: `configs/launch/pyth-upgraded-testnet.feeds.example.json` records only `BASE_FEED_ID` / `QUOTE_FEED_ID`; `tools/launch-assembly.test.mjs` proves Pyth-upgraded pool and matrix outputs materialize from split live artifacts.
+  - Verification: `rtk node --test tools/launch-assembly.test.mjs` passed 2/2; `rtk npm test --prefix tools` passed 98/98.
+- 2026-06-13 Pyth launch sequence runner slice:
+  - Finding: the launch path had tested individual steps, but a funded operator still had to manually chain publish test coins, publish BrownFi, materialize the pool config, create the pool, materialize the matrix, and submit add/remove/swap cases. That manual sequence could drift even though every step already had a checked tool boundary.
+  - Decision: add a thin Pyth-only sequence runner over the existing tools instead of duplicating launch logic. It writes every intermediate artifact under one output directory and preserves the existing gas, signer, runtime, and tx-evidence verification gates.
+  - RED: `rtk node --test tools/run-pyth-launch-sequence.test.mjs` failed with `ERR_MODULE_NOT_FOUND` before the sequence runner existed.
+  - GREEN: `tools/run-pyth-launch-sequence.mjs` now orchestrates the existing publish/materialize/create/submit helpers and writes `test-coins.json`, `brownfi-publish.json`, `pool-result.json`, `submit.json`, and `summary.json`.
+  - Verification: `rtk node --test tools/run-pyth-launch-sequence.test.mjs` passed 1/1.
+- 2026-06-13 SDK flash exact-repayment PTB helper slice:
+  - Finding: Sui flash repay requires exactly borrowed amount plus fee, but the SDK same-PTB helper only exposed the borrowed coin and receipt. Passing the borrowed coin directly to repay is only valid for zero-fee pools and is not enough for normal BrownFi V3 fee policy.
+  - Decision: keep fee sizing explicit and add narrow helpers that merge a caller-supplied fee coin into the borrowed coin before calling the existing `repay_*_with_coin` PTB thunk. The SDK still does not infer fees off-chain or silently split gas.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "flash fee helpers"` failed because `repayAWithBorrowedCoinAndFee` / `repayBWithBorrowedCoinAndFee` were not exported.
+  - GREEN: `sdk/router/src/index.ts` now supports transaction `mergeCoins` and exports `repayAWithBorrowedCoinAndFee` / `repayBWithBorrowedCoinAndFee`.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "flash fee helpers"` passed; the SDK suite reported 173/173 passing.
+- 2026-06-13 SDK generic AMM-reading route wrapper slice:
+  - Finding: FlowX had provider-independent route wrappers, and all oracle providers could consume `ammReadings`, but runtime code for reviewed non-FlowX readers still needed a narrow way to build and append BrownFi-owned `AmmReading` handles before delegating to an oracle route provider.
+  - Decision: add `createAmmReadingRoutePriceProvider` as a generic SDK wrapper. It executes a caller-supplied per-hop builder in route order, appends returned `AmmReading` handles to existing hop `ammReadings`, preserves the wrapped provider ID by default, and does not introduce unreviewed AMM math or source-specific adapters.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "createAmmReadingRoutePriceProvider"` failed because the SDK did not export `createAmmReadingRoutePriceProvider`.
+  - GREEN: `sdk/router/src/index.ts` now exports the generic AMM-reading route wrapper plus builder/context types.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "createAmmReadingRoutePriceProvider"` passed; the SDK suite reported 174/174 passing.
+- 2026-06-13 standard-registry generic AMM wrapper slice:
+  - Finding: after the generic wrapper existed, `createStandardRoutePriceProviderRegistry` still only auto-wrapped configured providers with FlowX readers, forcing standard-registry runtimes to wrap providers manually for other reviewed AMM readers.
+  - Decision: add optional `buildAmmReadings` to the standard registry options and compose it through the same deterministic wrapper chain as FlowX. Generic AMM readings are appended after existing and FlowX-generated readings.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "caller-built AMM readings"` failed because the standard registry ignored `buildAmmReadings` and built an oracle-only bundle.
+  - GREEN: `sdk/router/src/index.ts` now applies `createAmmReadingRoutePriceProvider` inside `createStandardRoutePriceProviderRegistry` when `buildAmmReadings` is supplied.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "caller-built AMM readings"` passed; the SDK suite reported 175/175 passing.
+- 2026-06-13 AMM launch source-set validation slice:
+  - Finding: launch profiles already made oracle providers explicit through `providerIds`, but AMM source modules such as `amm_flowx` could still be selected without an explicit AMM provider declaration.
+  - Decision: add `ammProviderIds` to launch profiles and enforce known AMM provider/source coherence in `tools/build-launch-package.mjs`. This keeps "FlowX is supported in code" separate from "FlowX AMM is included in this launch package".
+  - RED: `rtk node --test tools/build-launch-package.test.mjs` failed because `ammProviderIds: ["flowx"]` did not require `amm_flowx`, and selecting `amm_flowx` did not require a matching AMM provider ID.
+  - GREEN: `tools/build-launch-package.mjs` validates AMM provider/source selections, `configs/launch/no-supra.json` declares `ammProviderIds: ["flowx"]`, and `configs/launch/pyth-upgraded-testnet.json` declares an empty AMM provider set.
+  - Verification: `rtk node --test tools/build-launch-package.test.mjs` passed 10/10.
+- 2026-06-13 SDK result-aware Pyth exact-output route helper slice:
+  - Finding: `swapExactOutputWithRegisteredRouteResults` already handled arbitrary positive-length exact-output routes with explicit quote results, change coins, and final output handles, but the Pyth convenience layer only exposed the compatibility one/two-hop `swapExactOutputWithPythRoute` helper.
+  - Decision: add `swapExactOutputWithPythRouteResults` as a narrow Pyth-provider wrapper around the registered-provider result-aware planner. Preserve `swapExactOutputWithPythRoute` and its one/two-hop return shape for compatibility.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "swapExactOutputWithPythRouteResults"` failed because the SDK did not export the helper.
+  - GREEN: `sdk/router/src/index.ts` now creates a Pyth route provider registry and delegates to `swapExactOutputWithRegisteredRouteResults`.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "swapExactOutputWithPythRouteResults"` passed; the SDK suite reported 176/176 passing.
+- 2026-06-13 launch-matrix AMM provider-set validation slice:
+  - Finding: launch package profiles now declare `ammProviderIds`, but `tools/validate-launch-matrix.mjs --launch-config` only compared oracle `providerIds`. A matrix could therefore drift from a Pyth-only/no-AMM launch profile by declaring FlowX AMM without failing the offline gate.
+  - Decision: make launch matrices declare `ammProviderIds` and compare that sorted set against the launch profile when `--launch-config` is supplied. Keep AMM coverage semantics separate until route-case conventions explicitly identify source-specific AMM usage.
+  - RED: `rtk node --test tools/validate-launch-matrix.test.mjs` failed because a matrix with `ammProviderIds: ["flowx"]` and a launch profile with `ammProviderIds: []` did not throw.
+  - GREEN: `tools/validate-launch-matrix.mjs` now loads and compares matrix/profile `ammProviderIds`; the no-Supra matrix declares `["flowx"]`, and the Pyth-upgraded testnet matrix declares `[]`.
+  - Verification: `rtk node --test tools/validate-launch-matrix.test.mjs` passed 11/11; `rtk npm test --prefix tools` passed 102/102.
+- 2026-06-13 launch route-limit FlowX AMM counting slice:
+  - Finding: `routeLimits.maxAmmSourcesPerHop` counted prebuilt `ammReadings`, but not source-specific `flowxDirectAmm` / `flowxTwoHopAmm` route inputs before the FlowX wrapper turns them into BrownFi-owned `AmmReading` handles.
+  - Decision: count reviewed FlowX AMM route input arrays alongside prebuilt `ammReadings` during launch-matrix hydration. Generic caller-built AMM wrappers remain outside static counting because the builder is executable code, not serializable matrix data.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "configured max AMM sources per hop"` failed because a `flowxDirectAmm` route reached the transaction factory under `maxAmmSourcesPerHop: 0`.
+  - GREEN: `sdk/router/src/index.ts` now includes FlowX direct and two-hop AMM route inputs in `routeHopAmmReadingCount`.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "configured max AMM sources per hop"` passed; `rtk npm test --prefix sdk/router` passed 176/176.
+- 2026-06-13 exact-output gamma cutoff quote edge coverage slice:
+  - Finding: Sui core already implemented the Solidity §4.3 exact-output cutoff behavior, but the direct quote tests did not explicitly pin the zero-clamp and non-binding-cutoff cases from the Solidity router coverage.
+  - Decision: add direct Sui quote guards in `tests/v3_swap_test.move` instead of adding router API shape that EVM needs but Sui does not expose.
+  - GREEN: `swap::quote_a_for_exact_b` now has tests proving zero cutoff returns `(0, 0)` without a secondary input-formula abort and loose gamma leaves `effective_out == requested_out`.
+  - Verification: focused `rtk sui move test` filters passed for both new tests.
+- 2026-06-13 router exact-input TX_CASES execution coverage slice:
+  - Finding: exact-input formula fixtures were covered as quote/raw-output checks, but Sui router did not have a state-changing tx1-tx12 exact-input sequence analogous to the existing exact-output router sequence.
+  - Decision: add a Sui router sequence over the Solidity periphery `TX_CASES` input amounts using the existing constant Pyth-style router sequence bundle. This proves quote/execution consistency and no inventory abort across the input pattern; it does not replay each spreadsheet row's per-tx oracle price.
+  - GREEN: `test_router_exact_input_solidity_tx_sequence_executes_without_inventory_revert` executes all 12 exact-input steps through single-hop router bundle helpers and asserts actual output equals the pre-swap quote at each step.
+  - Verification: focused `rtk sui move test test_router_exact_input_solidity_tx_sequence_executes_without_inventory_revert --allow-dirty --build-env testnet --warnings-are-errors` passed.
+- 2026-06-13 launch-matrix AMM provider coverage slice:
+  - Finding: oracle `providerIds` required route/quote coverage, but `ammProviderIds` only had launch-profile set matching. A matrix could declare FlowX AMM without any route or quote exercising `flowxDirectAmm` or `flowxTwoHopAmm`.
+  - Decision: add SDK-level `ammProviderIds` validation for known AMM providers. `flowx` now requires at least one resolved route/quote hop with FlowX AMM route fields, and unknown AMM provider IDs fail closed because there is no generic AMM registry to validate.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "declared AMM providers"` failed because uncovered `ammProviderIds: ["flowx"]` did not throw.
+  - GREEN: `sdk/router/src/index.ts` validates FlowX AMM coverage, `tools/validate-launch-matrix.mjs` receives the rule through the SDK path, and `configs/launch/no-supra.matrix.example.json` includes one placeholder FlowX direct AMM route source.
+  - Verification: focused SDK AMM-provider tests passed; `rtk node --test tools/validate-launch-matrix.test.mjs` passed 12/12.
+- 2026-06-13 Pyth raw/no-cutoff route quote wrapper slice:
+  - Finding: registered-provider route quotes supported exact-input and exact-output raw/no-cutoff chaining, but the Pyth convenience layer only exposed cutoff-aware quote wrappers.
+  - Decision: add narrow Pyth wrappers over the existing registered-provider raw quote planners. No new math or provider behavior is introduced.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "WithoutCutoffWithPythRoute"` failed because `quoteExactInputWithoutCutoffWithPythRoute` was not exported.
+  - GREEN: `sdk/router/src/index.ts` now exports `quoteExactInputWithoutCutoffWithPythRoute` and `quoteExactOutputWithoutCutoffWithPythRoute`, both using the same one-provider Pyth registry delegation pattern as the cutoff-aware Pyth quote wrappers.
+  - Verification: focused SDK Pyth raw/no-cutoff wrapper tests passed.
+- 2026-06-13 Pyth launch matrix live feed-metadata validation slice:
+  - Finding: offline launch-matrix validation could prove provider/route coverage for a `pyth` case while still accepting non-feed-ID strings such as `feed-a`. The separate Pyth runtime validator already checks feed IDs, but the generic live matrix gate should fail before runtime/provider work when live values are required.
+  - Decision: add optional provider-metadata validation to the SDK launch-matrix config validator and enable it from `tools/validate-launch-matrix.mjs` only when `--require-live-values` is used. Placeholder templates still validate offline without concrete feed IDs, while live-value matrices require every resolved `pyth` route/quote hop to carry exactly two 32-byte hex feed IDs.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "malformed Pyth feed IDs"` failed because `validateLaunchValidationMatrixConfig` accepted `feed-a` / `feed-b`.
+  - GREEN: `sdk/router/src/index.ts` now exposes `requireProviderMetadata` on `validateLaunchValidationMatrixConfig`, validates resolved Pyth feed IDs when enabled, and `tools/validate-launch-matrix.mjs` passes that flag for live-value validation.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "malformed Pyth feed IDs"` passed 181/181 in the filtered SDK run; `rtk node --test tools/validate-launch-matrix.test.mjs` passed 13/13.
+- 2026-06-13 live Sui state check:
+  - Devnet smoke landed tx evidence was re-verified through Sui JSON-RPC for add-liquidity, swap, and remove-liquidity. All three returned `status: success`, expected `devnet_smoke` Move calls, and expected BrownFi events.
+  - Testnet remains externally blocked for real Pyth-backed submission: `rtk node tools/check-sui-gas-readiness.mjs --network testnet --min-mist 100000000 --use-rtk` returned no gas coins for the active address `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04`, and `rtk sui client --client.env testnet faucet --address ... --json` reported that testnet tokens must be requested through the web UI.
+  - Devnet gas is funded (`14,866,171,805` mist at the time of check), but the checked Pyth-upgraded launch profile is explicitly testnet/mainnet-Pyth-contract based; no real Pyth devnet package/state profile is documented in this repo, so using devnet for Pyth-provider evidence would be unproven.
+- 2026-06-13 Pyth pool config feed-metadata validation slice:
+  - Finding: the Pyth launch matrix now rejects malformed live feed IDs, but the earlier pool-creation config still accepted any two non-empty strings and reached runtime execution with `feed-a` / `feed-b`.
+  - Decision: validate pool-creation Pyth feed IDs at config-load time using the same 32-byte hex shape expected by the launch matrix/runtime gates. This keeps the pre-pool update step from touching Pyth/Sui runtime objects with malformed feed metadata.
+  - RED: `rtk node --test tools/create-pyth-launch-pool.test.mjs` failed because malformed feed IDs reached the test runtime and triggered `runtime should not be used`.
+  - GREEN: `tools/create-pyth-launch-pool.mjs` now rejects malformed `feedIds[0]` / `feedIds[1]` before runtime loading/execution.
+  - Verification: `rtk node --test tools/create-pyth-launch-pool.test.mjs` passed 4/4.
+- 2026-06-14 current-Pyth testnet launch evidence slice:
+  - Finding: Pyth is deployed on Sui testnet in both current and upgraded contract sets. The current set used for this launch has package `0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837`, state `0x243759059f4c3111179da5878c12f68d612c21a8d54d85edc86164bb18be1c7c`, and `base_update_fee = 1`; the upgraded set has package `0xd1ac23e1582080e2e5d43dbad1cf463ea2337cdbbb1a9ca669e470cefb74d8fd`, state `0x3c48fe392912de6c18087a2b3f5fdbfbfdb4598e180947feff1f12f8e9ea073e`, and `base_update_fee = 0`.
+  - Decision: use the current-Pyth path first because it is the path that currently publishes, updates Pyth prices, creates the pool, and submits BrownFi routes end-to-end on testnet. Keep upgraded-Pyth launch readiness separate until the VAA/Hermes/Wormhole compatibility path is verified.
+  - Tooling fixes: launch package generation can rewrite copied dependency manifests' local dependencies; `tools/create-pyth-launch-pool.mjs` configures the BrownFi `OracleAdapter` before pool creation and supports split initial amounts; `tools/run-launch-matrix-submit.mjs` supports split route input amounts, transfers returned linear coins, retries transient Sui JSON-RPC tx-indexing misses, and handles the three-return `router::add_liquidity_with_bundle` PTB result.
+  - Follow-up fix from full tools regression: `tools/materialize-launch-matrix.mjs` now replaces placeholder literals on an uppercase-token boundary, so `0xINPUT_COIN` cannot partially replace `0xINPUT_COIN_B` when the more specific value is missing.
+  - Live evidence: BrownFi package `0x97a004455b11ab75b10bd3bf4d9fe1b01e4da17140d30dcb2ddfe24319076c98` published in `3JhxmCnFGDHBmZ1TxYijvLzGJg9EXC6ghEmxe8GefPUb`; pool `0x9e65b62101786fe91c390206c034263631a2b8068f2f258ce099af8df199a2ee` created in `3kkUHwEXqo7jACdqJCN1CVtvtLWGrvaVNMpMnkjNMKqh`; exact-input B-to-A swap landed in `YJNzEQEKcrXCyUjYgK2ihDRS9XRhxdKPWEC6sXQqrDC`; add liquidity landed in `3e85wc15c5cAqgZqSz3NeYtF7kaoC2i9nQQLLwdEj42r`; remove liquidity landed in `CVio5cTVp6chLB5khv6rpSmvdYjA1PQioCx5JJ1F9CH5`.
+  - Verification: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` passed 10/10; `rtk node --test tools/run-launch-matrix-submit.test.mjs` passed 10/10; Sui testnet tx evidence verified the expected BrownFi Move calls/events for add/remove, and direct Sui CLI lookup verified the swap digest with BrownFi `OracleQuorumUsed`, `Sync`, `PriceBundleUsed`, `SwapExecuted`, and `Swap` events. Pool object `0x9e65...a2ee` later reported `prevTx = CVio5cTVp6chLB5khv6rpSmvdYjA1PQioCx5JJ1F9CH5`, confirming the remove transaction mutated the shared pool. Full regression checks passed: `rtk npm test --prefix tools` 115/115, `rtk npm test --prefix sdk/router` 181/181, `rtk node tools/check-move-struct-fields.mjs`, `git diff --check`, and `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` 277/277.
+- 2026-06-14 launch submit persistence/resume slice:
+  - Finding: a live route can land and then fail during immediate tx-evidence verification because of fullnode indexing lag, RPC errors, or expectation mismatches. Before this slice, `submit.json` was written only after the whole matrix completed, so operators could lose the generated digest/evidence and risk duplicating an already-landed route on rerun.
+  - Decision: make `tools/run-launch-matrix-submit.mjs` optionally write incremental `--out` snapshots after every submitted route digest and after every successful verification. Add prefix resume through `--resume-from`: saved route evidence is accepted only in matrix order and only when route name, expected Move calls, and expected event types still match the current matrix.
+  - GREEN: `tools/run-pyth-launch-sequence.mjs` now passes `submit.json` as both submit output and resume source. The sequence CLI also accepts `--tx-evidence-rpc-retries` and `--tx-evidence-rpc-retry-delay-ms`, matching the lower-level submit verifier.
+  - Verification: `rtk node --test tools/run-launch-matrix-submit.test.mjs tools/run-pyth-launch-sequence.test.mjs` passed 13/13; `rtk npm test --prefix tools` passed 118/118.
+- 2026-06-14 Pyth launch sequence setup-artifact resume slice:
+  - Finding: after a sequence lands test-coin publish, BrownFi package publish, or pool creation, rerunning the sequence could duplicate setup transactions before reaching the already-resumable route submit step.
+  - Decision: keep fresh runs fresh by default, but add explicit `--resume-existing-artifacts` for the Pyth sequence. When enabled, existing `test-coins.json`, `brownfi-publish.json`, and `pool-result.json` are reused only if they exist and report `status: "success"`.
+  - RED: `rtk node --test tools/run-pyth-launch-sequence.test.mjs` failed because the parser rejected `--resume-existing-artifacts` and the sequence republished instead of reusing existing artifacts.
+  - GREEN: `tools/run-pyth-launch-sequence.mjs` now skips already-successful setup artifacts under explicit resume while still rematerializing non-transaction pool/matrix configs and delegating route resume to the submitter.
+  - Live readiness check: upgraded-Pyth runtime readiness passed in placeholder mode with dependency imports, Sui keystore signer check, and testnet gas check for `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04` at `4,382,327,682` mist. Hermes returned BTC/USD feed `e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43` and ETH/USD feed `ff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace` for the next concrete Pyth launch values file.
+  - Verification: `rtk node --test tools/run-pyth-launch-sequence.test.mjs` passed 4/4.
+- 2026-06-16 current-Pyth Hermes Beta testnet launch evidence refresh:
+  - Finding: current-Pyth testnet launch remains the verified live path. Public upgraded-Pyth endpoints still need a compatible update stream/quorum before they can replace this path for landed evidence.
+  - Tooling fixes: `tools/build-launch-package.mjs` accepts object `copyPaths` for external dependency source copies, Pyth sequence/create-pool/submit CLIs accept and forward `--runtime-config`, and `tools/pyth-launch-runtime.mjs` now forwards options through the generic `createLaunchMatrixRuntime` alias. The alias bug caused matrix submission to ignore the current-Pyth Hermes Beta runtime config and fall back to Douro, which returned `401 unauthorized`.
+  - Config fix: `configs/launch/pyth-current-testnet.pool.example.json` now initializes `10_000_000_000` units per side so USDT/SDAI pool creation clears BrownFi's documented `$10` first-mint floor.
+  - Historical reproducibility caveat: the live publish used `/private/tmp/brownfi-pyth-current-testnet-local-wormhole.json`, which copied a machine-local cached Wormhole source and applied its `Move.testnet.toml` so the dependency resolved to published Wormhole package `0xf47329f4344f3bf0f8e436e2f7b485466cff300f12a166563995d3888c296a94`. The next slice below replaces this with the checked-in `packages/wormhole-sui-current` source and verified `configs/launch/pyth-current-testnet.json` publish dry-run.
+  - Live evidence: test coins package `0x853349650dc1c8bb11d7f97e39d40962e5502f3eb9823a35ccd4d343fdfd4108` landed in `ArBpEnkZwMFbRfHMEs9ZLPhWGU6ktFXMxHK7vBmdk3Wf`; BrownFi package `0x5b102adc905b4839dede0f10c4f01893ba618bf7edcba451d0cf227162f76349` landed in `7xTdYgGjqD3AgJ7sBf6nL3XZof3iRiqybD7DWhisj2KB`; pool `0xa4ab2e6613392a17d71ee915042284e6d85596494795085064fc2b83dc9e3e1d` created in `6ypSDoorYWWSuECG4jsozsqPxgcivs4eRyd2vCjXsP5h`; exact-input B-to-A swap landed in `6hVcwMkFCKrLNsrmR2QRK53b6LJhvP6MoqyfFLjqr8wL`; add liquidity landed in `E6qsNXV12qxhbSTYZ2cUzwvZnousQ66jM6CDgPTJsrWd`; remove liquidity landed in `BvpwL6SuzXbxmTQ3DvjMBJ5mv9mC8UpdEGmawcknkSJn`.
+  - Verification: pool tx evidence verified over Sui JSON-RPC with expected `swap::create_pool_with_coins_and_transfer_lp_to_sender`, `PoolCreated`, and `Sync`. The sequence verified route tx evidence for expected router Move calls/events: `swap_exact_b_for_a_with_bundle` plus `OracleQuorumUsed`/`PriceBundleUsed`/`SwapExecuted`/`Swap`, `add_liquidity_with_bundle` plus `AddLiquidity`, and `remove_liquidity_with_coins` plus `RemoveLiquidity`. Focused green tests: `rtk node --test tools/build-launch-package.test.mjs`, `rtk node --test tools/create-pyth-launch-pool.test.mjs`, `rtk node --test tools/run-launch-matrix-submit.test.mjs`, `rtk node --test tools/run-pyth-launch-sequence.test.mjs`, and `rtk node --test tools/pyth-launch-runtime.test.mjs`. Full green checks: `rtk npm test --prefix tools` 128/128, `rtk npm test --prefix sdk/router` 181/181, `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` 277/277, and `git diff --check`.
+- 2026-06-16 current-Pyth portable publish profile slice:
+  - Finding: the current-Pyth launch evidence was real, but the publish step still depended on a temporary config that copied Wormhole from an absolute machine-local Move cache path. The checked-in `pyth-current-testnet` profile could compile Pyth, but Sui publish dry-run failed with `PublishUpgradeMissingDependency` because the generated package listed current Pyth without listing Pyth's current Wormhole dependency.
+  - Decision: vendor the exact Sui Wormhole source used by current Pyth into `packages/wormhole-sui-current`, copied from `wormhole-foundation/wormhole@82d82bffd5a8566e4b5d94be4e4678ad55ab1f4f/sui/wormhole`, and apply `Move.testnet.toml` during launch package generation. The current-Pyth profile now rewrites both the root package and copied Pyth manifest to use that local Wormhole source. A launch-only `configs/launch/sources/wormhole_link.move` shim references `wormhole::state::State`, forcing Sui's publish dependency list to include current Wormhole without changing BrownFi core/router/oracle behavior.
+  - Verification: `rtk npm test --prefix tools -- build-launch-package.test.mjs verify-launch-package-publish-dry-run.test.mjs` passed 129/129. `rtk node tools/verify-launch-package-publish-dry-run.mjs --config configs/launch/pyth-current-testnet.json --network testnet --use-rtk --expected-dependency 0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837 --expected-dependency 0xf47329f4344f3bf0f8e436e2f7b485466cff300f12a166563995d3888c296a94 --expected-module swap --expected-module router --expected-module oracle_gateway --expected-module pyth_source --expected-module flash --expected-module wormhole_link` succeeded. The dry-run publish digest was `4yXceiPsRvDS2XTxkr6ht9UbwoC5RWFv8zUHKSf3YLrF`, the simulated package ID was `0x87ecf8f83ea07b3045b43fd71b8c4c7cc1859e3461ee8654b5eaa52040d43b12`, and dependencies included current Pyth `0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837` plus current Wormhole `0xf47329f4344f3bf0f8e436e2f7b485466cff300f12a166563995d3888c296a94`. Full regression after this slice: `rtk npm test --prefix tools` 129/129, `rtk npm test --prefix sdk/router` 181/181, `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` 277/277, and `git diff --check`.
+- 2026-06-16 current-Pyth launch default slice:
+  - Finding: the checked-in current-Pyth profile is now the verified live path, but the sequence and runtime defaults still pointed at Pyth-upgraded artifacts. That made a bare Pyth launch command select the profile whose live update path is not yet verified.
+  - Decision: default `tools/run-pyth-launch-sequence.mjs` to `configs/launch/pyth-current-testnet.json`, `configs/launch/pyth-current-testnet.pool.example.json`, and `configs/launch/pyth-current-testnet.matrix.example.json`; default `tools/pyth-launch-runtime.mjs` to `configs/launch/pyth-current-testnet.runtime.example.json`. Keep Pyth-upgraded explicitly selectable with CLI/runtime config overrides.
+  - RED: focused tests first failed because `parsePythLaunchSequenceArgs` returned Pyth-upgraded templates by default and `createLaunchMatrixRuntime` selected the upgraded contract set without an explicit runtime config.
+  - GREEN: the defaults now select the verified current-Pyth launch/runtime configs, while explicit Pyth-upgraded test cases still pass when those files are supplied.
+  - Verification: `rtk node --test tools/run-pyth-launch-sequence.test.mjs tools/pyth-launch-runtime.test.mjs` passed 13/13; `rtk npm test --prefix tools` passed 131/131; `rtk npm test --prefix sdk/router` passed 181/181; `rtk node tools/check-move-struct-fields.mjs` checked 73 Move structs with max fields <= 32; `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 277/277.
+- 2026-06-16 current-Pyth update-fee default slice:
+  - Finding: `tools/read-pyth-sui-update-fee.mjs` still defaulted to the upgraded Pyth contract set, so a no-flag fee check could report the upgraded testnet fee while the default BrownFi launch path uses current Pyth.
+  - Decision: keep explicit `--contract-set current|upgraded`, but default the fee helper to `current` so it matches the verified BrownFi launch profile. The generic Pyth contract manifest still records `upgraded` as the SDK helper default separately.
+  - RED: `rtk node --test tools/read-pyth-sui-update-fee.test.mjs` failed because the no-contract-set test dev-inspected upgraded Pyth package `0xd1ac...d8fd` instead of current Pyth package `0xabf8...c837`.
+  - GREEN: `readPythSuiUpdateFee` and the CLI parser now default to `current`, while the explicit upgraded test still passes.
+  - Verification: `rtk node --test tools/read-pyth-sui-update-fee.test.mjs` passed 3/3; `rtk npm test --prefix tools` passed 132/132. Live default-fee dev-inspect on testnet returned `contractSet: "current"`, `updateFeeInMist: "2"` for two updates, package `0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837`, state `0x243759059f4c3111179da5878c12f68d612c21a8d54d85edc86164bb18be1c7c`, digest `AwSBKsd5VSVVVsaiRiZCKyvePYxghCuD7rWwSLz2RSEt`.
+- 2026-06-16 current-Pyth launch assembly coverage slice:
+  - Finding: the launch-assembly tests still proved only the Pyth-upgraded pool/matrix templates even though the default launch profile is current-Pyth.
+  - Decision: add checked coverage that the Pyth-current pool and matrix templates materialize from BrownFi publish output, launch test-coin output, pool-create output, and the checked-in Hermes Beta USDT/SDAI feed values.
+  - Verification: `rtk node --test tools/launch-assembly.test.mjs` passed 4/4; `rtk npm test --prefix tools` passed 134/134.
+- 2026-06-16 current-Pyth live evidence artifact slice:
+  - Finding: the current-Pyth landed swap/add/remove evidence existed in notes and `/private/tmp/brownfi-pyth-current-testnet-20260614-run1`, but not as a checked matrix that the repo verifier can consume.
+  - Decision: add `configs/launch/pyth-current-testnet.live-evidence.matrix.json` as a verifier-only artifact with live package/pool/feed values and `txEvidence` for swap, add liquidity, and remove liquidity. The file records historical route input coin IDs and is not for resubmission.
+  - RED: `rtk node --test tools/validate-launch-matrix.test.mjs` failed with `ENOENT` before the checked live-evidence matrix existed.
+  - GREEN: the live-evidence matrix validates with `--require-live-values` against `configs/launch/pyth-current-testnet.json` and exposes route-aligned `txEvidence`.
+  - Verification: `rtk node --test tools/validate-launch-matrix.test.mjs` passed 14/14; `rtk npm test --prefix tools` passed 135/135. `rtk node tools/verify-sui-cli-tx-evidence.mjs --config configs/launch/pyth-current-testnet.live-evidence.matrix.json --tx 'pyth current testnet exact input route' --rpc-url https://fullnode.testnet.sui.io:443 --use-rtk`, the matching add-liquidity command, and the matching remove-liquidity command all returned `status: "success"` with expected BrownFi Move calls and events.
+- 2026-06-16 current-Pyth operator runbook slice:
+  - Finding: the current-Pyth launch path was implemented and evidenced, but operators had to reconstruct the command sequence from architecture notes, tool usage text, and temp artifacts.
+  - Decision: add `docs/PYTH_CURRENT_TESTNET_RUNBOOK.md` with checked defaults, environment requirements, no-spend validation, evidence verification, fresh live launch, and resume commands. Keep the runbook Pyth-only and current-testnet scoped.
+  - Verification: no-spend commands from the runbook were checked: live-evidence matrix validation returned three Pyth route cases; current-Pyth fee read returned `updateFeeInMist: "2"` for two updates; static readiness with `--skip-node-engine-check` returned `status: "success"` against current-Pyth dependencies; and all three tx-evidence verifier commands returned `status: "success"` over Sui testnet JSON-RPC. The shell's `rtk node` is `v25.9.0`, so the runbook keeps Node 24 as required for live submission and documents the static-check-only skip. Focused Pyth tooling tests passed 34/34; `rtk npm test --prefix tools` passed 135/135.
+- 2026-06-16 Pyth validity-window correction:
+  - Finding: direct Pyth compatibility bundles and BrownFi-owned `pyth_source` readings used `clock.timestamp_ms + max_price_age * 1000` as their validity limit. That makes an already-aged but still valid Pyth price appear fresh for a full extra max-age window. Other source adapters bind validity to `publish_time + max_price_age`.
+  - Decision: Pyth `PriceReading.valid_until_ms` is now `publish_time_ms + max_price_age * 1000` in both direct `oracle_gateway` compatibility reads and `pyth_source` reads. This preserves same-PTB validity while aligning reported bundle expiry with Pyth publish time.
+  - RED: `rtk sui move test test_pyth_bundle_validity_uses_publish_time_not_current_time --allow-dirty --build-env testnet --warnings-are-errors` failed because a price published at `0ms` and read at `10_000ms` with a `15s` max age produced a bundle validity later than `15_000ms`.
+  - GREEN: the same focused test passed after the Pyth validity calculation used publish time.
+  - Verification: `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 278/278; `rtk node tools/check-move-struct-fields.mjs` checked 73 Move structs with max fields <= 32.
+- 2026-06-16 Pyth SDK exact-output effective-output quote slice:
+  - Finding: `quoteExactOutputWithRegisteredRoute` and the Pyth wrapper returned the originally requested downstream output handles in `amounts[i + 1]` instead of the single-hop quote's cutoff-effective output. That diverged from the Move typed two-hop quote helpers and Solidity `getAmountsIn` cutoff propagation, where the next visible route amount is the effective output after gamma clipping.
+  - Decision: for cutoff-aware exact-output registered/Pyth quote routes, return `quoteResult[1]` as the hop output amount while still feeding `quoteResult[0]` backward as the required input for the previous hop. Leave raw/no-cutoff exact-output quote helpers unchanged.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "quoteExactOutputWithRegisteredRoute surfaces cutoff-effective route outputs"` failed because the route amounts exposed a required-input/downstream-request handle where the effective-output handle was expected.
+  - GREEN: the focused `quoteExactOutputWithRegisteredRoute` test pattern passed after the SDK amount chain used the effective output handle.
+  - Verification: `rtk npm test --prefix sdk/router` passed 182/182.
+- 2026-06-16 Pyth launch matrix exact-output coverage slice:
+  - Finding: the Pyth-current and Pyth-upgraded launch matrix templates covered exact-input swap, add liquidity, remove liquidity, and exact-input quote, but not exact-output swap or exact-output quote. That left the fresh Pyth launch matrix weaker than the implemented exact-output/router/SDK surface.
+  - Decision: add one-hop exact-output route cases and exact-output quote cases to the Pyth-only current/upgraded matrix templates. The historical current-Pyth live-evidence matrix was left unchanged in this slice because it records already-landed transactions and is not a resubmission template; a later fresh current-Pyth evidence slice promoted exact-output route evidence too.
+  - RED: `rtk node --test tools/validate-launch-matrix.test.mjs` failed in the Pyth-current and Pyth-upgraded matrix tests with `routeCaseCount: 3` / `quoteCaseCount: 1` instead of the expected `4` / `2`.
+  - GREEN: the validator tests passed after adding the Pyth exact-output route/quote cases. `tools/launch-assembly.test.mjs` initially caught stale positional assertions, then passed after checking materialized route cases by name.
+  - Verification: `rtk node --test tools/validate-launch-matrix.test.mjs` passed 15/15; `rtk node --test tools/launch-assembly.test.mjs` passed 4/4.
+- 2026-06-16 Pyth readiness placeholder-feed validation slice:
+  - Finding: `tools/check-pyth-launch-readiness.mjs --allow-placeholders` still rejected `0xBASE_FEED_ID` / `0xQUOTE_FEED_ID` in the current-Pyth matrix template, so the advertised template readiness path failed before gas/signer checks.
+  - Decision: allow only explicit base/quote feed placeholders when live values are not required. Arbitrary malformed feed strings still fail.
+  - RED: `rtk node --test tools/validate-pyth-launch-runtime.test.mjs` failed on `validatePythLaunchRuntimeConfigFile allows placeholder feed IDs when live values are not required`.
+  - GREEN: focused validator/readiness tests passed 11/11 after placeholder feed IDs were skipped from live feed counting in non-live mode.
+  - Verification: `rtk npm test --prefix tools` passed 137/137. A no-spend current-Pyth template readiness check passed under `/Applications/Codex.app/Contents/Resources/node` `v24.14.0` with the local Sui keystore signer, current Pyth package `0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837`, six matrix cases, and `10,127,099,988` mist available.
+- 2026-06-16 fresh current-Pyth testnet exact-output evidence slice:
+  - Finding: the checked Pyth live-evidence matrix still had only exact-input, add-liquidity, and remove-liquidity route txs, while the current Pyth matrix template now requires exact-output coverage too.
+  - Decision: run a fresh current-Pyth testnet launch with Node 24, Hermes Beta, the local Sui keystore signer, and the checked current-Pyth profile; then promote the landed four-route evidence into `configs/launch/pyth-current-testnet.live-evidence.matrix.json`.
+  - Live evidence: test coins package `0x1d9d1922985ac9c4443248412081e4a84083a4670d7041251be0c7502a71754f` landed in `7926eBhGE1SF13rPhZZow93qDUkgdtB8SDH7BvfsqVKg`; BrownFi package `0xa91b015ac9f654f586def48813f565cff7c43edc050eaad324c99f9e076a4c3a` landed in `GKAg5wootyZJZtUJspQJkrHmCNVm9RJKMTjxdAQEvp3C`; pool `0x046e4876df5e58e8df43baec88fb83f09608ac99b4a96abaa82cd1e594b33a72` was created in `BbmX1XgEdmKEsV9SnR4hHVPzqC6KkwqYv5iPDjkEeTso`.
+  - Route evidence: exact-input `3FWmE8jmZ1ib8ysKhPJAhDzXsUGhV15wxKjkyJK8ME2R`; exact-output `7gmwx4tp6c591nLFJnbnAeF5B6v4EABPbfRQuhhBxQK5`; add-liquidity `ArhSwrxL8nJtAaX9TPtdPxHRGWg5MeXqjjLJ36vV4gkz`; remove-liquidity `4Y2ooq6i4S3ybeTY5U2WmYhYHpuT9MhT5Uweu2JrVAgF`.
+  - RED: `rtk node --test tools/validate-launch-matrix.test.mjs` failed after updating the live-evidence expectation to four route cases because the checked matrix still contained only three.
+  - GREEN: the focused validator passed after regenerating the checked live-evidence matrix from `/private/tmp/brownfi-pyth-current-testnet-node24-run1`.
+  - Verification: all four checked route tx evidence entries verified over Sui testnet RPC with expected BrownFi Move calls/events; `rtk npm test --prefix tools` passed 137/137; `rtk /Applications/Codex.app/Contents/Resources/node tools/validate-launch-matrix.mjs --config configs/launch/pyth-current-testnet.live-evidence.matrix.json --launch-config configs/launch/pyth-current-testnet.json --require-live-values` returned four Pyth route cases; trailing-whitespace scan over touched files found no matches. Post-run gas balance for `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04` was `9,479,827,764` mist.
+- 2026-06-16 Pyth runtime Node-engine guard slice:
+  - Finding: the readiness checker enforced the documented Node 24 boundary, but `tools/pyth-launch-runtime.mjs` itself could still start default Pyth/Sui dependency imports under Node 25 if called directly by the launch sequence.
+  - Decision: guard the runtime immediately before default dependency imports and require Node major 24 on that real live-runtime path. Dependency-injected tests/offline builders remain usable without a Node 24 process. While adding the guard, tighten keystore decoder dependency loading so merely naming a keystore env var does not force default imports unless a keystore path is actually configured.
+  - RED: `rtk node --test tools/pyth-launch-runtime.test.mjs` failed because the Node 25 test reached dependency imports instead of an engine error.
+  - GREEN: focused runtime tests passed 8/8 after the guard and keystore-path condition change.
+  - Verification: focused runtime tests passed 8/8; full tools suite passed 138/138; Node 24 readiness succeeded with current-Pyth, keystore signer, and `9,479,827,764` mist; deliberate Node 25 runtime invocation failed before dependency imports with the expected Node-major error; trailing-whitespace scan over touched files found no matches.
+- 2026-06-16 Pyth runbook Node 24 command slice:
+  - Finding: the current-Pyth runbook documented the Node 24 binary, but the live-runtime examples still used generic `rtk node`, which can resolve to Node 25 in this environment and fail the intentional Pyth engine guard before runtime checks.
+  - Decision: make the runbook export `NODE24`, use it for readiness and fresh-launch sequence commands, and include the no-spend template signer/gas readiness command that was verified against the current testnet sender.
+  - Verification: docs-only change; command shape matches the successful Node 24 readiness invocation for current-Pyth template placeholders, keystore signer, and `9,479,827,764` mist.
+- 2026-06-16 Pyth live-evidence quote coverage slice:
+  - Finding: the checked current-Pyth live-evidence matrix had four landed route cases but no quote cases, while the current launch templates and SDK route coverage include exact-input and exact-output quote validation.
+  - Decision: add the materialized exact-input and exact-output Pyth quote cases from the fresh Node 24 launch matrix into `configs/launch/pyth-current-testnet.live-evidence.matrix.json`. Keep `txEvidence` route-only because quote cases are no-spend validation cases, not landed state-changing transactions.
+  - RED: `rtk node --test tools/validate-launch-matrix.test.mjs` failed with `quoteCaseCount: 0` / `totalCaseCount: 4` after the live-evidence expectation was raised to two quote cases and six total cases.
+  - GREEN: focused validator passed 15/15 after the live-evidence matrix carried the two Pyth quote cases. Architecture/runbook text now distinguishes landed route evidence from quote validation coverage.
+  - Verification: `rtk node --test tools/validate-launch-matrix.test.mjs` passed 15/15; `rtk npm test --prefix tools` passed 138/138; `rtk /Applications/Codex.app/Contents/Resources/node tools/validate-launch-matrix.mjs --config configs/launch/pyth-current-testnet.live-evidence.matrix.json --launch-config configs/launch/pyth-current-testnet.json --require-live-values` returned four route cases, two quote cases, and six total cases; stale-evidence and trailing-whitespace scans over touched docs/config/tooling files found no matches.
+- 2026-06-16 Pyth quote-only preflight and current Sui SDK build-option slice:
+  - Finding: after quote cases were added to the checked live-evidence matrix, running full matrix preflight against that file would try to rebuild historical state-changing route PTBs whose input coins may already be spent. The matrix needed a no-spend quote-only dry-run path. The first live quote-only attempt then failed before dry-run because `sdk/router` still called `Transaction#build({ provider })`, while the current Sui SDK expects `Transaction#build({ client })`.
+  - Decision: add `--quote-only` to `tools/run-launch-matrix-preflight.mjs`, filtering only the route section after full live matrix validation. Keep quote cases untouched. Update the router SDK build/preflight wrappers to pass `{ client: suiClient }`, matching the installed Sui SDK.
+  - RED: `rtk node --test tools/run-launch-matrix-preflight.test.mjs` failed because the mixed-matrix quote-only test still constructed the route transaction. `rtk npm test --prefix sdk/router -- --test-name-pattern "buildAndDryRunTransactionBlock builds with the Sui client before dry-run"` then failed with actual `{ provider: suiClient }` where current Sui behavior requires `{ client: suiClient }`.
+  - GREEN: focused preflight tests passed 6/6 after `--quote-only` skipped route transaction construction, and `rtk npm test --prefix sdk/router` passed 182/182 after the SDK source/dist/tests used `{ client }`.
+  - Live verification: `rtk env BROWNFI_SUI_RPC_URL=https://fullnode.testnet.sui.io:443 BROWNFI_SUI_SENDER=0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04 BROWNFI_SUI_KEYSTORE_PATH=/Users/manhtrv/.sui/sui_config/sui.keystore PYTH_HERMES_ENDPOINT=https://hermes-beta.pyth.network /Applications/Codex.app/Contents/Resources/node tools/run-launch-matrix-preflight.mjs --config configs/launch/pyth-current-testnet.live-evidence.matrix.json --launch-config configs/launch/pyth-current-testnet.json --runtime tools/pyth-launch-runtime.mjs --quote-only` returned routeCaseCount `0`, quoteCaseCount `2`, providerIds `["pyth"]`, and the expected current-Pyth exact-input/exact-output quote case names.
+- 2026-06-16 current-Pyth landed-route evidence refresh:
+  - Finding: the checked current-Pyth matrix already carried four route tx evidence entries and two quote-only cases. Fresh verification was needed before deciding whether another testnet launch was necessary.
+  - Verification: all four checked landed route digests re-verified over Sui testnet JSON-RPC with expected BrownFi Move calls and events: exact-input swap `3FWmE8jmZ1ib8ysKhPJAhDzXsUGhV15wxKjkyJK8ME2R` at checkpoint `348992291`, exact-output swap `7gmwx4tp6c591nLFJnbnAeF5B6v4EABPbfRQuhhBxQK5` at checkpoint `348992305`, add-liquidity `ArhSwrxL8nJtAaX9TPtdPxHRGWg5MeXqjjLJ36vV4gkz` at checkpoint `348992318`, and remove-liquidity `4Y2ooq6i4S3ybeTY5U2WmYhYHpuT9MhT5Uweu2JrVAgF` at checkpoint `348992326`. The live quote-only preflight against the same checked matrix also returned routeCaseCount `0`, quoteCaseCount `2`, and providerIds `["pyth"]`.
+  - Decision: no additional fresh testnet launch is required for the current Pyth evidence milestone unless the checked current-Pyth profile changes or a new route/liquidity surface is added.
+- 2026-06-16 current-Pyth setup-evidence verifier slice:
+  - Finding: `setupEvidence` recorded test-coin publish, BrownFi package publish, and pool-create digests, but only route `txEvidence` entries were first-class recheckable through `tools/verify-sui-cli-tx-evidence.mjs`.
+  - Decision: extend the same verifier with `--setup <name>`, loading `setupEvidence.<name>` and reusing the existing digest/status/optional call/event checks. Package publish setup remains digest-plus-success evidence because those transactions do not expose BrownFi Move calls. Pool setup now records expected `swap::create_pool_with_coins_and_transfer_lp_to_sender`, `Sync`, and `PoolCreated` checks.
+  - RED: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` failed on the setup-evidence test with `Missing launch matrix tx evidence name`.
+  - GREEN: the focused verifier test passed 11/11 after adding the setup selector and loader.
+  - Live verification: `--setup testCoins`, `--setup brownfiPackage`, and `--setup pool` all returned `status: "success"` over Sui testnet JSON-RPC. Checkpoints were `348992246`, `348992262`, and `348992279`; the pool setup check also returned the expected BrownFi pool-create Move call and `Sync` / `PoolCreated` events.
+- 2026-06-16 current-Pyth setup object-change verification slice:
+  - Finding: setup digest/status checks still did not prove that the recorded `packageId`, `objectId`, or `lpCoin` fields came from the referenced setup transaction.
+  - Decision: request `showObjectChanges` in the Sui JSON-RPC verifier and, when present in an evidence entry, require `packageId` to appear in a `published` object change and `objectId` / `lpCoin` to appear in object changes. This keeps route verification unchanged while making setup evidence stronger.
+  - RED: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` failed because the RPC payload lacked `showObjectChanges: true` and missing configured setup object changes were not rejected.
+  - GREEN: focused verifier tests passed 13/13 after the object-change checks were added.
+  - Live verification: current-Pyth `--setup testCoins`, `--setup brownfiPackage`, and `--setup pool` all passed over Sui testnet with object-change checks active. The publish setup checks prove the recorded package IDs; the pool setup check proves the recorded pool object and LP coin IDs in addition to the pool-create call/events.
+- 2026-06-16 current-Pyth launch-sequence setup verification slice:
+  - Finding: `tools/run-pyth-launch-sequence.mjs --verify-tx-evidence` passed route evidence verification into submit, but did not verify the generated setup evidence for test-coin publish, BrownFi package publish, or pool creation before submitting routes.
+  - Decision: derive setup evidence from the same successful setup artifacts written by the sequence, verify it with `verifySuiTxEvidence` before matrix route submission when `--verify-tx-evidence` is enabled, and record `setupEvidence` plus optional `setupVerification` in `summary.json`.
+  - RED: `rtk node --test tools/run-pyth-launch-sequence.test.mjs` failed because the sequence skipped the three expected setup verifier calls.
+  - GREEN: focused sequence tests passed 7/7 after setup verification was wired.
+- 2026-06-16 Pyth exact-output decimal coverage slice:
+  - Finding: the architecture still listed decimal coverage as pending; existing swap fixtures were dominated by 9-decimal/9-decimal pools even though Sui token decimals are pool-local inputs.
+  - Decision: add Pyth bundle exact-output tests for both 6-decimal quote / 9-decimal base and 9-decimal quote / 6-decimal base pools. Both cases pin required input at `1_001_056` micro-units for a `1_000_000_000` raw-unit output, proving required-input conversion rounds up before execution in both swap directions.
+  - Verification: the focused Move tests `test_exact_output_pyth_bundle_rounds_required_input_up_for_six_decimal_quote_token` and `test_exact_output_pyth_bundle_rounds_required_input_up_for_six_decimal_base_token` passed immediately. This is coverage-only; no production code change was required in this slice.
+- 2026-06-16 Pyth exact-input decimal coverage slice:
+  - Finding: exact-output decimal rounding had a pinned Pyth bundle case, but exact-input output conversion still lacked a matching non-9-decimal state-changing check.
+  - Decision: add Pyth bundle exact-input tests for both 9-decimal quote / 6-decimal base and 6-decimal quote / 9-decimal base pools. Both cases pin output at `998_945` micro-units for `1_000_000_000` raw input units, proving trader-output conversion rounds down before execution in both swap directions.
+  - Verification: the focused Move tests `test_exact_input_pyth_bundle_rounds_output_down_for_six_decimal_base_token` and `test_exact_input_pyth_bundle_rounds_output_down_for_six_decimal_quote_token` passed immediately. This is coverage-only; no production code change was required in this slice.
+- 2026-06-16 Pyth registered-route preflight fixture slice:
+  - Finding: the SDK already exposes Pyth through the generic registered route provider boundary, but launch-preflight coverage did not have a Pyth-specific hydrated route case proving update-before-consumption and dry-run ordering through `preflightRegisteredRouteCases`.
+  - Decision: add a Pyth exact-input registered-route preflight test that hydrates a serializable route case, fetches Pyth update payloads, calls `updatePriceFeeds` before BrownFi Move calls exist, builds the Pyth reading-pair bundle, builds transaction bytes with `{ client: suiClient }`, and dry-runs those exact bytes.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "preflightRegisteredRouteCases builds and dry-runs a Pyth exact-input route case"` passed. The production SDK already behaved correctly, so this is coverage-only.
+- 2026-06-16 Pyth launch route preflight coverage slice:
+  - Finding: the checked Pyth launch matrices include exact-input, exact-output, add-liquidity, and remove-liquidity route cases, but Pyth-specific registered-route preflight coverage still proved only exact-input. Generic custom-provider tests covered the other shapes, but not the Pyth update-before-consumption path for those launch cases.
+  - Decision: add a Pyth registered-route preflight fixture covering exact-output, add-liquidity, and remove-liquidity. The test proves exact-output and add-liquidity fetch Pyth updates, call `updatePriceFeeds` before BrownFi Move calls exist, then build and dry-run Pyth bundle-consuming PTBs; it also proves Pyth remove-liquidity skips oracle updates and dry-runs the direct LP burn PTB.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "preflightRegisteredRouteCases builds and dry-runs Pyth exact-output and liquidity route cases"` passed. No production code change was required.
+- 2026-06-16 Pyth quote-only preflight coverage slice:
+  - Finding: current-Pyth live evidence includes exact-input and exact-output quote cases for no-spend validation, but Pyth-specific SDK coverage still relied on route quote builders plus generic custom-provider launch quote tests rather than the launch quote preflight path with a Pyth provider.
+  - Decision: add a Pyth quote preflight fixture for exact-input and exact-output launch quote cases. The test proves both cases fetch Pyth updates, call `updatePriceFeeds` before BrownFi Move calls exist, build the Pyth reading-pair bundle, build with `{ client: suiClient }`, and dry-run the quote-only PTB bytes.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "preflightLaunchValidationQuoteCases builds and dry-runs Pyth quote cases"` passed. No production code change was required.
+- 2026-06-16 Pyth add-liquidity raw-decimal LP-safe rounding slice:
+  - Finding: `add_liquidity_with_bundle` computed LP from standard-decimal desired deposits before converting those deposits back to raw token decimals. With a 6-decimal token, this could mint LP for one standard-decimal dust unit that the raw token could not represent; AMM-floor fixtures had the same dust over-credit.
+  - Decision: after raw deposit conversion, re-evaluate deposit amounts from actual representable standard values and recompute LP from final deposited values. This returns unmatched dust and keeps LP minting rounded down and LP-safe.
+  - RED: the focused six-decimal quote-token Pyth add-liquidity test failed at the LP assertion before the production change.
+  - GREEN/Verification: the focused six-decimal quote test passed; the mirrored six-decimal base test passed; the add-liquidity Move subset passed 12/12; the router AMM-floor focused test passed; the full Move suite passed 284/284.
+- 2026-06-16 current-HEAD Pyth testnet landed evidence refresh:
+  - Finding: the checked current-Pyth live evidence predated the latest `swap.move` LP-safe rounding fix, so it no longer proved landed routes for the current package build.
+  - Decision: run a fresh current-Pyth testnet launch from the current working tree, promote the generated setup and route evidence into `configs/launch/pyth-current-testnet.live-evidence.matrix.json`, and keep the matrix Pyth-only.
+  - Live evidence: test coins package `0x3920efdee54a7f04802e1668213f8354f8a5671c222755fb77c8ed1572218f1e` landed in `Ht9PJi16AmyCHvB4tF1Ab4gLNZXNjh2CD3SsMKGyxATV`; BrownFi package `0x05b0a29903d6eacd2eb560f29eb1444f183c1112740e4b0c3c4c74f01fda1727` landed in `Cayvhwq4kmn3MXoyk4EhYhw8V65KKDq3kjYQQdidAagu`; pool `0xc0df12ad5ec0a0322020cb397243e1e13e467365de10b254b2f06e40d0792f11` was created in `GSKPE6Hmx3TREfv6A3t2ECBPfkLoJbhy1wK8pFihbVmt`.
+  - Route evidence: exact-input `AenZ9B126VJU68Mdgje1fFTQS87HGcyLT2cF7X8qVd4a`; exact-output `DVM95wSboXqKSDJbg2MWtKyhgwf6JqPKDvnvV6XHcKQw`; add-liquidity `6miZSuhr4XHgHNRuBBCBWjJ4QHoLSLa9F5yX2RbMHee5`; remove-liquidity `CAQAVkD9rd5E9duZbxcvzFt91vTduRWfWAY888xB5kc7`.
+  - Verification: readiness passed with Node `v24.14.0`, current Pyth package `0xabf837e98c26087cba0883c0a7a28326b1fa3c5e1e2c5abdb486f9e8f594c837`, signer `0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04`, and `9,479,827,764` mist; package publish dry-run linked current Pyth/Wormhole and required modules; quote-only preflight returned two Pyth quote cases; the fresh launch verified setup and four route txs during submission; all setup and route digests then re-verified from the promoted checked matrix over Sui testnet RPC.
+- 2026-06-16 math overflow-bound audit slice:
+  - Finding: `math::parse_amount_to_standard_decimals` scaled low-decimal token amounts with a direct `u64` multiply, so oversized values aborted with raw arithmetic overflow instead of BrownFi's explicit `EOverflow` code. This path feeds swap, add-liquidity, inventory, and protocol-fee value normalization for non-9-decimal tokens.
+  - Decision: mirror the checked `u128` multiply pattern already used by `parse_amount_from_standard_decimals`, then assert the product fits in `u64` before downcasting.
+  - RED: `test_parse_amount_to_standard_decimals_aborts_with_module_overflow_code` failed because the original code produced an arithmetic overflow at `amount * pow_10(diff)` instead of abort code `0`.
+  - GREEN/Verification: focused `math_v3_test` passed 9/9 after the fix; new coverage also pins the maximum safe low-decimal scaling boundary and `u256_to_u64_checked` overflow behavior.
+- 2026-06-16 Pyth exponent digest coverage slice:
+  - Finding: `oracle_gateway::PriceReading` and `OracleReadingDigestInput` already carry Pyth exponent sign/magnitude, but there was no focused test proving that two Pyth readings with identical normalized BrownFi prices and different raw Pyth exponents produce different bundle price digests.
+  - Decision: add an exponent-aware Pyth test fixture and a BrownFi-owned `pyth_source` bundle test that compares `-8` and `-9` exponent feeds with matching normalized prices.
+  - Verification: `rtk sui move test test_pyth_bundle_digest_commits_exponent_metadata_when_normalized_prices_match --allow-dirty --build-env testnet --warnings-are-errors` passed immediately. This is coverage-only; no production code change was required.
+- 2026-06-16 Pyth-only launch package boundary slice:
+  - Finding: the Pyth-current launch config already selected only `providerIds: ["pyth"]`, no AMM providers, and the core/Pyth source module set, but the package-builder tests did not assert the exact source set for that active profile.
+  - Decision: add a Pyth-current package-builder regression test that checks the exact selected modules and proves optional non-Pyth oracle/AMM source files are absent from the generated launch package.
+  - Verification: `rtk node --test tools/build-launch-package.test.mjs` passed 14/14.
+- 2026-06-16 Pyth validity-window overflow slice:
+  - Finding: direct Pyth bundle reads and BrownFi-owned `pyth_source` reads converted Pyth publish time and pool `oracle_max_price_age` to milliseconds with unchecked `u64` arithmetic. Oversized configured max ages therefore aborted with a raw arithmetic overflow in the Pyth path before BrownFi could classify the oracle policy as invalid.
+  - Decision: keep admin configuration semantics unchanged, but compute Pyth `publish_time_ms` and `valid_until_ms` through a shared `oracle_gateway` package helper using `u128` and abort with `EOraclePolicyMismatch` if the resulting millisecond window cannot fit in `u64`.
+  - RED: `rtk sui move test test_pyth_source_rejects_unrepresentable_validity_window --allow-dirty --build-env testnet --warnings-are-errors` failed because the old `pyth_source` path produced a raw arithmetic error at `publish_time_ms + max_price_age * 1000` instead of BrownFi abort code `14`.
+  - GREEN: the focused Pyth-source regression passed after the shared helper patch; the direct Pyth bundle companion test also passed, proving both Pyth entry points use the checked conversion.
+- 2026-06-16 Pyth flash launch surface slice:
+  - Finding: `flash.move` and SDK flash borrow/repay builders existed, and the Pyth launch package included `flash`, but the serializable launch route matrix had no flash route kind. Fresh launch evidence would therefore cover swaps/liquidity/quotes but not day-one flash.
+  - Decision: add `flash-borrow-a` / `flash-borrow-b` registered route cases. A flash case is a single-pair provider-backed PTB: build the Pyth bundle, borrow with coin, split/merge the configured fee coin, repay in the same transaction, and expect no returned trader output. Because pool flash is disabled by default, the current-Pyth pool setup template now carries `pauseCap` and `flashEnabled: true`, and pool setup submits a verified `admin::set_pool_flash_enabled` transaction before route submission.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "flash borrow configs"` failed on unsupported `flash-borrow-a`; `rtk node --test tools/create-pyth-launch-pool.test.mjs --test-name-pattern "enable flash"` failed because no flash-enable setup transaction was submitted; `rtk node --test tools/run-launch-matrix-submit.test.mjs --test-name-pattern "flash fee coin"` failed because the flash fee coin was not split.
+  - GREEN: the focused SDK, pool setup, submit, sequence, assembly, materializer, and validator tests passed after wiring the flash case, admin gate setup, flash fee split, and setup evidence.
+- 2026-06-16 Pyth-only scope and flash-evidence docs slice:
+  - Decision: keep active work on the current-Pyth lane only. Other oracle adapters remain documented scaffolding/background unless explicitly re-requested.
+  - Finding: after adding the Pyth flash route to the launch template, `docs/PYTH_CURRENT_TESTNET_RUNBOOK.md` still described fresh launches as swaps plus add/remove only, and did not distinguish template flash support from checked landed flash evidence.
+  - Decision: update the architecture status and Pyth runbook to say fresh current-Pyth launches enable pool flash and submit add/remove/swap/flash-borrow routes. At this point the checked live-evidence matrix still lacked a landed flash-borrow tx; the next slice refreshes that evidence.
+- 2026-06-16 Pyth live flash-evidence refresh:
+  - Finding: the first fresh flash launch landed pool creation, then failed the immediate flash-enable transaction with Sui `notExists` for the newly created shared pool. The pool object existed by the time it was inspected, so this was a transient indexing/input-availability race between pool creation and the next transaction.
+  - Decision: retry only flash-enable submissions that fail with `notExists` mentioning the just-created pool ID, rebuilding a fresh transaction per attempt. Other flash-enable failures still abort immediately.
+  - RED: `rtk node --test tools/create-pyth-launch-pool.test.mjs --test-name-pattern "retries flash enable"` failed because the first transient missing-pool error was thrown directly.
+  - GREEN: the focused retry regression passed after the narrow retry patch.
+  - Live evidence: fresh current-Pyth testnet launch succeeded from `/private/tmp/brownfi-pyth-current-testnet-flash-20260616-verified-r2`. Test coins package `0x66ccf98f484ec1e0c950b4c6038f54a7e01c32a5125c109c0d509d13307795da` landed in `GZ5r8r28twYwygJ6XSUy47zmn3sxSzXuQTqYo3wfTkpJ`; BrownFi package `0x2ec26f58ae66130f2e6ed86e219b3d988b38f52e60a53ad16987eefbeaacc735` landed in `BVWNZQb3WasTRWC6qXNH8HiT1SdJFhtG3tuvDpSoivaA`; pool `0x17c1bc7378837b23e0fc47c7f235b976834b73326425615e4b89a637c4acf1b1` was created in `6jPjZKZdo6mVuY4uii2L6fJWsPYhiAFKnEv5quGs3dPX`; flash was enabled in `FbuxLW1NUxiGA4uSYopjhpgWxJSP4CxTa9JvJeG8DEP2`.
+  - Route evidence: exact-input `45a6XXgRXeooUztTc5wRxretTTTUuDvrVK2QhZ1k3jui`; exact-output `B2wKGfkzd2jt774NWBGoeYiqa8Gac9aQchx86pNnuhXo`; add-liquidity `HkmBNAjLWpEAjASwfUszC89BJjbbEiKdxqsmdJ1Jz3u8`; remove-liquidity `8j52RcczbaK2zCJ8GS8tHyvq9gGhYtRNDkaxsbh1r7V1`; flash-borrow-A `HTc1rzzQqdSzYts2DfKAZYVfYetKCN76oWibgxB1nwCM`.
+  - Verification: promoted the fresh artifacts into `configs/launch/pyth-current-testnet.live-evidence.matrix.json`; checked live matrix validates as five Pyth routes plus two Pyth quote cases; setup evidence and all five route txs re-verified from Sui testnet RPC; quote-only preflight against the checked matrix returned two Pyth quote cases; `rtk npm test --prefix tools` passed 147/147; `rtk npm test --prefix sdk/router` passed 187/187; `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 290/290; `rtk node tools/check-move-struct-fields.mjs` passed with 73 structs and max fields <= 32; trailing-whitespace scan over touched files found no matches.
+- 2026-06-16 Pyth registered zap launch surface slice:
+  - Finding: Move router and low-level SDK builders already supported `zap_in_a`, `zap_in_b`, `zap_out_a`, and `zap_out_b`, matching the Solidity periphery zap surface, but the registered launch/preflight path could not express zap route cases. That meant the Pyth launch matrix could land swaps/liquidity/flash but not zap transactions.
+  - Decision: add single-pair registered route cases `zap-in-a`, `zap-in-b`, `zap-out-a`, and `zap-out-b`. Zap-in cases use `input` as the single-sided input coin, require the relevant `minAFromSwap`/`minBFromSwap` plus `minLpOut`, build one selected provider bundle, and transfer the two dust coins plus LP coin returned by Move. Zap-out cases use `input` as LP, require `minOut`, build one provider bundle, and transfer the single output coin. Active template coverage is current-Pyth only; non-Pyth matrices were left unchanged.
+  - RED: `rtk npm test --prefix sdk/router -- --test-name-pattern "provider-backed zap"` failed with `Unsupported BrownFi registered route preflight case kind: zap-in-a`; `rtk npm test --prefix tools -- --test-name-pattern "zap outputs"` failed because submitted zap outputs were not transferred.
+  - GREEN: the focused SDK test passed 188/188 after wiring registered zap hydration/preflight/build paths; the focused tools test passed 148/148 after submit evidence, output transfer, and input splitting support were added.
+  - Template update: `configs/launch/pyth-current-testnet.matrix.example.json` now includes zap-in A/B and zap-out A/B Pyth route cases. The verifier-only `pyth-current-testnet.live-evidence.matrix.json` was intentionally not changed because no fresh zap route digests have been landed and promoted yet.
+- 2026-06-16 Pyth zap live-evidence refresh:
+  - Finding: the checked current-Pyth runtime config still delegated Hermes endpoint selection to `PYTH_HERMES_ENDPOINT`; without that env var, the current Pyth SDK path defaulted to an auth-gated endpoint and returned HTTP 401. Node fetch inside the sandbox also could not resolve Sui RPC DNS, while `curl` could, so the successful live run used the approved escalated Node 24 command and the Sui CLI keystore signer fields.
+  - Decision: pin the current-Pyth runtime example to `https://hermes-beta.pyth.network`, keep this lane Pyth-only, and promote fresh landed zap evidence only after the launch sequence verified setup and all route txs over Sui testnet RPC.
+  - RED: the focused runtime test failed once it asserted that the default current-Pyth runtime config must pass a Hermes endpoint to `SuiPriceServiceConnection`.
+  - GREEN: the runtime endpoint regression passed after the config patch, then the fresh current-Pyth testnet launch succeeded from `/private/tmp/brownfi-pyth-current-testnet-zap-20260616-r1`.
+  - Live evidence: test coins package `0x9e921662d43013cef26c5469a9cb29ab328f2ea04b206c1cbaf68bafcf376f94` landed in `JCLo1o9YiBxD9eduBDzhhpwGKXN8afqYXkZLtjncxqHh`; BrownFi package `0xfc634646639834ca25e3adb9f6ed96ff032655dc3f6da482b36cf635e273ba5e` landed in `ALz2S21dgVjcfTiJBt77kMqHiA9Z75jffnKybHcPZPsi`; pool `0xd68b64193a4104aece2f48c9946afcd7ccd0925d05fae70dc5633878218d2c86` was created in `GAKWQEjfw186C1m5QLGSGtv54fF1yi7wYvwccoeMvn2P`; flash was enabled in `2YDzmVHcLkpe3RaSSwUxb8jNsKscSFkjyHznRxZiwoEy`.
+  - Route evidence: exact-input `9CJSqbP1HpZbqMF6xWo9x81tAHgXmaC8T5iqYgWf7zMu`; exact-output `D9Vfs7QJUuv58MnUbVEP7NCFNZVD6y6KpmZNS1UTAzak`; add-liquidity `53Vy8j3LHKZseGdes4ybEnpuoK37FxseN2Mh9rRnBmXS`; remove-liquidity `FsTLwZRspgvz8NMx3Wt25sguBPmXC9SHQTEdHSG2Uwrv`; zap-in-A `DssRrNipGxLo5fyohT6rCja8oUHDV8MC2rQsjQWTaDoa`; zap-in-B `61ZCm66zvxwKf5txnzqkdNzkfmw32mw87omrkr7GkvLT`; zap-out-A `8d3iqegqYUmtBoMLvce45HHuCQF1LFGjSE1NcnAC1HbB`; zap-out-B `DuEk6Rxq4HCi4NVWUgCkiTTCeEZPkFxhWYYb5dcaeydd`; flash-borrow-A `9f82Gppv4uPnTGW6TfzSPKkb8C6oz9kogzdvVhjQNkCH`.
+  - Verification: the launch sequence verified setup evidence and all nine route txs during submission, then `configs/launch/pyth-current-testnet.live-evidence.matrix.json` was regenerated from the materialized matrix plus verified setup/route evidence. The promoted matrix validates as nine Pyth route cases plus two quote cases; all four setup entries and all nine route txs re-verified from the checked matrix over Sui testnet RPC; `rtk npm test --prefix tools` passed 148/148; `rtk npm test --prefix sdk/router` passed 188/188; `rtk sui move test --allow-dirty --build-env testnet --warnings-are-errors` passed 290/290; `rtk node tools/check-move-struct-fields.mjs` passed with 73 structs and max fields <= 32.

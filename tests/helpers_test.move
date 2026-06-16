@@ -3,7 +3,7 @@ module brownfi_amm::helpers_test {
     use sui::test_scenario::{Self, Scenario, next_tx, ctx};
     use sui::balance;
     use sui::clock::{Self, Clock};
-    use brownfi_amm::factory::{Self, Factory};
+    use brownfi_amm::factory::{Self, Factory, PoolCreatorCap};
     use brownfi_amm::swap;
     use brownfi_oracle::oracle::{Self, OracleAdapter};
     use pyth::price_info::{Self, PriceInfoObject};
@@ -18,7 +18,7 @@ module brownfi_amm::helpers_test {
     public struct C has drop {}
 
     /// Create a mock PriceInfoObject with a dummy price feed
-    fun create_mock_price_info_object(feed_id: vector<u8>, ctx: &mut TxContext): PriceInfoObject {
+    public fun create_mock_price_info_object(feed_id: vector<u8>, ctx: &mut TxContext): PriceInfoObject {
         let dummy_price = price::new(i64::new(1, false), 1, i64::new(0, false), 0);
         let dummy_ema = price::new(i64::new(1, false), 1, i64::new(0, false), 0);
         let feed = price_feed::new(
@@ -27,7 +27,7 @@ module brownfi_amm::helpers_test {
             dummy_ema
         );
         let info = price_info::new_price_info(0, 0, feed);
-        price_info::create_price_info_object_for_testing(info, ctx)
+        price_info::new_price_info_object_for_test(info, ctx)
     }
 
     /// Initialize test scenario with factory, oracle, clock, and mock PriceInfoObjects deployed
@@ -62,9 +62,9 @@ module brownfi_amm::helpers_test {
             let price_feed_b = sui::object::id_from_address(@0xBBBB);
             let price_feed_c = sui::object::id_from_address(@0xCCCC);
 
-            oracle::configure_token<A>(&mut oracle_adapter, b"test", price_feed_a, vector::empty());
-            oracle::configure_token<B>(&mut oracle_adapter, b"test", price_feed_b, vector::empty());
-            oracle::configure_token<C>(&mut oracle_adapter, b"test", price_feed_c, vector::empty());
+            oracle::configure_token<A>(&mut oracle_adapter, b"test", price_feed_a, vector[]);
+            oracle::configure_token<B>(&mut oracle_adapter, b"test", price_feed_b, vector[]);
+            oracle::configure_token<C>(&mut oracle_adapter, b"test", price_feed_c, vector[]);
 
             test_scenario::return_shared(oracle_adapter);
         };
@@ -98,12 +98,14 @@ module brownfi_amm::helpers_test {
             let clock = test_scenario::take_shared<Clock>(scenario);
             let pio_a = test_scenario::take_shared<PriceInfoObject>(scenario);
             let pio_b = test_scenario::take_shared<PriceInfoObject>(scenario);
+            let pool_creator_cap = test_scenario::take_from_sender<PoolCreatorCap>(scenario);
 
             let init_a = balance::create_for_testing<A>(init_a);
             let init_b = balance::create_for_testing<B>(init_b);
 
-            let lp = swap::create_pool(
+            let lp = swap::create_pool_for_testing(
                 &mut factory,
+                &pool_creator_cap,
                 &oracle,
                 &pio_a,
                 &pio_b,
@@ -116,6 +118,7 @@ module brownfi_amm::helpers_test {
             );
             sui::transfer::public_transfer(sui::coin::from_balance(lp, ctx(scenario)), @0xA);
 
+            test_scenario::return_to_sender(scenario, pool_creator_cap);
             test_scenario::return_shared(factory);
             test_scenario::return_shared(oracle);
             test_scenario::return_shared(clock);

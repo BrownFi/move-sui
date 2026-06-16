@@ -1,0 +1,7 @@
+[package]
+name = "brownfi_launch_test_coins"
+edition = "2024.beta"
+version = "0.0.0"
+
+[addresses]
+brownfi_launch_test_coins = "0x0"
