@@ -318,6 +318,52 @@ test("verifySuiCliTxEvidenceConfigFile rejects missing expected events", () => {
   );
 });
 
+test("verifySuiTxEvidence rejects missing duplicate expected Move calls", () => {
+  assert.throws(
+    () =>
+      verifySuiTxEvidence({
+        txName: "three-hop-swap",
+        evidence: {
+          digest: SWAP_DIGEST,
+          expectedMoveCalls: [
+            "0x1::router::swap_exact_a_for_b_with_bundle",
+            "0x1::router::swap_exact_a_for_b_with_bundle"
+          ]
+        },
+        execFileSync() {
+          return txBlockResult({
+            moveCalls: ["0x1::router::swap_exact_a_for_b_with_bundle"],
+            eventTypes: []
+          });
+        }
+      }),
+    /Sui CLI tx evidence three-hop-swap missing expected Move call 0x1::router::swap_exact_a_for_b_with_bundle/
+  );
+});
+
+test("verifySuiTxEvidence rejects missing duplicate expected events", () => {
+  assert.throws(
+    () =>
+      verifySuiTxEvidence({
+        txName: "three-hop-swap",
+        evidence: {
+          digest: SWAP_DIGEST,
+          expectedEventTypes: [
+            "0x1::events::SwapExecuted",
+            "0x1::events::SwapExecuted"
+          ]
+        },
+        execFileSync() {
+          return txBlockResult({
+            moveCalls: [],
+            eventTypes: ["0x1::events::SwapExecuted"]
+          });
+        }
+      }),
+    /Sui CLI tx evidence three-hop-swap missing expected event 0x1::events::SwapExecuted/
+  );
+});
+
 test("verifySuiCliTxEvidenceConfigFile rejects failed tx status", () => {
   assert.throws(
     () =>

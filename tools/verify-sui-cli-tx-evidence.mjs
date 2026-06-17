@@ -338,10 +338,16 @@ function assertTxDigestMatches(result, expectedDigest, txName) {
 }
 
 function assertExpectedValues(actual, expected, label, txName) {
+  const remaining = new Map();
+  for (const item of actual) {
+    remaining.set(item, (remaining.get(item) ?? 0) + 1);
+  }
   for (const item of expected) {
-    if (!actual.includes(item)) {
+    const count = remaining.get(item) ?? 0;
+    if (count === 0) {
       throw new Error(`Sui CLI tx evidence ${txName} missing expected ${label} ${item}`);
     }
+    remaining.set(item, count - 1);
   }
 }
 

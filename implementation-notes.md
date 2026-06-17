@@ -1972,3 +1972,7 @@
   - Finding: SDK preflight covered a three-hop result-aware exact-output route, but launch-submit coverage only pinned one-hop and two-hop exact-output ownership/evidence paths. That left the landed-tx runner's Solidity-style dynamic path parity under-covered.
   - Decision: add a submit-level three-hop `exact-output-results` route case with a separate recipient. It must refund all three change coins to the runtime sender, transfer only the final output coin to the route recipient, and emit expected evidence for the two backward quote calls plus the three single-hop swap calls.
   - Verification: `rtk node --test tools/run-launch-matrix-submit.test.mjs` passed 22/22. This is coverage-only; the existing result-aware route submit code already satisfied the invariant.
+- 2026-06-17 landed tx evidence multiplicity slice:
+  - Finding: launch evidence expected Move calls and event types are arrays, but the verifier only checked `actual.includes(expected)`. Duplicate expected calls/events from multi-hop routes could be satisfied by one observed occurrence, weakening evidence for repeated BrownFi hop execution.
+  - Decision: make `tools/verify-sui-cli-tx-evidence.mjs` consume actual values as a multiset, so each expected occurrence must be present independently while preserving the existing matrix schema and error wording.
+  - RED/GREEN: focused verifier tests first failed because duplicate expected Move-call/event expectations did not throw; after the count-aware assertion patch, `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` passed 17/17.
