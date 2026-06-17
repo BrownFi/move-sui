@@ -1763,6 +1763,10 @@ export interface AddLiquidityWithBundleOptions extends PairTypesOptions {
   minLpOut: U64Input;
 }
 
+export interface AddLiquidityWithBundleTransferOptions extends AddLiquidityWithBundleOptions {
+  recipient: string;
+}
+
 export interface ZapInAWithBundleOptions extends PairTypesOptions {
   priceBundle: TransactionArgument;
   clock: ObjectInput;
@@ -7393,6 +7397,23 @@ export function addLiquidityWithBundle(options: AddLiquidityWithBundleOptions): 
         objectArg(tx, options.inputA),
         objectArg(tx, options.inputB),
         tx.pure.u64(options.minLpOut)
+      ]
+    });
+}
+
+export function addLiquidityWithBundleAndTransfer(
+  options: AddLiquidityWithBundleTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "add_liquidity_with_bundle_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.inputA),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }

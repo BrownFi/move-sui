@@ -5,6 +5,7 @@ import {
   addLiquidityWithCoins,
   addLiquidityWithCoinsAndTransfer,
   addLiquidityWithRegisteredRoute,
+  addLiquidityWithBundleAndTransfer,
   assertDryRunTransactionBlockSucceeded,
   buildPythHermesConnectionConfig,
   buildAndDryRunTransactionBlock,
@@ -9725,6 +9726,34 @@ test("liquidity builders target router functions with Move argument order", () =
       { kind: "object", id: "0xCOINA" },
       { kind: "result", index: 1 },
       { kind: "u64", value: "505" }
+    ]
+  });
+
+  const transferTx = createTransactionRecorder();
+  addLiquidityWithBundleAndTransfer({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    priceBundle: { kind: "result", index: 3 },
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    inputA: "0xCOINA",
+    inputB: { kind: "result", index: 4 },
+    minLpOut: 808n,
+    recipient: "0xRECIPIENT"
+  })(transferTx);
+
+  assert.deepEqual(transferTx.calls[0], {
+    target: "0xBROWN::router::add_liquidity_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 3 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "result", index: 4 },
+      { kind: "u64", value: "808" },
+      { kind: "address", value: "0xRECIPIENT" }
     ]
   });
 

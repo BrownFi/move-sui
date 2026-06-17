@@ -223,6 +223,33 @@ public fun add_liquidity_with_bundle<A, B>(
     )
 }
 
+#[allow(lint(self_transfer))]
+public fun add_liquidity_with_bundle_and_transfer<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_a: Coin<A>,
+    input_b: Coin<B>,
+    min_lp_out: u64,
+    lp_recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_a, remaining_b, lp) = add_liquidity_with_bundle(
+        price_bundle,
+        clock,
+        pool,
+        input_a,
+        input_b,
+        min_lp_out,
+        ctx
+    );
+
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_a), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(lp), lp_recipient, ctx);
+}
+
 public fun zap_in_a_with_bundle<A, B>(
     price_bundle: &PriceBundle,
     clock: &Clock,
