@@ -181,14 +181,28 @@ export async function createLaunchMatrixRuntime(options = {}) {
       }
       const expectedTransferObjectCounts = ${JSON.stringify(options.expectedTransferObjectCounts ?? null)};
       const expectedTransferObjectCount = expectedTransferObjectCounts?.[context.index];
-      if (
-        expectedTransferObjectCount !== undefined &&
-        _tx.transfers[0]?.objects.length !== expectedTransferObjectCount
-      ) {
-        throw new Error(
-          "expected " + expectedTransferObjectCount + " transferred route outputs, got " +
-            (_tx.transfers[0]?.objects.length ?? 0)
-        );
+      if (expectedTransferObjectCount !== undefined) {
+        const actualCounts = _tx.transfers.map((transfer) => transfer.objects.length);
+        const expectedCounts = Array.isArray(expectedTransferObjectCount)
+          ? expectedTransferObjectCount
+          : [expectedTransferObjectCount];
+        if (JSON.stringify(actualCounts) !== JSON.stringify(expectedCounts)) {
+          throw new Error(
+            "expected transferred route output counts " + JSON.stringify(expectedCounts) +
+              ", got " + JSON.stringify(actualCounts)
+          );
+        }
+      }
+      const expectedTransferRecipients = ${JSON.stringify(options.expectedTransferRecipients ?? null)};
+      const expectedTransferRecipient = expectedTransferRecipients?.[context.index];
+      if (expectedTransferRecipient !== undefined) {
+        const actualRecipients = _tx.transfers.map((transfer) => transfer.recipient.value);
+        if (JSON.stringify(actualRecipients) !== JSON.stringify(expectedTransferRecipient)) {
+          throw new Error(
+            "expected transferred route recipients " + JSON.stringify(expectedTransferRecipient) +
+              ", got " + JSON.stringify(actualRecipients)
+          );
+        }
       }
       if (${JSON.stringify(options.requireSplits ?? false)} && _tx.splits.length === 0) {
         throw new Error("expected route inputs to be split");
@@ -348,6 +362,63 @@ test("submitLaunchMatrixRoutesConfigFile transfers exact-output-results change a
   const runtime = writeRuntime(root, {
     requireTransfers: true,
     expectedTransferObjectCounts: [2]
+  });
+
+  const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
+
+  assert.equal(report.summary.routeCaseCount, 1);
+});
+
+test("submitLaunchMatrixRoutesConfigFile sends exact-output output to recipient and refunds sender", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root, {
+    routeCases: [
+      {
+        name: "custom exact output route",
+        kind: "exact-output",
+        providerId: "custom",
+        clock: "0x6",
+        path: ["0x1::coin_a::COIN_A", "0x1::coin_b::COIN_B"],
+        pairs: [routePair()],
+        input: "0x3",
+        amountOut: "1",
+        recipient: "0xdef"
+      }
+    ]
+  });
+  const runtime = writeRuntime(root, {
+    requireTransfers: true,
+    expectedTransferObjectCounts: [[1, 1]],
+    expectedTransferRecipients: [["0xabc", "0xdef"]]
+  });
+
+  const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
+
+  assert.equal(report.summary.routeCaseCount, 1);
+});
+
+test("submitLaunchMatrixRoutesConfigFile sends add-liquidity LP to recipient and refunds sender", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root, {
+    routeCases: [
+      {
+        name: "custom add liquidity route",
+        kind: "add-liquidity",
+        providerId: "custom",
+        clock: "0x6",
+        path: ["0x1::coin_a::COIN_A", "0x1::coin_b::COIN_B"],
+        pairs: [routePair()],
+        input: "0x4",
+        inputB: "0x5",
+        minLpOut: "1",
+        recipient: "0xdef"
+      }
+    ]
+  });
+  const runtime = writeRuntime(root, {
+    requireTransfers: true,
+    expectedTransferObjectCounts: [[2, 1]],
+    expectedTransferRecipients: [["0xabc", "0xdef"]]
   });
 
   const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });

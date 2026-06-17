@@ -433,16 +433,96 @@ function runtimeSender(runtime, tx) {
   return sender;
 }
 
-function transferRouteResultOutputs(tx, runtime, routeResult) {
-  const outputs = routeResultOutputs(routeResult).filter((item) => item !== undefined);
-  if (outputs.length === 0) return;
+function optionalRouteRecipient(routeCaseConfig) {
+  const recipient = routeCaseConfig?.recipient;
+  if (recipient === undefined) return undefined;
+  if (typeof recipient !== "string" || recipient.length === 0) {
+    throw new Error("Launch matrix route case recipient must be a non-empty address when present");
+  }
+  return recipient;
+}
+
+function routeResultTransferGroups(routeResult, senderAddress, recipientAddress) {
+  const defaultRecipient = recipientAddress ?? senderAddress;
+  if (recipientAddress === undefined || recipientAddress === senderAddress) {
+    return [{ recipient: senderAddress, outputs: routeResultOutputs(routeResult) }];
+  }
+  if (routeResult.kind === "exact-input") {
+    return [{ recipient: recipientAddress, outputs: [routeResult.swapResult] }];
+  }
+  if (routeResult.kind === "exact-output-results") {
+    return [
+      { recipient: senderAddress, outputs: routeResult.changeCoins ?? [] },
+      { recipient: recipientAddress, outputs: [routeResult.output] }
+    ];
+  }
+  if (routeResult.kind === "add-liquidity") {
+    return [
+      {
+        recipient: senderAddress,
+        outputs: [
+          transactionResultAt(routeResult.liquidityResult, 0, "add-liquidity remaining coin A"),
+          transactionResultAt(routeResult.liquidityResult, 1, "add-liquidity remaining coin B")
+        ]
+      },
+      {
+        recipient: recipientAddress,
+        outputs: [transactionResultAt(routeResult.liquidityResult, 2, "add-liquidity LP coin")]
+      }
+    ];
+  }
+  if (routeResult.kind === "remove-liquidity") {
+    return [{ recipient: recipientAddress, outputs: routeResultOutputs(routeResult) }];
+  }
+  if (routeResult.kind === "zap-in-a" || routeResult.kind === "zap-in-b") {
+    return [
+      {
+        recipient: senderAddress,
+        outputs: [
+          transactionResultAt(routeResult.zapResult, 0, "zap-in remaining input-side coin"),
+          transactionResultAt(routeResult.zapResult, 1, "zap-in remaining paired coin")
+        ]
+      },
+      {
+        recipient: recipientAddress,
+        outputs: [transactionResultAt(routeResult.zapResult, 2, "zap-in LP coin")]
+      }
+    ];
+  }
+  if (routeResult.kind === "zap-out-a" || routeResult.kind === "zap-out-b") {
+    return [{ recipient: recipientAddress, outputs: [routeResult.zapResult] }];
+  }
+  const swapResult = routeResult.swapResult;
+  if (swapResult?.[0] !== undefined && swapResult?.[1] !== undefined) {
+    return [
+      {
+        recipient: senderAddress,
+        outputs: [transactionResultAt(swapResult, 0, "exact-output change coin")]
+      },
+      {
+        recipient: recipientAddress,
+        outputs: [transactionResultAt(swapResult, 1, "exact-output output coin")]
+      }
+    ];
+  }
+  return [{ recipient: defaultRecipient, outputs: [swapResult] }];
+}
+
+function transferRouteResultOutputs(tx, runtime, routeResult, routeCaseConfig) {
+  const senderAddress = runtimeSender(runtime, tx);
+  const recipientAddress = optionalRouteRecipient(routeCaseConfig);
+  const groups = routeResultTransferGroups(routeResult, senderAddress, recipientAddress);
   if (typeof tx.transferObjects !== "function") {
     throw new Error("Launch matrix submit transaction builder must support transferObjects");
   }
   if (typeof tx.pure?.address !== "function") {
     throw new Error("Launch matrix submit transaction builder must support pure address values");
   }
-  tx.transferObjects(outputs, tx.pure.address(runtimeSender(runtime, tx)));
+  for (const group of groups) {
+    const outputs = group.outputs.filter((item) => item !== undefined);
+    if (outputs.length === 0) continue;
+    tx.transferObjects(outputs, tx.pure.address(group.recipient));
+  }
 }
 
 function optionalU64(value, label) {
@@ -722,7 +802,7 @@ export async function submitLaunchMatrixRoutesConfigFile({
     }
     applyRouteInputSplits(routeCase, routeCaseConfigs[i]);
     const routeResult = await buildRegisteredRouteCaseTransaction(routeCase);
-    transferRouteResultOutputs(routeCase.tx, launchRuntime, routeResult);
+    transferRouteResultOutputs(routeCase.tx, launchRuntime, routeResult, routeCaseConfigs[i]);
     const executionResult = await launchRuntime.executeTransaction(routeCase.tx, {
       config: matrixConfig,
       index: i,
