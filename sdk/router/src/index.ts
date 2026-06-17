@@ -2042,6 +2042,11 @@ export interface SwapExactAForCViaBWithBundlesOptions {
   minCOut: U64Input;
 }
 
+export interface SwapExactAForCViaBWithBundlesAndTransferOptions
+  extends SwapExactAForCViaBWithBundlesOptions {
+  recipient: string;
+}
+
 export interface QuoteExactAForCViaBWithBundlesOptions {
   packageId: string;
   typeA: string;
@@ -2068,6 +2073,11 @@ export interface SwapExactCForAViaBWithBundlesOptions {
   input: ObjectInput;
   minBOut: U64Input;
   minAOut: U64Input;
+}
+
+export interface SwapExactCForAViaBWithBundlesAndTransferOptions
+  extends SwapExactCForAViaBWithBundlesOptions {
+  recipient: string;
 }
 
 export interface QuoteExactCForAViaBWithBundlesOptions {
@@ -8271,6 +8281,25 @@ export function swapExactAForCViaBWithBundles(
     });
 }
 
+export function swapExactAForCViaBWithBundlesAndTransfer(
+  options: SwapExactAForCViaBWithBundlesAndTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(
+        options.packageId,
+        "swap_exact_a_for_c_via_b_with_bundles_and_transfer"
+      ),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...twoHopBundleArgs(tx, options),
+        tx.pure.u64(options.minBOut),
+        tx.pure.u64(options.minCOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function swapExactCForAViaBWithBundles(
   options: SwapExactCForAViaBWithBundlesOptions
 ): TransactionThunk {
@@ -8282,6 +8311,25 @@ export function swapExactCForAViaBWithBundles(
         ...twoHopBundleArgs(tx, options),
         tx.pure.u64(options.minBOut),
         tx.pure.u64(options.minAOut)
+      ]
+    });
+}
+
+export function swapExactCForAViaBWithBundlesAndTransfer(
+  options: SwapExactCForAViaBWithBundlesAndTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(
+        options.packageId,
+        "swap_exact_c_for_a_via_b_with_bundles_and_transfer"
+      ),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...twoHopBundleArgs(tx, options),
+        tx.pure.u64(options.minBOut),
+        tx.pure.u64(options.minAOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }

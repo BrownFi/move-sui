@@ -846,6 +846,33 @@ public fun swap_exact_a_for_c_via_b_with_bundles<A, B, C>(
     coin::from_balance(c_out, ctx)
 }
 
+#[allow(lint(self_transfer))]
+public fun swap_exact_a_for_c_via_b_with_bundles_and_transfer<A, B, C>(
+    price_bundle_ab: &PriceBundle,
+    price_bundle_bc: &PriceBundle,
+    clock: &Clock,
+    pool_ab: &mut Pool<A, B>,
+    pool_bc: &mut Pool<B, C>,
+    input: Coin<A>,
+    min_b_out: u64,
+    min_c_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let c_out = swap_exact_a_for_c_via_b_with_bundles(
+        price_bundle_ab,
+        price_bundle_bc,
+        clock,
+        pool_ab,
+        pool_bc,
+        input,
+        min_b_out,
+        min_c_out,
+        ctx
+    );
+    library::destroy_zero_or_transfer(coin::into_balance(c_out), recipient, ctx);
+}
+
 public fun quote_exact_a_for_c_via_b_with_bundles<A, B, C>(
     price_bundle_ab: &PriceBundle,
     price_bundle_bc: &PriceBundle,
@@ -974,6 +1001,33 @@ public fun swap_exact_c_for_a_via_b_with_bundles<A, B, C>(
     );
 
     coin::from_balance(a_out, ctx)
+}
+
+#[allow(lint(self_transfer))]
+public fun swap_exact_c_for_a_via_b_with_bundles_and_transfer<A, B, C>(
+    price_bundle_ab: &PriceBundle,
+    price_bundle_bc: &PriceBundle,
+    clock: &Clock,
+    pool_ab: &mut Pool<A, B>,
+    pool_bc: &mut Pool<B, C>,
+    input: Coin<C>,
+    min_b_out: u64,
+    min_a_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let a_out = swap_exact_c_for_a_via_b_with_bundles(
+        price_bundle_ab,
+        price_bundle_bc,
+        clock,
+        pool_ab,
+        pool_bc,
+        input,
+        min_b_out,
+        min_a_out,
+        ctx
+    );
+    library::destroy_zero_or_transfer(coin::into_balance(a_out), recipient, ctx);
 }
 
 public fun quote_exact_c_for_a_via_b_with_bundles<A, B, C>(

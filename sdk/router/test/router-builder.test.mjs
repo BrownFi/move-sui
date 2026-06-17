@@ -179,6 +179,7 @@ import {
   swapExactAForBWithBundleAndTransfer,
   swapExactAForCViaB,
   swapExactAForCViaBWithBundles,
+  swapExactAForCViaBWithBundlesAndTransfer,
   swapExactAForCViaBWithPythRoute,
   swapExactBForA,
   swapExactBForAAndTransfer,
@@ -187,6 +188,7 @@ import {
   swapExactBForAWithPythRoute,
   swapExactCForAViaB,
   swapExactCForAViaBWithBundles,
+  swapExactCForAViaBWithBundlesAndTransfer,
   swapExactCForAViaBWithPythRoute,
   swapExactOutputWithRegisteredRoute,
   swapExactOutputWithRegisteredRouteResults,
@@ -10885,6 +10887,74 @@ test("swapExactCForAViaBWithBundles builds the reverse typed two-hop exact-input
       { kind: "u64", value: "444" }
     ]
   });
+});
+
+test("typed two-hop bundle exact-input transfer builders target recipient-aware router functions", () => {
+  const tx = createTransactionRecorder();
+  swapExactAForCViaBWithBundlesAndTransfer({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    priceBundleAB: { kind: "result", index: 0 },
+    priceBundleBC: { kind: "result", index: 1 },
+    clock: "0x6",
+    poolAB: "0xPOOLAB",
+    poolBC: "0xPOOLBC",
+    input: { kind: "result", index: 2 },
+    minBOut: 111n,
+    minCOut: 222n,
+    recipient: "0xRECIPIENT"
+  })(tx);
+
+  swapExactCForAViaBWithBundlesAndTransfer({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    priceBundleAB: { kind: "result", index: 3 },
+    priceBundleBC: { kind: "result", index: 4 },
+    clock: "0x6",
+    poolAB: "0xPOOLAB",
+    poolBC: "0xPOOLBC",
+    input: "0xCOINC",
+    minBOut: 333n,
+    minAOut: 444n,
+    recipient: "0xRECIPIENT"
+  })(tx);
+
+  assert.deepEqual(tx.calls, [
+    {
+      target: "0xBROWN::router::swap_exact_a_for_c_via_b_with_bundles_and_transfer",
+      typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+      arguments: [
+        { kind: "result", index: 0 },
+        { kind: "result", index: 1 },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" },
+        { kind: "object", id: "0xPOOLBC" },
+        { kind: "result", index: 2 },
+        { kind: "u64", value: "111" },
+        { kind: "u64", value: "222" },
+        { kind: "address", value: "0xRECIPIENT" }
+      ]
+    },
+    {
+      target: "0xBROWN::router::swap_exact_c_for_a_via_b_with_bundles_and_transfer",
+      typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+      arguments: [
+        { kind: "result", index: 3 },
+        { kind: "result", index: 4 },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" },
+        { kind: "object", id: "0xPOOLBC" },
+        { kind: "object", id: "0xCOINC" },
+        { kind: "u64", value: "333" },
+        { kind: "u64", value: "444" },
+        { kind: "address", value: "0xRECIPIENT" }
+      ]
+    }
+  ]);
 });
 
 test("swapAForExactCViaBWithBundles builds the typed two-hop exact-output PTB call", () => {
