@@ -1341,6 +1341,114 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    #[expected_failure(abort_code = swap::EInsufficientOutputAmount)]
+    fun test_swap_a_for_exact_b_with_bundle_rejects_zero_standard_output() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            1_000_000_000,
+            1_000_000_000_000_000_000,
+            9,
+            18
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+            let input_a = balance::create_for_testing<A>(1);
+            let (remaining_a, b_out) = swap::swap_a_for_exact_b_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                1
+            );
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(b_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = swap::EInsufficientOutputAmount)]
+    fun test_swap_b_for_exact_a_with_bundle_rejects_zero_standard_output() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            1_000_000_000_000_000_000,
+            1_000_000_000,
+            18,
+            9
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+            let input_b = balance::create_for_testing<B>(1);
+            let (remaining_b, a_out) = swap::swap_b_for_exact_a_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_b,
+                1
+            );
+
+            balance::destroy_for_testing(remaining_b);
+            balance::destroy_for_testing(a_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_exact_input_pyth_bundle_rounds_output_down_for_six_decimal_base_token() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool_with_amounts_and_decimals(

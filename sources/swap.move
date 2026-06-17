@@ -1872,6 +1872,7 @@ fun v3_amount_in_without_cutoff(
 
     let parsed_amount_out = math::parse_amount_to_standard_decimals(output_decimals, amount_out, STANDARD_DECIMALS);
     let parsed_reserve_out = math::parse_amount_to_standard_decimals(output_decimals, reserve_out, STANDARD_DECIMALS);
+    assert!(parsed_amount_out > 0, EInsufficientOutputAmount);
     assert!(parsed_amount_out < parsed_reserve_out, EInsufficientLiquidity);
 
     let q = Q32 as u256;
