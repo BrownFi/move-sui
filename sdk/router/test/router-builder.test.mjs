@@ -207,13 +207,17 @@ import {
   updateSingleStorkTemporalNumericValueEvm,
   validateLaunchValidationMatrixConfig,
   zapInA,
+  zapInAAndTransfer,
   zapInB,
+  zapInBAndTransfer,
   zapInAWithBundle,
   zapInAWithBundleAndTransfer,
   zapInBWithBundle,
   zapInBWithBundleAndTransfer,
   zapOutA,
+  zapOutAAndTransfer,
   zapOutB,
+  zapOutBAndTransfer,
   zapOutAWithBundle,
   zapOutAWithBundleAndTransfer,
   zapOutBWithBundleAndTransfer,
@@ -10620,6 +10624,108 @@ test("direct zap-out builders target router functions with Move argument order",
       { kind: "object", id: "0xPOOLAB" },
       { kind: "result", index: 2 },
       { kind: "u64", value: "1313" }
+    ]
+  });
+});
+
+test("direct zap transfer builders target recipient-aware router entrypoints", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    oracle: "0xORACLE",
+    priceInfoObjectA: "0xPIOA",
+    priceInfoObjectB: "0xPIOB",
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    recipient: "0xRECIPIENT"
+  };
+
+  const zapInATx = createTransactionRecorder();
+  zapInAAndTransfer({
+    ...base,
+    inputA: "0xCOINA",
+    minBFromSwap: 808n,
+    minLpOut: 909n
+  })(zapInATx);
+  assert.deepEqual(zapInATx.calls[0], {
+    target: "0xBROWN::router::zap_in_a_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPIOA" },
+      { kind: "object", id: "0xPIOB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "808" },
+      { kind: "u64", value: "909" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapInBTx = createTransactionRecorder();
+  zapInBAndTransfer({
+    ...base,
+    inputB: { kind: "result", index: 2 },
+    minAFromSwap: 1_010n,
+    minLpOut: 1_111n
+  })(zapInBTx);
+  assert.deepEqual(zapInBTx.calls[0], {
+    target: "0xBROWN::router::zap_in_b_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPIOA" },
+      { kind: "object", id: "0xPIOB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "result", index: 2 },
+      { kind: "u64", value: "1010" },
+      { kind: "u64", value: "1111" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapOutATx = createTransactionRecorder();
+  zapOutAAndTransfer({
+    ...base,
+    lpIn: "0xLP",
+    minOut: 1_212n
+  })(zapOutATx);
+  assert.deepEqual(zapOutATx.calls[0], {
+    target: "0xBROWN::router::zap_out_a_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPIOA" },
+      { kind: "object", id: "0xPIOB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xLP" },
+      { kind: "u64", value: "1212" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapOutBTx = createTransactionRecorder();
+  zapOutBAndTransfer({
+    ...base,
+    lpIn: { kind: "result", index: 3 },
+    minOut: 1_313n
+  })(zapOutBTx);
+  assert.deepEqual(zapOutBTx.calls[0], {
+    target: "0xBROWN::router::zap_out_b_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPIOA" },
+      { kind: "object", id: "0xPIOB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "result", index: 3 },
+      { kind: "u64", value: "1313" },
+      { kind: "address", value: "0xRECIPIENT" }
     ]
   });
 });

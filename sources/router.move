@@ -192,6 +192,37 @@ public fun zap_in_a<A, B>(
     )
 }
 
+#[allow(lint(self_transfer))]
+public fun zap_in_a_and_transfer<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_a: Coin<A>,
+    min_b_from_swap: u64,
+    min_lp_out: u64,
+    lp_recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_a, remaining_b, lp) = zap_in_a(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        input_a,
+        min_b_from_swap,
+        min_lp_out,
+        ctx
+    );
+
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_a), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(lp), lp_recipient, ctx);
+}
+
 public fun zap_in_b<A, B>(
     oracle: &OracleAdapter,
     price_info_object_a: &PriceInfoObject,
@@ -232,6 +263,37 @@ public fun zap_in_b<A, B>(
     );
 
     (remaining_b, remaining_a, lp)
+}
+
+#[allow(lint(self_transfer))]
+public fun zap_in_b_and_transfer<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_b: Coin<B>,
+    min_a_from_swap: u64,
+    min_lp_out: u64,
+    lp_recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_b, remaining_a, lp) = zap_in_b(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        input_b,
+        min_a_from_swap,
+        min_lp_out,
+        ctx
+    );
+
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_a), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(lp), lp_recipient, ctx);
 }
 
 public fun add_liquidity_with_bundle<A, B>(
@@ -516,6 +578,31 @@ public fun zap_out_a<A, B>(
     coin::from_balance(a_out, ctx)
 }
 
+#[allow(lint(self_transfer))]
+public fun zap_out_a_and_transfer<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    lp_in: Coin<LP<A, B>>,
+    min_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let a_out = zap_out_a(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        lp_in,
+        min_out,
+        ctx
+    );
+    library::destroy_zero_or_transfer(coin::into_balance(a_out), recipient, ctx);
+}
+
 public fun zap_out_b<A, B>(
     oracle: &OracleAdapter,
     price_info_object_a: &PriceInfoObject,
@@ -553,6 +640,31 @@ public fun zap_out_b<A, B>(
     balance::join(&mut b_out, coin::into_balance(swapped_b));
 
     coin::from_balance(b_out, ctx)
+}
+
+#[allow(lint(self_transfer))]
+public fun zap_out_b_and_transfer<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    lp_in: Coin<LP<A, B>>,
+    min_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let b_out = zap_out_b(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        lp_in,
+        min_out,
+        ctx
+    );
+    library::destroy_zero_or_transfer(coin::into_balance(b_out), recipient, ctx);
 }
 
 public fun zap_out_a_with_bundle<A, B>(

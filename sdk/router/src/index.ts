@@ -1652,15 +1652,27 @@ export interface ZapInAOptions extends DirectOraclePairOptions {
   minLpOut: U64Input;
 }
 
+export interface ZapInATransferOptions extends ZapInAOptions {
+  recipient: string;
+}
+
 export interface ZapInBOptions extends DirectOraclePairOptions {
   inputB: ObjectInput;
   minAFromSwap: U64Input;
   minLpOut: U64Input;
 }
 
+export interface ZapInBTransferOptions extends ZapInBOptions {
+  recipient: string;
+}
+
 export interface ZapOutOptions extends DirectOraclePairOptions {
   lpIn: ObjectInput;
   minOut: U64Input;
+}
+
+export interface ZapOutTransferOptions extends ZapOutOptions {
+  recipient: string;
 }
 
 export interface SingleHopDirectQuoteExactInputOptions extends DirectOraclePairOptions {
@@ -7411,6 +7423,21 @@ export function zapInA(options: ZapInAOptions): TransactionThunk {
     });
 }
 
+export function zapInAAndTransfer(options: ZapInATransferOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_in_a_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.inputA),
+        tx.pure.u64(options.minBFromSwap),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function zapInB(options: ZapInBOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7421,6 +7448,21 @@ export function zapInB(options: ZapInBOptions): TransactionThunk {
         objectArg(tx, options.inputB),
         tx.pure.u64(options.minAFromSwap),
         tx.pure.u64(options.minLpOut)
+      ]
+    });
+}
+
+export function zapInBAndTransfer(options: ZapInBTransferOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_in_b_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minAFromSwap),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }
@@ -7438,6 +7480,20 @@ export function zapOutA(options: ZapOutOptions): TransactionThunk {
     });
 }
 
+export function zapOutAAndTransfer(options: ZapOutTransferOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_out_a_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.lpIn),
+        tx.pure.u64(options.minOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function zapOutB(options: ZapOutOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7447,6 +7503,20 @@ export function zapOutB(options: ZapOutOptions): TransactionThunk {
         ...directOraclePairArgs(tx, options),
         objectArg(tx, options.lpIn),
         tx.pure.u64(options.minOut)
+      ]
+    });
+}
+
+export function zapOutBAndTransfer(options: ZapOutTransferOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_out_b_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.lpIn),
+        tx.pure.u64(options.minOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }
