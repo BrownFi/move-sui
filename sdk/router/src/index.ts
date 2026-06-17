@@ -1592,6 +1592,11 @@ export interface SingleHopDirectExactInputOptions extends DirectOraclePairOption
   minOut: U64Input;
 }
 
+export interface SingleHopDirectExactInputTransferOptions
+  extends SingleHopDirectExactInputOptions {
+  recipient: string;
+}
+
 export interface SingleHopDirectExactOutputOptions extends DirectOraclePairOptions {
   input: ObjectInput;
   amountOut: U64Input;
@@ -1601,6 +1606,10 @@ export interface AddLiquidityWithCoinsOptions extends DirectOraclePairOptions {
   inputA: ObjectInput;
   inputB: ObjectInput;
   minLpOut: U64Input;
+}
+
+export interface AddLiquidityWithCoinsTransferOptions extends AddLiquidityWithCoinsOptions {
+  recipient: string;
 }
 
 export interface ZapInAOptions extends DirectOraclePairOptions {
@@ -1775,6 +1784,10 @@ export interface RemoveLiquidityWithCoinsOptions extends PairTypesOptions {
   lpIn: ObjectInput;
   minAOut: U64Input;
   minBOut: U64Input;
+}
+
+export interface RemoveLiquidityWithCoinsTransferOptions extends RemoveLiquidityWithCoinsOptions {
+  recipient: string;
 }
 
 export interface FlashBorrowWithCoinOptions extends PairTypesOptions {
@@ -6920,6 +6933,22 @@ export function swapExactAForB(options: SingleHopDirectExactInputOptions): Trans
     });
 }
 
+export function swapExactAForBAndTransfer(
+  options: SingleHopDirectExactInputTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "swap_a_for_b_with_coin_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.input),
+        tx.pure.u64(options.minOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function swapExactBForA(options: SingleHopDirectExactInputOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -6929,6 +6958,22 @@ export function swapExactBForA(options: SingleHopDirectExactInputOptions): Trans
         ...directOraclePairArgs(tx, options),
         objectArg(tx, options.input),
         tx.pure.u64(options.minOut)
+      ]
+    });
+}
+
+export function swapExactBForAAndTransfer(
+  options: SingleHopDirectExactInputTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "swap_b_for_a_with_coin_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.input),
+        tx.pure.u64(options.minOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }
@@ -7011,6 +7056,23 @@ export function addLiquidityWithCoins(options: AddLiquidityWithCoinsOptions): Tr
         objectArg(tx, options.inputA),
         objectArg(tx, options.inputB),
         tx.pure.u64(options.minLpOut)
+      ]
+    });
+}
+
+export function addLiquidityWithCoinsAndTransfer(
+  options: AddLiquidityWithCoinsTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "add_liquidity_with_coins_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.inputA),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }
@@ -7315,6 +7377,23 @@ export function removeLiquidityWithCoins(
         objectArg(tx, options.lpIn),
         tx.pure.u64(options.minAOut),
         tx.pure.u64(options.minBOut)
+      ]
+    });
+}
+
+export function removeLiquidityWithCoinsAndTransfer(
+  options: RemoveLiquidityWithCoinsTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "remove_liquidity_with_coins_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.lpIn),
+        tx.pure.u64(options.minAOut),
+        tx.pure.u64(options.minBOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }

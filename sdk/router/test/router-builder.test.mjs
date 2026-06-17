@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   addLiquidityWithCoins,
+  addLiquidityWithCoinsAndTransfer,
   addLiquidityWithRegisteredRoute,
   assertDryRunTransactionBlockSucceeded,
   buildPythHermesConnectionConfig,
@@ -117,6 +118,7 @@ import {
   readPythPriceA,
   readPythPriceB,
   removeLiquidityWithCoins,
+  removeLiquidityWithCoinsAndTransfer,
   repayAWithBorrowedCoinAndFee,
   repayAWithCoin,
   repayBWithBorrowedCoinAndFee,
@@ -160,6 +162,7 @@ import {
   swapAForExactCViaBWithBundles,
   swapAForExactCViaBWithPythRoute,
   swapExactAForB,
+  swapExactAForBAndTransfer,
   swapExactAForBWithPythRoute,
   swapBForExactA,
   swapBForExactAWithBundle,
@@ -174,6 +177,7 @@ import {
   swapExactAForCViaBWithBundles,
   swapExactAForCViaBWithPythRoute,
   swapExactBForA,
+  swapExactBForAAndTransfer,
   swapExactBForAWithBundle,
   swapExactBForAWithPythRoute,
   swapExactCForAViaB,
@@ -9097,6 +9101,108 @@ test("direct add-liquidity OracleAdapter builder targets router add_liquidity_wi
       { kind: "object", id: "0xCOINA" },
       { kind: "object", id: "0xCOINB" },
       { kind: "u64", value: "999" }
+    ]
+  });
+});
+
+test("direct coin transfer builders target recipient-aware swap entrypoints", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    oracle: "0xORACLE",
+    priceInfoObjectA: "0xPRICEA",
+    priceInfoObjectB: "0xPRICEB",
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    recipient: "0xRECIPIENT"
+  };
+
+  const exactATx = createTransactionRecorder();
+  swapExactAForBAndTransfer({
+    ...base,
+    input: "0xCOINA",
+    minOut: 111n
+  })(exactATx);
+  assert.deepEqual(exactATx.calls[0], {
+    target: "0xBROWN::swap::swap_a_for_b_with_coin_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPRICEA" },
+      { kind: "object", id: "0xPRICEB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "111" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const exactBTx = createTransactionRecorder();
+  swapExactBForAAndTransfer({
+    ...base,
+    input: "0xCOINB",
+    minOut: 222n
+  })(exactBTx);
+  assert.deepEqual(exactBTx.calls[0], {
+    target: "0xBROWN::swap::swap_b_for_a_with_coin_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPRICEA" },
+      { kind: "object", id: "0xPRICEB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "222" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const addTx = createTransactionRecorder();
+  addLiquidityWithCoinsAndTransfer({
+    ...base,
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minLpOut: 333n
+  })(addTx);
+  assert.deepEqual(addTx.calls[0], {
+    target: "0xBROWN::swap::add_liquidity_with_coins_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPRICEA" },
+      { kind: "object", id: "0xPRICEB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "333" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const removeTx = createTransactionRecorder();
+  removeLiquidityWithCoinsAndTransfer({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    pool: "0xPOOLAB",
+    lpIn: "0xLP",
+    minAOut: 444n,
+    minBOut: 555n,
+    recipient: "0xRECIPIENT"
+  })(removeTx);
+  assert.deepEqual(removeTx.calls[0], {
+    target: "0xBROWN::swap::remove_liquidity_with_coins_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xLP" },
+      { kind: "u64", value: "444" },
+      { kind: "u64", value: "555" },
+      { kind: "address", value: "0xRECIPIENT" }
     ]
   });
 });

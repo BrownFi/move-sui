@@ -2112,6 +2112,34 @@ public fun add_liquidity_with_coins_and_transfer_to_sender<A, B>(
     min_lp_out: u64,
     ctx: &mut TxContext
 ) {
+    let sender_addr = sender(ctx);
+    add_liquidity_with_coins_and_transfer(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        input_a,
+        input_b,
+        min_lp_out,
+        sender_addr,
+        ctx
+    );
+}
+
+#[allow(lint(self_transfer))]
+public fun add_liquidity_with_coins_and_transfer<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_a: Coin<A>,
+    input_b: Coin<B>,
+    min_lp_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
     let (remaining_a, remaining_b, lp) = add_liquidity(
         oracle,
         price_info_object_a,
@@ -2122,10 +2150,9 @@ public fun add_liquidity_with_coins_and_transfer_to_sender<A, B>(
         coin::into_balance(input_b),
         min_lp_out
     );
-    let sender_addr = sender(ctx);
-    library::destroy_zero_or_transfer(remaining_a, sender_addr, ctx);
-    library::destroy_zero_or_transfer(remaining_b, sender_addr, ctx);
-    library::destroy_zero_or_transfer(lp, sender_addr, ctx);
+    library::destroy_zero_or_transfer(remaining_a, recipient, ctx);
+    library::destroy_zero_or_transfer(remaining_b, recipient, ctx);
+    library::destroy_zero_or_transfer(lp, recipient, ctx);
 }
 
 public fun remove_liquidity_with_coins<A, B>(
@@ -2153,15 +2180,27 @@ public fun remove_liquidity_with_coins_and_transfer_to_sender<A, B>(
     min_b_out: u64,
     ctx: &mut TxContext
 ) {
+    let sender_addr = sender(ctx);
+    remove_liquidity_with_coins_and_transfer(pool, lp_in, min_a_out, min_b_out, sender_addr, ctx);
+}
+
+#[allow(lint(self_transfer))]
+public fun remove_liquidity_with_coins_and_transfer<A, B>(
+    pool: &mut Pool<A, B>,
+    lp_in: Coin<LP<A, B>>,
+    min_a_out: u64,
+    min_b_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
     let (a_out, b_out) = remove_liquidity(
         pool,
         coin::into_balance(lp_in),
         min_a_out,
         min_b_out
     );
-    let sender_addr = sender(ctx);
-    library::destroy_zero_or_transfer(a_out, sender_addr, ctx);
-    library::destroy_zero_or_transfer(b_out, sender_addr, ctx);
+    library::destroy_zero_or_transfer(a_out, recipient, ctx);
+    library::destroy_zero_or_transfer(b_out, recipient, ctx);
 }
 
 public fun swap_a_for_b_with_coin<A, B>(
@@ -2189,8 +2228,34 @@ public fun swap_a_for_b_with_coin_and_transfer_to_sender<A, B>(
     min_out: u64,
     ctx: &mut TxContext
 ) {
+    let sender_addr = sender(ctx);
+    swap_a_for_b_with_coin_and_transfer(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        input,
+        min_out,
+        sender_addr,
+        ctx
+    );
+}
+
+#[allow(lint(self_transfer))]
+public fun swap_a_for_b_with_coin_and_transfer<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input: Coin<A>,
+    min_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
     let b_coin = swap_a_for_b_with_coin(oracle, price_info_object_a, price_info_object_b, clock, pool, input, min_out, ctx);
-    transfer::public_transfer(b_coin, sender(ctx));
+    transfer::public_transfer(b_coin, recipient);
 }
 
 public fun swap_a_for_exact_b_with_coin<A, B>(
@@ -2241,8 +2306,34 @@ public fun swap_b_for_a_with_coin_and_transfer_to_sender<A, B>(
     min_out: u64,
     ctx: &mut TxContext
 ) {
+    let sender_addr = sender(ctx);
+    swap_b_for_a_with_coin_and_transfer(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        input,
+        min_out,
+        sender_addr,
+        ctx
+    );
+}
+
+#[allow(lint(self_transfer))]
+public fun swap_b_for_a_with_coin_and_transfer<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input: Coin<B>,
+    min_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
     let a_coin = swap_b_for_a_with_coin(oracle, price_info_object_a, price_info_object_b, clock, pool, input, min_out, ctx);
-    transfer::public_transfer(a_coin, sender(ctx));
+    transfer::public_transfer(a_coin, recipient);
 }
 
 public fun swap_b_for_exact_a_with_coin<A, B>(

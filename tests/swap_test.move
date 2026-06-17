@@ -274,6 +274,180 @@ module brownfi_amm::swap_test {
         test_scenario::end(scenario);
     }
 
+    #[test]
+    fun test_swap_a_for_b_transfer_wrapper_accepts_recipient() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 20000, 10000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+
+            let input_a = coin::from_balance(balance::create_for_testing<A>(1300), test_scenario::ctx(&mut scenario));
+            swap::swap_a_for_b_with_coin_and_transfer(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &mut pool,
+                input_a,
+                1298,
+                ADDR1,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let b_coin = take_from_sender<Coin<B>>(&scenario);
+            assert!(coin::value(&b_coin) == 1298, 0);
+            balance::destroy_for_testing(coin::into_balance(b_coin));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_swap_b_for_a_transfer_wrapper_accepts_recipient() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 20000, 10000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+
+            let input_b = coin::from_balance(balance::create_for_testing<B>(1300), test_scenario::ctx(&mut scenario));
+            swap::swap_b_for_a_with_coin_and_transfer(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &mut pool,
+                input_b,
+                1298,
+                ADDR1,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let a_coin = take_from_sender<Coin<A>>(&scenario);
+            assert!(coin::value(&a_coin) == 1298, 0);
+            balance::destroy_for_testing(coin::into_balance(a_coin));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_add_liquidity_transfer_wrapper_accepts_recipient() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 20000, 10000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+
+            let input_a = coin::from_balance(balance::create_for_testing<A>(2000), test_scenario::ctx(&mut scenario));
+            let input_b = coin::from_balance(balance::create_for_testing<B>(1000), test_scenario::ctx(&mut scenario));
+            swap::add_liquidity_with_coins_and_transfer(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                1,
+                ADDR2,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let lp_coin = take_from_sender<Coin<LP<A, B>>>(&scenario);
+            assert!(coin::value(&lp_coin) > 0, 0);
+            balance::destroy_for_testing(coin::into_balance(lp_coin));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_remove_liquidity_transfer_wrapper_accepts_recipient() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 20000, 10000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let lp_coin = take_from_sender<Coin<LP<A, B>>>(&scenario);
+
+            swap::remove_liquidity_with_coins_and_transfer(
+                &mut pool,
+                lp_coin,
+                1,
+                1,
+                ADDR2,
+                test_scenario::ctx(&mut scenario)
+            );
+
+            return_shared(factory);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let a_coin = take_from_sender<Coin<A>>(&scenario);
+            let b_coin = take_from_sender<Coin<B>>(&scenario);
+            assert!(coin::value(&a_coin) > 0, 0);
+            assert!(coin::value(&b_coin) > 0, 1);
+            balance::destroy_for_testing(coin::into_balance(a_coin));
+            balance::destroy_for_testing(coin::into_balance(b_coin));
+        };
+
+        test_scenario::end(scenario);
+    }
+
     // --- Parametric swap scenarios ---
 
     fun run_swap_a_for_b_scenario(init_a: u64, init_b: u64, swap_amount: u64, expected_out: u64) {
