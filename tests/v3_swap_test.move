@@ -2988,6 +2988,70 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_protocol_fee_lp_handles_high_price_intermediate_without_raw_overflow() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts(
+            &mut scenario,
+            500_000_000_000_000_000,
+            500_000_000_000_000_000
+        );
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let fee_cap = take_from_sender<FeeCap>(&scenario);
+            let risk_cap = take_from_sender<RiskCap>(&scenario);
+
+            admin::set_pool_fee_to(&mut pool, &fee_cap, ADDR1);
+            admin::set_pool_fee_split(&mut pool, &risk_cap, 100_000_000);
+
+            return_to_sender<RiskCap>(&scenario, risk_cap);
+            return_to_sender<FeeCap>(&scenario, fee_cap);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let initial_supply = pool::lp_supply(&pool);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                4_000_000_000_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+
+            let input_b = balance::create_for_testing<B>(100_000_000_000_000_000);
+            let a_out = swap::swap_b_for_a_with_bundle(&bundle, &clock, &mut pool, input_b, 0);
+            let protocol_lp_accrued = pool::protocol_lp_value(&pool);
+
+            assert!(protocol_lp_accrued > 0, 0);
+            assert!(pool::lp_supply(&pool) > initial_supply, 1);
+
+            balance::destroy_for_testing(a_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_core_module_vector_a_sell_exact_output_protocol_lp_parity() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_core_module_vector_pool(&mut scenario);

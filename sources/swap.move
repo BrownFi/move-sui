@@ -2013,11 +2013,15 @@ fun collect_protocol_fee_on_swap<A, B>(
         let fee_standard = math::parse_amount_to_standard_decimals(token_in_decimals, fee_amount, STANDARD_DECIMALS);
         let input_is_quote = (input_is_a && token_a_is_quote) || (!input_is_a && !token_a_is_quote);
         let fee_value = if (input_is_quote) {
-            fee_standard as u128
+            fee_standard as u256
         } else {
-            math::mul_div_down_u128((fee_standard as u128), (base_price as u128), Q32)
+            math::mul_div_down_u256((fee_standard as u256), (base_price as u256), (Q32 as u256))
         };
-        let protocol_fee_value = math::mul_div_down_u128(fee_value, (fee_split as u128), (PRECISION as u128));
+        let protocol_fee_value = math::mul_div_down_u256(
+            fee_value,
+            (fee_split as u256),
+            (PRECISION as u256)
+        );
 
         if (protocol_fee_value > 0) {
             let quote_amount = if (token_a_is_quote) {
@@ -2031,13 +2035,16 @@ fun collect_protocol_fee_on_swap<A, B>(
                 math::parse_amount_to_standard_decimals(decimals_a, reserve_a, STANDARD_DECIMALS)
             };
             let inventory_value = base_quote_value(base_amount, quote_amount, base_price);
+            let inventory_value_u = inventory_value as u256;
 
             let total_supply = pool::lp_supply(pool);
-            if (total_supply > 0 && inventory_value > protocol_fee_value) {
-                let lp_for_protocol = math::mul_div_down_to_u64(
-                    (total_supply as u128),
-                    protocol_fee_value,
-                    inventory_value - protocol_fee_value
+            if (total_supply > 0 && inventory_value_u > protocol_fee_value) {
+                let lp_for_protocol = math::u256_to_u64_checked(
+                    math::mul_div_down_u256(
+                        (total_supply as u256),
+                        protocol_fee_value,
+                        inventory_value_u - protocol_fee_value
+                    )
                 );
 
                 if (lp_for_protocol > 0) {
@@ -2053,7 +2060,6 @@ fun collect_protocol_fee_on_swap<A, B>(
     };
     protocol_lp_minted
 }
-
 public fun create_pool_with_coins<A, B>(
     factory: &mut Factory,
     pool_creator_cap: &PoolCreatorCap,
