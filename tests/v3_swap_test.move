@@ -4345,6 +4345,132 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_quote_max_a_for_b_with_bundle_returns_cutoff_boundary() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 50_000_000_000, 10_000_000_000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+
+            let bundle = oracle_gateway::get_swap_price_bundle(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &pool
+            );
+            let (max_a_in, max_b_out) = swap::quote_max_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool
+            );
+            let (required_a_in, effective_b_out) = swap::quote_a_for_exact_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                max_b_out
+            );
+            let (_, clipped_b_out) = swap::quote_a_for_exact_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                max_b_out + 1
+            );
+            let (forward_b_out, _, _) = swap::quote_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                max_a_in
+            );
+
+            assert!(max_a_in > 0, 0);
+            assert!(max_b_out > 0, 1);
+            assert!(required_a_in == max_a_in, 2);
+            assert!(effective_b_out == max_b_out, 3);
+            assert!(clipped_b_out < max_b_out + 1, 4);
+            assert!(math::abs_diff(forward_b_out, max_b_out) <= 1, forward_b_out);
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_quote_max_b_for_a_with_bundle_returns_cutoff_boundary() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 10_000_000_000, 50_000_000_000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+
+            let bundle = oracle_gateway::get_swap_price_bundle(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &pool
+            );
+            let (max_b_in, max_a_out) = swap::quote_max_b_for_a_with_bundle(
+                &bundle,
+                &clock,
+                &pool
+            );
+            let (required_b_in, effective_a_out) = swap::quote_b_for_exact_a_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                max_a_out
+            );
+            let (_, clipped_a_out) = swap::quote_b_for_exact_a_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                max_a_out + 1
+            );
+            let (forward_a_out, _, _) = swap::quote_b_for_a_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                max_b_in
+            );
+
+            assert!(max_b_in > 0, 0);
+            assert!(max_a_out > 0, 1);
+            assert!(required_b_in == max_b_in, 2);
+            assert!(effective_a_out == max_a_out, 3);
+            assert!(clipped_a_out < max_a_out + 1, 4);
+            assert!(math::abs_diff(forward_a_out, max_a_out) <= 1, forward_a_out);
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_forward_sell_allows_large_input_with_gamma_cutoff() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         test_helpers::create_test_pool(&mut scenario, 10_000_000_000, 10_000_000_000);

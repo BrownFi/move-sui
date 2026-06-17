@@ -27,6 +27,50 @@ public fun assert_hop_limit(hops: u8) {
     assert!(hops <= MAX_HOPS, ERouteLimitExceeded);
 }
 
+public fun quote_max_a_for_b<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    assert!(pool::router_enabled(pool), ERouterDisabled);
+    assert_hop_limit(1);
+    swap::quote_max_a_for_b(oracle, price_info_object_a, price_info_object_b, clock, pool)
+}
+
+public fun quote_max_a_for_b_with_bundle<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    assert!(pool::router_enabled(pool), ERouterDisabled);
+    assert_hop_limit(1);
+    swap::quote_max_a_for_b_with_bundle(price_bundle, clock, pool)
+}
+
+public fun quote_max_b_for_a<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    assert!(pool::router_enabled(pool), ERouterDisabled);
+    assert_hop_limit(1);
+    swap::quote_max_b_for_a(oracle, price_info_object_a, price_info_object_b, clock, pool)
+}
+
+public fun quote_max_b_for_a_with_bundle<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    assert!(pool::router_enabled(pool), ERouterDisabled);
+    assert_hop_limit(1);
+    swap::quote_max_b_for_a_with_bundle(price_bundle, clock, pool)
+}
+
 public fun swap_exact_a_for_b<A, B>(
     oracle: &OracleAdapter,
     price_info_object_a: &PriceInfoObject,

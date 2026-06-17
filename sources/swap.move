@@ -1035,6 +1035,55 @@ public fun quote_a_for_b_with_bundle<A, B>(
     )
 }
 
+public fun quote_max_a_for_b<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    let price_bundle =
+        oracle_gateway::get_swap_price_bundle(oracle, price_info_object_a, price_info_object_b, clock, pool);
+    quote_max_a_for_b_with_bundle(&price_bundle, clock, pool)
+}
+
+public fun quote_max_a_for_b_with_bundle<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    let reserve_a = pool::balance_a(pool);
+    let reserve_b = pool::balance_b(pool);
+    assert!(reserve_a > 0 && reserve_b > 0, ENoLiquidity);
+
+    let (fee, _, _, _) = pool::get_parameters(pool);
+    let decimals_a = pool::token_a_decimals(pool);
+    let decimals_b = pool::token_b_decimals(pool);
+    oracle_gateway::assert_bundle_valid_for_pool(price_bundle, pool, clock);
+
+    let token_a_is_quote = pool::quote_token_index(pool) == 0;
+    let is_sell = token_a_is_quote;
+    let (price_in, price_out, kappa) = if (is_sell) {
+        ((Q32 as u64), oracle_gateway::bundle_sell_price(price_bundle), pool::k_b(pool))
+    } else {
+        (oracle_gateway::bundle_buy_price(price_bundle), (Q32 as u64), pool::k_q(pool))
+    };
+
+    v3_cutoff_bound(
+        reserve_a,
+        reserve_b,
+        price_in,
+        price_out,
+        oracle_gateway::bundle_adj_price(price_bundle),
+        kappa,
+        pool::gamma(pool),
+        fee,
+        decimals_a,
+        decimals_b,
+        is_sell
+    )
+}
+
 public fun quote_b_for_a<A, B>(
     oracle: &OracleAdapter,
     price_info_object_a: &PriceInfoObject,
@@ -1075,6 +1124,55 @@ public fun quote_b_for_a_with_bundle<A, B>(
 
     v3_amount_out_with_analytics(
         amount_in,
+        reserve_b,
+        reserve_a,
+        price_in,
+        price_out,
+        oracle_gateway::bundle_adj_price(price_bundle),
+        kappa,
+        pool::gamma(pool),
+        fee,
+        decimals_b,
+        decimals_a,
+        is_sell
+    )
+}
+
+public fun quote_max_b_for_a<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    let price_bundle =
+        oracle_gateway::get_swap_price_bundle(oracle, price_info_object_a, price_info_object_b, clock, pool);
+    quote_max_b_for_a_with_bundle(&price_bundle, clock, pool)
+}
+
+public fun quote_max_b_for_a_with_bundle<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &Pool<A, B>
+): (u64, u64) {
+    let reserve_a = pool::balance_a(pool);
+    let reserve_b = pool::balance_b(pool);
+    assert!(reserve_a > 0 && reserve_b > 0, ENoLiquidity);
+
+    let (fee, _, _, _) = pool::get_parameters(pool);
+    let decimals_a = pool::token_a_decimals(pool);
+    let decimals_b = pool::token_b_decimals(pool);
+    oracle_gateway::assert_bundle_valid_for_pool(price_bundle, pool, clock);
+
+    let token_a_is_quote = pool::quote_token_index(pool) == 0;
+    let is_sell = !token_a_is_quote;
+    let (price_in, price_out, kappa) = if (is_sell) {
+        ((Q32 as u64), oracle_gateway::bundle_sell_price(price_bundle), pool::k_b(pool))
+    } else {
+        (oracle_gateway::bundle_buy_price(price_bundle), (Q32 as u64), pool::k_q(pool))
+    };
+
+    v3_cutoff_bound(
         reserve_b,
         reserve_a,
         price_in,
@@ -1801,6 +1899,151 @@ fun v3_amount_out_cutoff(
     math::parse_amount_from_standard_decimals(
         output_decimals,
         math::u256_to_u64_checked(cutoff_standard),
+        STANDARD_DECIMALS
+    )
+}
+
+fun v3_cutoff_bound(
+    reserve_in: u64,
+    reserve_out: u64,
+    price_in: u64,
+    price_out: u64,
+    adj_price: u64,
+    kappa: u64,
+    gamma: u32,
+    fee: u32,
+    input_decimals: u8,
+    output_decimals: u8,
+    is_sell: bool
+): (u64, u64) {
+    let max_output = v3_max_output_under_cutoff(
+        reserve_in,
+        reserve_out,
+        price_in,
+        price_out,
+        adj_price,
+        kappa,
+        gamma,
+        fee,
+        input_decimals,
+        output_decimals,
+        is_sell
+    );
+    if (max_output == 0) return (0, 0);
+
+    let max_input = v3_amount_in_without_cutoff(
+        max_output,
+        reserve_out,
+        price_in,
+        price_out,
+        kappa,
+        fee,
+        input_decimals,
+        output_decimals
+    );
+
+    (max_input, max_output)
+}
+
+fun v3_max_output_under_cutoff(
+    reserve_in: u64,
+    reserve_out: u64,
+    price_in: u64,
+    price_out: u64,
+    adj_price: u64,
+    kappa: u64,
+    gamma: u32,
+    fee: u32,
+    input_decimals: u8,
+    output_decimals: u8,
+    is_sell: bool
+): u64 {
+    let mut low = 0;
+    let mut high = max_raw_output_below_reserve(reserve_out, output_decimals);
+
+    while (low < high) {
+        let mid = low + (high - low + 1) / 2;
+        if (
+            exact_output_within_cutoff(
+                mid,
+                reserve_in,
+                reserve_out,
+                price_in,
+                price_out,
+                adj_price,
+                kappa,
+                gamma,
+                fee,
+                input_decimals,
+                output_decimals,
+                is_sell
+            )
+        ) {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    };
+
+    low
+}
+
+fun exact_output_within_cutoff(
+    amount_out: u64,
+    reserve_in: u64,
+    reserve_out: u64,
+    price_in: u64,
+    price_out: u64,
+    adj_price: u64,
+    kappa: u64,
+    gamma: u32,
+    fee: u32,
+    input_decimals: u8,
+    output_decimals: u8,
+    is_sell: bool
+): bool {
+    if (amount_out == 0) return true;
+
+    let parsed_amount_out =
+        math::parse_amount_to_standard_decimals(output_decimals, amount_out, STANDARD_DECIMALS);
+    let parsed_reserve_out =
+        math::parse_amount_to_standard_decimals(output_decimals, reserve_out, STANDARD_DECIMALS);
+    if (parsed_amount_out == 0) return true;
+    if (parsed_amount_out >= parsed_reserve_out) return false;
+
+    let amount_in = v3_amount_in_without_cutoff(
+        amount_out,
+        reserve_out,
+        price_in,
+        price_out,
+        kappa,
+        fee,
+        input_decimals,
+        output_decimals
+    );
+    let cutoff = v3_amount_out_cutoff(
+        amount_in,
+        reserve_in,
+        reserve_out,
+        adj_price,
+        gamma,
+        fee,
+        input_decimals,
+        output_decimals,
+        is_sell
+    );
+
+    amount_out <= cutoff
+}
+
+fun max_raw_output_below_reserve(reserve_out: u64, output_decimals: u8): u64 {
+    let parsed_reserve_out =
+        math::parse_amount_to_standard_decimals(output_decimals, reserve_out, STANDARD_DECIMALS);
+    if (parsed_reserve_out <= 1) return 0;
+
+    math::parse_amount_from_standard_decimals(
+        output_decimals,
+        parsed_reserve_out - 1,
         STANDARD_DECIMALS
     )
 }

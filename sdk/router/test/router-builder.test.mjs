@@ -96,6 +96,10 @@ import {
   quoteExactAForCViaBWithoutCutoffWithBundles,
   quoteExactCForAViaBWithBundles,
   quoteExactCForAViaBWithoutCutoffWithBundles,
+  quoteMaxAForB,
+  quoteMaxAForBWithBundle,
+  quoteMaxBForA,
+  quoteMaxBForAWithBundle,
   preflightBuiltTransactionBlock,
   preflightLaunchValidationMatrix,
   preflightLaunchValidationCase,
@@ -9910,6 +9914,41 @@ test("direct OracleAdapter quote builders target swap quote functions", () => {
   }
 });
 
+test("direct OracleAdapter max-bound quote builders target swap quote functions", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    oracle: "0xORACLE",
+    priceInfoObjectA: "0xPRICEA",
+    priceInfoObjectB: "0xPRICEB",
+    clock: "0x6",
+    pool: "0xPOOLAB"
+  };
+
+  const cases = [
+    { builder: quoteMaxAForB, target: "quote_max_a_for_b" },
+    { builder: quoteMaxBForA, target: "quote_max_b_for_a" }
+  ];
+
+  for (const testCase of cases) {
+    const tx = createTransactionRecorder();
+    testCase.builder(base)(tx);
+
+    assert.deepEqual(tx.calls[0], {
+      target: `0xBROWN::swap::${testCase.target}`,
+      typeArguments: ["0x1::a::A", "0x1::b::B"],
+      arguments: [
+        { kind: "object", id: "0xORACLE" },
+        { kind: "object", id: "0xPRICEA" },
+        { kind: "object", id: "0xPRICEB" },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" }
+      ]
+    });
+  }
+});
+
 test("direct typed two-hop OracleAdapter compatibility builders target router functions", () => {
   const base = {
     packageId: "0xBROWN",
@@ -11589,6 +11628,35 @@ test("single-hop bundle quote builders target swap functions with Move argument 
         { kind: "object", id: "0x6" },
         { kind: "object", id: "0xPOOLAB" },
         { kind: "u64", value: String(amountValue) }
+      ]
+    });
+  }
+});
+
+test("single-hop bundle max-bound quote builders target swap functions", () => {
+  const cases = [
+    ["quote_max_a_for_b_with_bundle", quoteMaxAForBWithBundle],
+    ["quote_max_b_for_a_with_bundle", quoteMaxBForAWithBundle]
+  ];
+
+  for (const [functionName, build] of cases) {
+    const tx = createTransactionRecorder();
+    build({
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      priceBundle: { kind: "result", index: 0 },
+      clock: "0x6",
+      pool: "0xPOOLAB"
+    })(tx);
+
+    assert.deepEqual(tx.calls[0], {
+      target: `0xBROWN::swap::${functionName}`,
+      typeArguments: ["0x1::a::A", "0x1::b::B"],
+      arguments: [
+        { kind: "result", index: 0 },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" }
       ]
     });
   }

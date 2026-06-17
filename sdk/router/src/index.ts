@@ -1688,6 +1688,8 @@ export interface SingleHopDirectQuoteExactOutputOptions extends DirectOraclePair
   amountOut: U64Input;
 }
 
+export interface SingleHopDirectQuoteMaxOptions extends DirectOraclePairOptions {}
+
 export interface DirectOracleRouteOptions {
   packageId: string;
   typeA: string;
@@ -2103,6 +2105,12 @@ export interface SingleHopBundleQuoteExactOutputOptions extends PairTypesOptions
   clock: ObjectInput;
   pool: ObjectInput;
   amountOut: SuiAmountInput;
+}
+
+export interface SingleHopBundleQuoteMaxOptions extends PairTypesOptions {
+  priceBundle: TransactionArgument;
+  clock: ObjectInput;
+  pool: ObjectInput;
 }
 
 export interface SwapExactAForCViaBWithBundlesOptions {
@@ -7628,6 +7636,24 @@ export function quoteBForA(options: SingleHopDirectQuoteExactInputOptions): Tran
     });
 }
 
+export function quoteMaxAForB(options: SingleHopDirectQuoteMaxOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "quote_max_a_for_b"),
+      typeArguments: pairTypeArguments(options),
+      arguments: directOraclePairArgs(tx, options)
+    });
+}
+
+export function quoteMaxBForA(options: SingleHopDirectQuoteMaxOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "quote_max_b_for_a"),
+      typeArguments: pairTypeArguments(options),
+      arguments: directOraclePairArgs(tx, options)
+    });
+}
+
 export function quoteAForExactB(
   options: SingleHopDirectQuoteExactOutputOptions
 ): TransactionThunk {
@@ -8656,6 +8682,28 @@ export function quoteBForAWithBundle(
       target: moduleTarget(options.packageId, "swap", "quote_b_for_a_with_bundle"),
       typeArguments: pairTypeArguments(options),
       arguments: [...singleHopBundleArgs(tx, options), amountArg(tx, options.amountIn)]
+    });
+}
+
+export function quoteMaxAForBWithBundle(
+  options: SingleHopBundleQuoteMaxOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "quote_max_a_for_b_with_bundle"),
+      typeArguments: pairTypeArguments(options),
+      arguments: singleHopBundleArgs(tx, options)
+    });
+}
+
+export function quoteMaxBForAWithBundle(
+  options: SingleHopBundleQuoteMaxOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "swap", "quote_max_b_for_a_with_bundle"),
+      typeArguments: pairTypeArguments(options),
+      arguments: singleHopBundleArgs(tx, options)
     });
 }
 

@@ -136,6 +136,82 @@ module brownfi_amm::v3_router_test {
     }
 
     #[test]
+    fun test_router_quote_max_a_for_b_with_bundle_delegates_to_swap_boundary() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 50_000_000_000, 10_000_000_000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let bundle = oracle_gateway::get_swap_price_bundle(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &pool
+            );
+
+            let (router_max_in, router_max_out) =
+                router::quote_max_a_for_b_with_bundle(&bundle, &clock, &pool);
+            let (swap_max_in, swap_max_out) =
+                swap::quote_max_a_for_b_with_bundle(&bundle, &clock, &pool);
+
+            assert!(router_max_in == swap_max_in, 0);
+            assert!(router_max_out == swap_max_out, 1);
+
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_router_quote_max_b_for_a_with_bundle_delegates_to_swap_boundary() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 10_000_000_000, 50_000_000_000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let bundle = oracle_gateway::get_swap_price_bundle(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &pool
+            );
+
+            let (router_max_in, router_max_out) =
+                router::quote_max_b_for_a_with_bundle(&bundle, &clock, &pool);
+            let (swap_max_in, swap_max_out) =
+                swap::quote_max_b_for_a_with_bundle(&bundle, &clock, &pool);
+
+            assert!(router_max_in == swap_max_in, 0);
+            assert!(router_max_out == swap_max_out, 1);
+
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_router_swap_exact_a_for_b_with_bundle_transfer_sends_output_to_recipient() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool(&mut scenario);
