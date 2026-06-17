@@ -1226,12 +1226,12 @@ export interface PreflightRegisteredRemoveLiquidityRouteCase<
   recipient?: string;
 }
 
-export interface PreflightRegisteredZapInARouteCase<
+export interface RegisteredZapInARouteCase<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
-> extends AssertDryRunTransactionBlockSucceededOptions {
+> {
   name: string;
   kind: "zap-in-a";
-  tx: SuiTransactionBlockBuilderLike;
+  tx: TransactionLike;
   providerRegistry: RoutePriceProviderRegistry<THop>;
   providerId: string;
   clock: ObjectInput;
@@ -1239,15 +1239,14 @@ export interface PreflightRegisteredZapInARouteCase<
   inputA: ObjectInput;
   minBFromSwap: U64Input;
   minLpOut: U64Input;
-  recipient?: string;
 }
 
-export interface PreflightRegisteredZapInBRouteCase<
+export interface RegisteredZapInBRouteCase<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
-> extends AssertDryRunTransactionBlockSucceededOptions {
+> {
   name: string;
   kind: "zap-in-b";
-  tx: SuiTransactionBlockBuilderLike;
+  tx: TransactionLike;
   providerRegistry: RoutePriceProviderRegistry<THop>;
   providerId: string;
   clock: ObjectInput;
@@ -1255,21 +1254,50 @@ export interface PreflightRegisteredZapInBRouteCase<
   inputB: ObjectInput;
   minAFromSwap: U64Input;
   minLpOut: U64Input;
-  recipient?: string;
 }
 
-export interface PreflightRegisteredZapOutRouteCase<
+export interface RegisteredZapOutRouteCase<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
-> extends AssertDryRunTransactionBlockSucceededOptions {
+> {
   name: string;
   kind: "zap-out-a" | "zap-out-b";
-  tx: SuiTransactionBlockBuilderLike;
+  tx: TransactionLike;
   providerRegistry: RoutePriceProviderRegistry<THop>;
   providerId: string;
   clock: ObjectInput;
   pair: THop;
   lpIn: ObjectInput;
   minOut: U64Input;
+}
+
+export type RegisteredZapRouteCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> =
+  | RegisteredZapInARouteCase<THop>
+  | RegisteredZapInBRouteCase<THop>
+  | RegisteredZapOutRouteCase<THop>;
+
+export interface PreflightRegisteredZapInARouteCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> extends Omit<RegisteredZapInARouteCase<THop>, "tx">,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  recipient?: string;
+}
+
+export interface PreflightRegisteredZapInBRouteCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> extends Omit<RegisteredZapInBRouteCase<THop>, "tx">,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  recipient?: string;
+}
+
+export interface PreflightRegisteredZapOutRouteCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> extends Omit<RegisteredZapOutRouteCase<THop>, "tx">,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
   recipient?: string;
 }
 
@@ -1280,18 +1308,25 @@ export type PreflightRegisteredZapRouteCase<
   | PreflightRegisteredZapInBRouteCase<THop>
   | PreflightRegisteredZapOutRouteCase<THop>;
 
-export interface PreflightRegisteredFlashBorrowRouteCase<
+export interface RegisteredFlashBorrowRouteCase<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
-> extends AssertDryRunTransactionBlockSucceededOptions {
+> {
   name: string;
   kind: "flash-borrow-a" | "flash-borrow-b";
-  tx: SuiTransactionBlockBuilderLike;
+  tx: TransactionLike;
   providerRegistry: RoutePriceProviderRegistry<THop>;
   providerId: string;
   clock: ObjectInput;
   pair: THop;
   amount: U64Input;
   feeCoin: ObjectInput;
+}
+
+export interface PreflightRegisteredFlashBorrowRouteCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> extends Omit<RegisteredFlashBorrowRouteCase<THop>, "tx">,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
   recipient?: string;
 }
 
@@ -1501,9 +1536,12 @@ export interface ValidateLaunchValidationMatrixConfigOptions<
   requireProviderMetadata?: boolean;
 }
 
-export interface SwapExactInputWithPythRouteOptions {
+export interface PythRouteProviderOptions {
   priceFeedConnection: PythPriceFeedUpdateFetcher;
   pythClient: PythPriceFeedUpdater;
+}
+
+export interface SwapExactInputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
   path: readonly string[];
   pairs: readonly PythRoutePriceHopOptions[];
@@ -1511,9 +1549,7 @@ export interface SwapExactInputWithPythRouteOptions {
   minOutputs: readonly U64Input[];
 }
 
-export interface SwapExactOutputWithPythRouteOptions {
-  priceFeedConnection: PythPriceFeedUpdateFetcher;
-  pythClient: PythPriceFeedUpdater;
+export interface SwapExactOutputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
   path: readonly string[];
   pairs: readonly PythRoutePriceHopOptions[];
@@ -1521,30 +1557,74 @@ export interface SwapExactOutputWithPythRouteOptions {
   amountOut: U64Input;
 }
 
-export interface QuoteExactInputWithPythRouteOptions {
-  priceFeedConnection: PythPriceFeedUpdateFetcher;
-  pythClient: PythPriceFeedUpdater;
+export interface AddLiquidityWithPythRouteOptions
+  extends Omit<
+      AddLiquidityWithRegisteredRouteOptions<PythRoutePriceHopOptions>,
+      "providerRegistry" | "providerId"
+    >,
+    PythRouteProviderOptions {}
+
+export type RemoveLiquidityWithPythRouteOptions =
+  RemoveLiquidityWithRegisteredRouteOptions<PythRoutePriceHopOptions>;
+
+export interface QuoteExactInputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
   path: readonly string[];
   pairs: readonly PythRoutePriceHopOptions[];
   amountIn: SuiAmountInput;
 }
 
-export interface QuoteExactOutputWithPythRouteOptions {
-  priceFeedConnection: PythPriceFeedUpdateFetcher;
-  pythClient: PythPriceFeedUpdater;
+export interface QuoteExactOutputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
   path: readonly string[];
   pairs: readonly PythRoutePriceHopOptions[];
   amountOut: SuiAmountInput;
 }
 
-export interface QuoteMaxBoundWithPythRouteOptions {
-  priceFeedConnection: PythPriceFeedUpdateFetcher;
-  pythClient: PythPriceFeedUpdater;
+export interface QuoteMaxBoundWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
   path: readonly string[];
   pairs: readonly PythRoutePriceHopOptions[];
+}
+
+export interface ZapWithPythRouteBaseOptions extends PythRouteProviderOptions {
+  name?: string;
+  clock: ObjectInput;
+  pair: PythRoutePriceHopOptions;
+}
+
+export interface ZapInAWithPythRouteOptions extends ZapWithPythRouteBaseOptions {
+  kind: "zap-in-a";
+  inputA: ObjectInput;
+  minBFromSwap: U64Input;
+  minLpOut: U64Input;
+}
+
+export interface ZapInBWithPythRouteOptions extends ZapWithPythRouteBaseOptions {
+  kind: "zap-in-b";
+  inputB: ObjectInput;
+  minAFromSwap: U64Input;
+  minLpOut: U64Input;
+}
+
+export interface ZapOutWithPythRouteOptions extends ZapWithPythRouteBaseOptions {
+  kind: "zap-out-a" | "zap-out-b";
+  lpIn: ObjectInput;
+  minOut: U64Input;
+}
+
+export type ZapWithPythRouteOptions =
+  | ZapInAWithPythRouteOptions
+  | ZapInBWithPythRouteOptions
+  | ZapOutWithPythRouteOptions;
+
+export interface FlashBorrowWithPythRouteOptions extends PythRouteProviderOptions {
+  name?: string;
+  kind: "flash-borrow-a" | "flash-borrow-b";
+  clock: ObjectInput;
+  pair: PythRoutePriceHopOptions;
+  amount: U64Input;
+  feeCoin: ObjectInput;
 }
 
 export interface SwapExactAForBWithPythRouteOptions
@@ -6021,7 +6101,7 @@ export async function zapWithRegisteredRoute<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 >(
   tx: TransactionLike,
-  options: PreflightRegisteredZapRouteCase<THop>
+  options: RegisteredZapRouteCase<THop>
 ): Promise<RegisteredRouteCaseZapTransactionResult> {
   const provider = getRoutePriceProvider(options.providerRegistry, options.providerId);
   const priceBundles = await provider.buildPriceBundles(tx, {
@@ -6092,7 +6172,7 @@ export async function flashBorrowWithRegisteredRoute<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 >(
   tx: TransactionLike,
-  options: PreflightRegisteredFlashBorrowRouteCase<THop>
+  options: RegisteredFlashBorrowRouteCase<THop>
 ): Promise<RegisteredRouteCaseFlashBorrowTransactionResult> {
   const provider = getRoutePriceProvider(options.providerRegistry, options.providerId);
   const priceBundles = await provider.buildPriceBundles(tx, {
@@ -6993,16 +7073,22 @@ export async function preflightRegisteredRouteCases<
   return results;
 }
 
-export async function swapExactInputWithPythRoute(
-  tx: TransactionLike,
-  options: SwapExactInputWithPythRouteOptions
-): Promise<TransactionArgument> {
-  const providerRegistry = createRoutePriceProviderRegistry([
+function createPythOnlyRoutePriceProviderRegistry(
+  options: PythRouteProviderOptions
+): RoutePriceProviderRegistry<PythRoutePriceHopOptions> {
+  return createRoutePriceProviderRegistry([
     createPythRoutePriceProvider({
       priceFeedConnection: options.priceFeedConnection,
       pythClient: options.pythClient
     })
   ]);
+}
+
+export async function swapExactInputWithPythRoute(
+  tx: TransactionLike,
+  options: SwapExactInputWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return swapExactInputWithRegisteredRoute(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7018,12 +7104,7 @@ export async function swapExactOutputWithPythRoute(
   tx: TransactionLike,
   options: SwapExactOutputWithPythRouteOptions
 ): Promise<TransactionArgument> {
-  const providerRegistry = createRoutePriceProviderRegistry([
-    createPythRoutePriceProvider({
-      priceFeedConnection: options.priceFeedConnection,
-      pythClient: options.pythClient
-    })
-  ]);
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return swapExactOutputWithRegisteredRoute(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7039,12 +7120,7 @@ export async function swapExactOutputWithPythRouteResults(
   tx: TransactionLike,
   options: SwapExactOutputWithPythRouteOptions
 ): Promise<SwapExactOutputWithRegisteredRouteResults> {
-  const providerRegistry = createRoutePriceProviderRegistry([
-    createPythRoutePriceProvider({
-      priceFeedConnection: options.priceFeedConnection,
-      pythClient: options.pythClient
-    })
-  ]);
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return swapExactOutputWithRegisteredRouteResults(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7060,12 +7136,7 @@ export async function quoteExactInputWithPythRoute(
   tx: TransactionLike,
   options: QuoteExactInputWithPythRouteOptions
 ): Promise<RouteQuoteResults> {
-  const providerRegistry = createRoutePriceProviderRegistry([
-    createPythRoutePriceProvider({
-      priceFeedConnection: options.priceFeedConnection,
-      pythClient: options.pythClient
-    })
-  ]);
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return quoteExactInputWithRegisteredRoute(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7080,12 +7151,7 @@ export async function quoteExactInputWithoutCutoffWithPythRoute(
   tx: TransactionLike,
   options: QuoteExactInputWithPythRouteOptions
 ): Promise<RouteQuoteResults> {
-  const providerRegistry = createRoutePriceProviderRegistry([
-    createPythRoutePriceProvider({
-      priceFeedConnection: options.priceFeedConnection,
-      pythClient: options.pythClient
-    })
-  ]);
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return quoteExactInputWithoutCutoffWithRegisteredRoute(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7100,12 +7166,7 @@ export async function quoteMaxBoundWithPythRoute(
   tx: TransactionLike,
   options: QuoteMaxBoundWithPythRouteOptions
 ): Promise<RouteQuoteResults> {
-  const providerRegistry = createRoutePriceProviderRegistry([
-    createPythRoutePriceProvider({
-      priceFeedConnection: options.priceFeedConnection,
-      pythClient: options.pythClient
-    })
-  ]);
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return quoteMaxBoundWithRegisteredRoute(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7119,12 +7180,7 @@ export async function quoteExactOutputWithPythRoute(
   tx: TransactionLike,
   options: QuoteExactOutputWithPythRouteOptions
 ): Promise<RouteQuoteResults> {
-  const providerRegistry = createRoutePriceProviderRegistry([
-    createPythRoutePriceProvider({
-      priceFeedConnection: options.priceFeedConnection,
-      pythClient: options.pythClient
-    })
-  ]);
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return quoteExactOutputWithRegisteredRoute(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7139,12 +7195,7 @@ export async function quoteExactOutputWithoutCutoffWithPythRoute(
   tx: TransactionLike,
   options: QuoteExactOutputWithPythRouteOptions
 ): Promise<RouteQuoteResults> {
-  const providerRegistry = createRoutePriceProviderRegistry([
-    createPythRoutePriceProvider({
-      priceFeedConnection: options.priceFeedConnection,
-      pythClient: options.pythClient
-    })
-  ]);
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
   return quoteExactOutputWithoutCutoffWithRegisteredRoute(tx, {
     providerRegistry,
     providerId: "pyth",
@@ -7152,6 +7203,88 @@ export async function quoteExactOutputWithoutCutoffWithPythRoute(
     path: options.path,
     pairs: options.pairs,
     amountOut: options.amountOut
+  });
+}
+
+export async function addLiquidityWithPythRoute(
+  tx: TransactionLike,
+  options: AddLiquidityWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  return addLiquidityWithRegisteredRoute(tx, {
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    pair: options.pair,
+    inputA: options.inputA,
+    inputB: options.inputB,
+    minADeposit: options.minADeposit,
+    minBDeposit: options.minBDeposit,
+    minLpOut: options.minLpOut
+  });
+}
+
+export function removeLiquidityWithPythRoute(
+  tx: TransactionLike,
+  options: RemoveLiquidityWithPythRouteOptions
+): TransactionArgument {
+  return removeLiquidityWithRegisteredRoute(tx, options);
+}
+
+export async function zapWithPythRoute(
+  tx: TransactionLike,
+  options: ZapWithPythRouteOptions
+): Promise<RegisteredRouteCaseZapTransactionResult> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  const commonOptions = {
+    name: options.name ?? `pyth ${options.kind} route`,
+    tx,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    pair: options.pair
+  };
+  if (options.kind === "zap-in-a") {
+    return zapWithRegisteredRoute(tx, {
+      ...commonOptions,
+      kind: options.kind,
+      inputA: options.inputA,
+      minBFromSwap: options.minBFromSwap,
+      minLpOut: options.minLpOut
+    });
+  }
+  if (options.kind === "zap-in-b") {
+    return zapWithRegisteredRoute(tx, {
+      ...commonOptions,
+      kind: options.kind,
+      inputB: options.inputB,
+      minAFromSwap: options.minAFromSwap,
+      minLpOut: options.minLpOut
+    });
+  }
+  return zapWithRegisteredRoute(tx, {
+    ...commonOptions,
+    kind: options.kind,
+    lpIn: options.lpIn,
+    minOut: options.minOut
+  });
+}
+
+export async function flashBorrowWithPythRoute(
+  tx: TransactionLike,
+  options: FlashBorrowWithPythRouteOptions
+): Promise<RegisteredRouteCaseFlashBorrowTransactionResult> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  return flashBorrowWithRegisteredRoute(tx, {
+    name: options.name ?? `pyth ${options.kind} route`,
+    kind: options.kind,
+    tx,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    pair: options.pair,
+    amount: options.amount,
+    feeCoin: options.feeCoin
   });
 }
 

@@ -2001,3 +2001,8 @@
   - Finding: after registered-provider max-bound quote support landed, the SDK still lacked the Pyth-specific convenience wrapper matching the existing exact-input/exact-output Pyth route quote helpers.
   - Decision: add `quoteMaxBoundWithPythRoute` as a thin Pyth provider-registry wrapper over `quoteMaxBoundWithRegisteredRoute`; no Move or economic behavior changes.
   - RED/GREEN: `rtk npm test --prefix sdk/router` first failed because `quoteMaxBoundWithPythRoute` was not exported, then passed 209/209 after adding the wrapper and coverage proving Pyth updates happen before the max-bound bundle quote call.
+- 2026-06-17 Pyth route SDK convenience parity:
+  - Finding: the registered-provider SDK and launch tooling could already build Pyth add/remove/zap/flash route PTBs, but the Pyth-specific convenience layer only exposed swaps and quotes.
+  - Decision: add thin Pyth wrappers for add-liquidity, remove-liquidity, zap, and same-PTB flash borrow/repay. Add/zap/flash use the existing Pyth provider-registry path and keep provider updates before BrownFi calls; remove-liquidity delegates to the oracle-free coin remove entrypoint and does not fetch Pyth.
+  - Type fix: split registered zap/flash execution case types from preflight case types, because plain PTB construction only needs `TransactionLike`; dry-run preflight still requires `SuiTransactionBlockBuilderLike`.
+  - RED/GREEN: `rtk npm test --prefix sdk/router` first failed because `addLiquidityWithPythRoute`, `removeLiquidityWithPythRoute`, `zapWithPythRoute`, and `flashBorrowWithPythRoute` were not exported. After adding the wrappers and type split, the suite passed 213/213.

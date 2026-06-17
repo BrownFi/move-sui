@@ -63,7 +63,7 @@ rtk "$NODE24" tools/run-launch-matrix-preflight.mjs \
 ```
 
 The quote-only preflight skips historical route input coins from the evidence matrix.
-The 2026-06-17 testnet dry-run returned five Pyth quote cases: cutoff-aware exact input/output, exact-output round trip, and raw/no-cutoff exact input/output. It returned zero route cases in `--quote-only` mode.
+The 2026-06-17 historical live-evidence dry-run returned five Pyth quote cases: cutoff-aware exact input/output, exact-output round trip, and raw/no-cutoff exact input/output. It returned zero route cases in `--quote-only` mode. The fresh current-source matrix template has a sixth max-bound quote case, which requires a package published from the current source.
 
 Check current-Pyth runtime readiness without submitting transactions:
 
@@ -297,7 +297,7 @@ The sequence writes:
 - `$OUT_DIR/protocol-lp-claim.json` when protocol fee setup is enabled
 - `$OUT_DIR/summary.json`
 
-`summary.json` includes generated `setupEvidence` for the test-coin publish, BrownFi package publish, pool-create, optional protocol-fee setup, and optional flash-enable transactions. When `--preflight-quotes` is set, quote-only dry-run results are written to `quote-preflight.json` and summarized under `results.quotePreflight`. When `--verify-tx-evidence` is set, it also includes `setupVerification`; route evidence and route verification remain in `submit.json`. Protocol-LP claim evidence and the configured fee recipient are written under `results.protocolLpClaim` when protocol fee setup is enabled.
+`summary.json` includes generated `setupEvidence` for the test-coin publish, BrownFi package publish, pool-create, optional protocol-fee setup, and optional flash-enable transactions. When `--preflight-quotes` is set, quote-only dry-run results are written to `quote-preflight.json` and summarized under `results.quotePreflight`; for a fresh current-source package this includes the max-bound quote case from the checked matrix template. When `--verify-tx-evidence` is set, it also includes `setupVerification`; route evidence and route verification remain in `submit.json`. Protocol-LP claim evidence and the configured fee recipient are written under `results.protocolLpClaim` when protocol fee setup is enabled.
 
 If setup transactions already landed but later verification failed, rerun with:
 

@@ -8816,6 +8816,203 @@ test("quoteMaxBoundWithPythRoute updates Pyth before max-bound route quote", asy
   );
 });
 
+test("addLiquidityWithPythRoute updates Pyth before bundle add-liquidity", async () => {
+  const { addLiquidityWithPythRoute } = await import("../dist/index.js");
+  assert.equal(typeof addLiquidityWithPythRoute, "function");
+
+  const tx = createTransactionRecorder();
+  const result = await addLiquidityWithPythRoute(tx, {
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(txArg.calls.length, 0);
+        assert.deepEqual(updatesArg, [{ update: "feed-a" }, { update: "feed-b" }]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    },
+    clock: "0x6",
+    pair: {
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      pool: "0xPOOLAB",
+      feedIds: ["feed-a", "feed-b"]
+    },
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minLpOut: 100n
+  });
+
+  assert.deepEqual(result, { kind: "result", index: 3 });
+  assert.deepEqual(
+    tx.calls.map((call) => call.target),
+    [
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::router::add_liquidity_with_bundle"
+    ]
+  );
+});
+
+test("removeLiquidityWithPythRoute delegates to the coin remove entrypoint", async () => {
+  const { removeLiquidityWithPythRoute } = await import("../dist/index.js");
+  assert.equal(typeof removeLiquidityWithPythRoute, "function");
+
+  const tx = createTransactionRecorder();
+  const result = removeLiquidityWithPythRoute(tx, {
+    pair: {
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      pool: "0xPOOLAB",
+      feedIds: ["feed-a", "feed-b"]
+    },
+    lpIn: "0xLP",
+    minAOut: 10n,
+    minBOut: 20n
+  });
+
+  assert.deepEqual(result, { kind: "result", index: 0 });
+  assert.deepEqual(tx.calls[0], {
+    target: "0xBROWN::router::remove_liquidity_with_coins",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xLP" },
+      { kind: "u64", value: "10" },
+      { kind: "u64", value: "20" }
+    ]
+  });
+});
+
+test("zapWithPythRoute updates Pyth before bundle zap execution", async () => {
+  const { zapWithPythRoute } = await import("../dist/index.js");
+  assert.equal(typeof zapWithPythRoute, "function");
+
+  const tx = createTransactionRecorder();
+  const result = await zapWithPythRoute(tx, {
+    name: "pyth zap in A",
+    kind: "zap-in-a",
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(txArg.calls.length, 0);
+        assert.deepEqual(updatesArg, [{ update: "feed-a" }, { update: "feed-b" }]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    },
+    clock: "0x6",
+    pair: {
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      pool: "0xPOOLAB",
+      feedIds: ["feed-a", "feed-b"]
+    },
+    inputA: "0xCOINA",
+    minBFromSwap: 1n,
+    minLpOut: 2n
+  });
+
+  assert.deepEqual(result, {
+    name: "pyth zap in A",
+    kind: "zap-in-a",
+    providerId: "pyth",
+    zapResult: { kind: "result", index: 3 }
+  });
+  assert.deepEqual(tx.calls[3], {
+    target: "0xBROWN::router::zap_in_a_with_bundle",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "1" },
+      { kind: "u64", value: "2" }
+    ]
+  });
+});
+
+test("flashBorrowWithPythRoute updates Pyth before same-PTB borrow and repay", async () => {
+  const { flashBorrowWithPythRoute } = await import("../dist/index.js");
+  assert.equal(typeof flashBorrowWithPythRoute, "function");
+
+  const tx = createTransactionRecorder();
+  const result = await flashBorrowWithPythRoute(tx, {
+    name: "pyth flash borrow A",
+    kind: "flash-borrow-a",
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(txArg.calls.length, 0);
+        assert.deepEqual(updatesArg, [{ update: "feed-a" }, { update: "feed-b" }]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    },
+    clock: "0x6",
+    pair: {
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      pool: "0xPOOLAB",
+      feedIds: ["feed-a", "feed-b"]
+    },
+    amount: 1_000n,
+    feeCoin: "0xFEEA"
+  });
+
+  assert.deepEqual(result, {
+    name: "pyth flash borrow A",
+    kind: "flash-borrow-a",
+    providerId: "pyth",
+    flashResult: {
+      result: { kind: "result", index: 3 },
+      borrowed: { kind: "nested-result", index: 3, resultIndex: 0 },
+      receipt: { kind: "nested-result", index: 3, resultIndex: 1 }
+    },
+    repayResult: { kind: "result", index: 4 }
+  });
+  assert.deepEqual(tx.merges, [
+    {
+      coin: { kind: "nested-result", index: 3, resultIndex: 0 },
+      sources: [{ kind: "object", id: "0xFEEA" }]
+    }
+  ]);
+  assert.deepEqual(
+    tx.calls.map((call) => call.target),
+    [
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::flash::borrow_a_with_coin",
+      "0xBROWN::flash::repay_a_with_coin"
+    ]
+  );
+});
+
 test("swapExactInputWithPythRoute plans a reverse two-hop PTB route from token path", async () => {
   const tx = createTransactionRecorder();
   const result = await swapExactInputWithPythRoute(tx, {
