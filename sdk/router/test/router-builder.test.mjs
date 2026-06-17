@@ -175,12 +175,14 @@ import {
   swapExactInputWithRegisteredRoute,
   swapExactInputWithPythRoute,
   swapExactAForBWithBundle,
+  swapExactAForBWithBundleAndTransfer,
   swapExactAForCViaB,
   swapExactAForCViaBWithBundles,
   swapExactAForCViaBWithPythRoute,
   swapExactBForA,
   swapExactBForAAndTransfer,
   swapExactBForAWithBundle,
+  swapExactBForAWithBundleAndTransfer,
   swapExactBForAWithPythRoute,
   swapExactCForAViaB,
   swapExactCForAViaBWithBundles,
@@ -9595,6 +9597,57 @@ test("single-hop bundle swap builders target router functions with Move argument
       ]
     });
   }
+});
+
+test("bundle exact-input transfer builders target recipient-aware router entrypoints", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    priceBundle: { kind: "result", index: 0 },
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    recipient: "0xRECIPIENT"
+  };
+
+  const aForBTx = createTransactionRecorder();
+  swapExactAForBWithBundleAndTransfer({
+    ...base,
+    input: { kind: "result", index: 2 },
+    minOut: 101n
+  })(aForBTx);
+  assert.deepEqual(aForBTx.calls[0], {
+    target: "0xBROWN::router::swap_exact_a_for_b_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 0 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "result", index: 2 },
+      { kind: "u64", value: "101" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const bForATx = createTransactionRecorder();
+  swapExactBForAWithBundleAndTransfer({
+    ...base,
+    priceBundle: { kind: "result", index: 1 },
+    input: "0xCOINB",
+    minOut: 202n
+  })(bForATx);
+  assert.deepEqual(bForATx.calls[0], {
+    target: "0xBROWN::router::swap_exact_b_for_a_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 1 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "202" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
 });
 
 test("bundle exact-output transfer builders target recipient-aware router entrypoints", () => {
