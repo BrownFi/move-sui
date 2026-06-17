@@ -44,6 +44,28 @@ function routePairBC() {
   };
 }
 
+function routePairAC() {
+  return {
+    packageId: "0x1",
+    typeA: "0x1::coin_a::COIN_A",
+    typeB: "0x1::coin_c::COIN_C",
+    pool: "0x9",
+    oracleSourceCount: 1,
+    updatePayloadByteLength: 0
+  };
+}
+
+function routePairBD() {
+  return {
+    packageId: "0x1",
+    typeA: "0x1::coin_b::COIN_B",
+    typeB: "0x1::coin_d::COIN_D",
+    pool: "0xa",
+    oracleSourceCount: 1,
+    updatePayloadByteLength: 0
+  };
+}
+
 function writeMatrix(root, overrides = {}) {
   const config = path.join(root, "matrix.json");
   writeJson(config, {
@@ -446,6 +468,52 @@ test("submitLaunchMatrixRoutesConfigFile sends two-hop exact-output final output
   const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
 
   assert.equal(report.summary.routeCaseCount, 1);
+});
+
+test("submitLaunchMatrixRoutesConfigFile sends arbitrary-hop exact-output-results final output to recipient", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root, {
+    routeLimits: {
+      maxHops: 3,
+      maxOracleSourcesPerHop: 1,
+      maxAmmSourcesPerHop: 0,
+      maxUpdatePayloadBytes: 0
+    },
+    routeCases: [
+      {
+        name: "custom three-hop exact output results route",
+        kind: "exact-output-results",
+        providerId: "custom",
+        clock: "0x6",
+        path: [
+          "0x1::coin_a::COIN_A",
+          "0x1::coin_c::COIN_C",
+          "0x1::coin_b::COIN_B",
+          "0x1::coin_d::COIN_D"
+        ],
+        pairs: [routePairAC(), routePairBC(), routePairBD()],
+        input: "0x3",
+        amountOut: "1",
+        recipient: "0xdef"
+      }
+    ]
+  });
+  const runtime = writeRuntime(root, {
+    requireTransfers: true,
+    expectedTransferObjectCounts: [[3, 1]],
+    expectedTransferRecipients: [["0xabc", "0xdef"]]
+  });
+
+  const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
+
+  assert.equal(report.summary.routeCaseCount, 1);
+  assert.deepEqual(report.txEvidence[0].expectedMoveCalls, [
+    "0x1::swap::quote_a_for_exact_b_with_bundle",
+    "0x1::swap::quote_b_for_exact_a_with_bundle",
+    "0x1::router::swap_a_for_exact_b_with_bundle",
+    "0x1::router::swap_b_for_exact_a_with_bundle",
+    "0x1::router::swap_a_for_exact_b_with_bundle"
+  ]);
 });
 
 test("submitLaunchMatrixRoutesConfigFile sends add-liquidity LP to recipient and refunds sender", async () => {
