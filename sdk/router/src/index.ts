@@ -1652,6 +1652,14 @@ export interface SwapExactAForBWithPythRouteOptions
 
 export type SwapExactBForAWithPythRouteOptions = SwapExactAForBWithPythRouteOptions;
 
+export interface SwapExactAForBWithPythRouteAndTransferOptions
+  extends SwapExactAForBWithPythRouteOptions {
+  recipient: string;
+}
+
+export type SwapExactBForAWithPythRouteAndTransferOptions =
+  SwapExactAForBWithPythRouteAndTransferOptions;
+
 export interface SwapAForExactBWithPythRouteOptions
   extends PairTypesOptions,
     PythRouteHopSourceOptions {
@@ -1663,6 +1671,14 @@ export interface SwapAForExactBWithPythRouteOptions
 }
 
 export type SwapBForExactAWithPythRouteOptions = SwapAForExactBWithPythRouteOptions;
+
+export interface SwapAForExactBWithPythRouteAndTransferOptions
+  extends SwapAForExactBWithPythRouteOptions {
+  recipient: string;
+}
+
+export type SwapBForExactAWithPythRouteAndTransferOptions =
+  SwapAForExactBWithPythRouteAndTransferOptions;
 
 export interface SwapExactAForCViaBWithPythRouteOptions {
   packageId: string;
@@ -1679,6 +1695,11 @@ export interface SwapExactAForCViaBWithPythRouteOptions {
   minCOut: U64Input;
 }
 
+export interface SwapExactAForCViaBWithPythRouteAndTransferOptions
+  extends SwapExactAForCViaBWithPythRouteOptions {
+  recipient: string;
+}
+
 export interface SwapAForExactCViaBWithPythRouteOptions {
   packageId: string;
   typeA: string;
@@ -1691,6 +1712,11 @@ export interface SwapAForExactCViaBWithPythRouteOptions {
   hopBC: PythRouteHopSourceOptions;
   input: ObjectInput;
   amountOut: U64Input;
+}
+
+export interface SwapAForExactCViaBWithPythRouteAndTransferOptions
+  extends SwapAForExactCViaBWithPythRouteOptions {
+  recipient: string;
 }
 
 export interface SwapExactCForAViaBWithPythRouteOptions {
@@ -1708,6 +1734,11 @@ export interface SwapExactCForAViaBWithPythRouteOptions {
   minAOut: U64Input;
 }
 
+export interface SwapExactCForAViaBWithPythRouteAndTransferOptions
+  extends SwapExactCForAViaBWithPythRouteOptions {
+  recipient: string;
+}
+
 export interface SwapCForExactAViaBWithPythRouteOptions {
   packageId: string;
   typeA: string;
@@ -1720,6 +1751,11 @@ export interface SwapCForExactAViaBWithPythRouteOptions {
   hopBC: PythRouteHopSourceOptions;
   input: ObjectInput;
   amountOut: U64Input;
+}
+
+export interface SwapCForExactAViaBWithPythRouteAndTransferOptions
+  extends SwapCForExactAViaBWithPythRouteOptions {
+  recipient: string;
 }
 
 export interface DirectOraclePairOptions extends PairTypesOptions {
@@ -7244,6 +7280,32 @@ export function removeLiquidityWithPythRoute(
   return removeLiquidityWithRegisteredRoute(tx, options);
 }
 
+async function buildSinglePythRouteBundle(
+  tx: TransactionLike,
+  options: PythRouteProviderOptions &
+    PairTypesOptions &
+    PythRouteHopSourceOptions & {
+      clock: ObjectInput;
+    }
+): Promise<TransactionArgument> {
+  const priceBundles = await buildPythRoutePriceBundles(tx, {
+    priceFeedConnection: options.priceFeedConnection,
+    pythClient: options.pythClient,
+    clock: options.clock,
+    hops: [
+      {
+        packageId: options.packageId,
+        typeA: options.typeA,
+        typeB: options.typeB,
+        pool: options.pool,
+        feedIds: options.feedIds,
+        ammReadings: options.ammReadings
+      }
+    ]
+  });
+  return routeBundleAt(priceBundles, 0);
+}
+
 async function buildSinglePythPairBundle(
   tx: TransactionLike,
   options: PythRouteProviderOptions & {
@@ -7251,13 +7313,50 @@ async function buildSinglePythPairBundle(
     pair: PythRoutePriceHopOptions;
   }
 ): Promise<TransactionArgument> {
+  return buildSinglePythRouteBundle(tx, {
+    priceFeedConnection: options.priceFeedConnection,
+    pythClient: options.pythClient,
+    clock: options.clock,
+    ...options.pair
+  });
+}
+
+async function buildTwoHopPythRouteBundles(
+  tx: TransactionLike,
+  options: PythRouteProviderOptions & {
+    packageId: string;
+    typeA: string;
+    typeB: string;
+    typeC: string;
+    clock: ObjectInput;
+    hopAB: PythRouteHopSourceOptions;
+    hopBC: PythRouteHopSourceOptions;
+  }
+): Promise<[TransactionArgument, TransactionArgument]> {
   const priceBundles = await buildPythRoutePriceBundles(tx, {
     priceFeedConnection: options.priceFeedConnection,
     pythClient: options.pythClient,
     clock: options.clock,
-    hops: [options.pair]
+    hops: [
+      {
+        packageId: options.packageId,
+        typeA: options.typeA,
+        typeB: options.typeB,
+        pool: options.hopAB.pool,
+        feedIds: options.hopAB.feedIds,
+        ammReadings: options.hopAB.ammReadings
+      },
+      {
+        packageId: options.packageId,
+        typeA: options.typeB,
+        typeB: options.typeC,
+        pool: options.hopBC.pool,
+        feedIds: options.hopBC.feedIds,
+        ammReadings: options.hopBC.ammReadings
+      }
+    ]
   });
-  return routeBundleAt(priceBundles, 0);
+  return [routeBundleAt(priceBundles, 0), routeBundleAt(priceBundles, 1)];
 }
 
 export async function addLiquidityWithPythRouteAndTransfer(
@@ -7551,6 +7650,78 @@ export async function swapBForExactAWithPythRoute(
   })(tx);
 }
 
+export async function swapExactAForBWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapExactAForBWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return swapExactAForBWithBundleAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    priceBundle,
+    clock: options.clock,
+    pool: options.pool,
+    input: options.input,
+    minOut: options.minOut,
+    recipient: options.recipient
+  })(tx);
+}
+
+export async function swapExactBForAWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapExactBForAWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return swapExactBForAWithBundleAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    priceBundle,
+    clock: options.clock,
+    pool: options.pool,
+    input: options.input,
+    minOut: options.minOut,
+    recipient: options.recipient
+  })(tx);
+}
+
+export async function swapAForExactBWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapAForExactBWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return swapAForExactBWithBundleAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    priceBundle,
+    clock: options.clock,
+    pool: options.pool,
+    input: options.input,
+    amountOut: options.amountOut,
+    recipient: options.recipient
+  })(tx);
+}
+
+export async function swapBForExactAWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapBForExactAWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return swapBForExactAWithBundleAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    priceBundle,
+    clock: options.clock,
+    pool: options.pool,
+    input: options.input,
+    amountOut: options.amountOut,
+    recipient: options.recipient
+  })(tx);
+}
+
 export async function swapExactAForCViaBWithPythRoute(
   tx: TransactionLike,
   options: SwapExactAForCViaBWithPythRouteOptions
@@ -7722,6 +7893,92 @@ export async function swapCForExactAViaBWithPythRoute(
     poolBC: options.hopBC.pool,
     input: options.input,
     amountOut: options.amountOut
+  })(tx);
+}
+
+export async function swapExactAForCViaBWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapExactAForCViaBWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(tx, options);
+  return swapExactAForCViaBWithBundlesAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    typeC: options.typeC,
+    priceBundleAB,
+    priceBundleBC,
+    clock: options.clock,
+    poolAB: options.hopAB.pool,
+    poolBC: options.hopBC.pool,
+    input: options.input,
+    minBOut: options.minBOut,
+    minCOut: options.minCOut,
+    recipient: options.recipient
+  })(tx);
+}
+
+export async function swapExactCForAViaBWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapExactCForAViaBWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(tx, options);
+  return swapExactCForAViaBWithBundlesAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    typeC: options.typeC,
+    priceBundleAB,
+    priceBundleBC,
+    clock: options.clock,
+    poolAB: options.hopAB.pool,
+    poolBC: options.hopBC.pool,
+    input: options.input,
+    minBOut: options.minBOut,
+    minAOut: options.minAOut,
+    recipient: options.recipient
+  })(tx);
+}
+
+export async function swapAForExactCViaBWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapAForExactCViaBWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(tx, options);
+  return swapAForExactCViaBWithBundlesAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    typeC: options.typeC,
+    priceBundleAB,
+    priceBundleBC,
+    clock: options.clock,
+    poolAB: options.hopAB.pool,
+    poolBC: options.hopBC.pool,
+    input: options.input,
+    amountOut: options.amountOut,
+    recipient: options.recipient
+  })(tx);
+}
+
+export async function swapCForExactAViaBWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapCForExactAViaBWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(tx, options);
+  return swapCForExactAViaBWithBundlesAndTransfer({
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    typeC: options.typeC,
+    priceBundleAB,
+    priceBundleBC,
+    clock: options.clock,
+    poolAB: options.hopAB.pool,
+    poolBC: options.hopBC.pool,
+    input: options.input,
+    amountOut: options.amountOut,
+    recipient: options.recipient
   })(tx);
 }
 

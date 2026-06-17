@@ -9017,25 +9017,48 @@ test("Pyth route transfer convenience wrappers target recipient-aware entrypoint
   const {
     addLiquidityWithPythRouteAndTransfer,
     removeLiquidityWithPythRouteAndTransfer,
+    swapAForExactBWithPythRouteAndTransfer,
+    swapAForExactCViaBWithPythRouteAndTransfer,
+    swapBForExactAWithPythRouteAndTransfer,
+    swapCForExactAViaBWithPythRouteAndTransfer,
+    swapExactAForBWithPythRouteAndTransfer,
+    swapExactAForCViaBWithPythRouteAndTransfer,
+    swapExactBForAWithPythRouteAndTransfer,
+    swapExactCForAViaBWithPythRouteAndTransfer,
     zapWithPythRouteAndTransfer
   } = await import("../dist/index.js");
   assert.equal(typeof addLiquidityWithPythRouteAndTransfer, "function");
   assert.equal(typeof removeLiquidityWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapAForExactBWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapAForExactCViaBWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapBForExactAWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapCForExactAViaBWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapExactAForBWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapExactAForCViaBWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapExactBForAWithPythRouteAndTransfer, "function");
+  assert.equal(typeof swapExactCForAViaBWithPythRouteAndTransfer, "function");
   assert.equal(typeof zapWithPythRouteAndTransfer, "function");
 
   const pythProvider = {
     priceFeedConnection: {
       async getPriceFeedsUpdateData(feedIdsArg) {
-        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        assert.ok(
+          [
+            ["feed-a", "feed-b"],
+            ["feed-a", "feed-b", "feed-c"]
+          ].some((expected) => JSON.stringify(expected) === JSON.stringify(feedIdsArg))
+        );
         return feedIdsArg.map((feedId) => ({ update: feedId }));
       }
     },
     pythClient: {
       async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
         assert.equal(txArg.calls.length, 0);
-        assert.deepEqual(updatesArg, [{ update: "feed-a" }, { update: "feed-b" }]);
-        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
-        return ["0xPRICEA", "0xPRICEB"];
+        assert.deepEqual(
+          updatesArg,
+          feedIdsArg.map((feedId) => ({ update: feedId }))
+        );
+        return feedIdsArg.map((feedId) => `0xPRICE_${feedId}`);
       }
     }
   };
@@ -9045,6 +9068,14 @@ test("Pyth route transfer convenience wrappers target recipient-aware entrypoint
     typeB: "0x1::b::B",
     pool: "0xPOOLAB",
     feedIds: ["feed-a", "feed-b"]
+  };
+  const hopAB = {
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+  const hopBC = {
+    pool: "0xPOOLBC",
+    feedIds: ["feed-b", "feed-c"]
   };
 
   const addTx = createTransactionRecorder();
@@ -9176,6 +9207,165 @@ test("Pyth route transfer convenience wrappers target recipient-aware entrypoint
       { kind: "address", value: "0xRECIPIENT" }
     ]
   });
+
+  const swapExactATx = createTransactionRecorder();
+  await swapExactAForBWithPythRouteAndTransfer(swapExactATx, {
+    ...pythProvider,
+    ...pair,
+    clock: "0x6",
+    input: "0xCOINA",
+    minOut: 77n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(swapExactATx.calls[3], {
+    target: "0xBROWN::router::swap_exact_a_for_b_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "77" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const swapExactBTx = createTransactionRecorder();
+  await swapExactBForAWithPythRouteAndTransfer(swapExactBTx, {
+    ...pythProvider,
+    ...pair,
+    clock: "0x6",
+    input: "0xCOINB",
+    minOut: 66n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(swapExactBTx.calls[3].target, "0xBROWN::router::swap_exact_b_for_a_with_bundle_and_transfer");
+
+  const swapExactOutputATx = createTransactionRecorder();
+  await swapAForExactBWithPythRouteAndTransfer(swapExactOutputATx, {
+    ...pythProvider,
+    ...pair,
+    clock: "0x6",
+    input: "0xCOINA",
+    amountOut: 55n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(swapExactOutputATx.calls[3], {
+    target: "0xBROWN::router::swap_a_for_exact_b_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "55" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const swapExactOutputBTx = createTransactionRecorder();
+  await swapBForExactAWithPythRouteAndTransfer(swapExactOutputBTx, {
+    ...pythProvider,
+    ...pair,
+    clock: "0x6",
+    input: "0xCOINB",
+    amountOut: 44n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(swapExactOutputBTx.calls[3].target, "0xBROWN::router::swap_b_for_exact_a_with_bundle_and_transfer");
+
+  const twoHopExactATx = createTransactionRecorder();
+  await swapExactAForCViaBWithPythRouteAndTransfer(twoHopExactATx, {
+    ...pythProvider,
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    clock: "0x6",
+    hopAB,
+    hopBC,
+    input: "0xCOINA",
+    minBOut: 33n,
+    minCOut: 22n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(twoHopExactATx.calls[6], {
+    target: "0xBROWN::router::swap_exact_a_for_c_via_b_with_bundles_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "result", index: 5 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xPOOLBC" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "33" },
+      { kind: "u64", value: "22" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const twoHopExactCTx = createTransactionRecorder();
+  await swapExactCForAViaBWithPythRouteAndTransfer(twoHopExactCTx, {
+    ...pythProvider,
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    clock: "0x6",
+    hopAB,
+    hopBC,
+    input: "0xCOINC",
+    minBOut: 31n,
+    minAOut: 21n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(twoHopExactCTx.calls[6].target, "0xBROWN::router::swap_exact_c_for_a_via_b_with_bundles_and_transfer");
+
+  const twoHopExactOutputATx = createTransactionRecorder();
+  await swapAForExactCViaBWithPythRouteAndTransfer(twoHopExactOutputATx, {
+    ...pythProvider,
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    clock: "0x6",
+    hopAB,
+    hopBC,
+    input: "0xCOINA",
+    amountOut: 20n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(twoHopExactOutputATx.calls[6], {
+    target: "0xBROWN::router::swap_a_for_exact_c_via_b_with_bundles_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "result", index: 5 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xPOOLBC" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "20" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const twoHopExactOutputCTx = createTransactionRecorder();
+  await swapCForExactAViaBWithPythRouteAndTransfer(twoHopExactOutputCTx, {
+    ...pythProvider,
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    clock: "0x6",
+    hopAB,
+    hopBC,
+    input: "0xCOINC",
+    amountOut: 19n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(twoHopExactOutputCTx.calls[6].target, "0xBROWN::router::swap_c_for_exact_a_via_b_with_bundles_and_transfer");
 });
 
 test("swapExactInputWithPythRoute plans a reverse two-hop PTB route from token path", async () => {
