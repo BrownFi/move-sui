@@ -9013,6 +9013,171 @@ test("flashBorrowWithPythRoute updates Pyth before same-PTB borrow and repay", a
   );
 });
 
+test("Pyth route transfer convenience wrappers target recipient-aware entrypoints", async () => {
+  const {
+    addLiquidityWithPythRouteAndTransfer,
+    removeLiquidityWithPythRouteAndTransfer,
+    zapWithPythRouteAndTransfer
+  } = await import("../dist/index.js");
+  assert.equal(typeof addLiquidityWithPythRouteAndTransfer, "function");
+  assert.equal(typeof removeLiquidityWithPythRouteAndTransfer, "function");
+  assert.equal(typeof zapWithPythRouteAndTransfer, "function");
+
+  const pythProvider = {
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg.calls.length, 0);
+        assert.deepEqual(updatesArg, [{ update: "feed-a" }, { update: "feed-b" }]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    }
+  };
+  const pair = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+
+  const addTx = createTransactionRecorder();
+  const addResult = await addLiquidityWithPythRouteAndTransfer(addTx, {
+    ...pythProvider,
+    clock: "0x6",
+    pair,
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minLpOut: 100n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(addResult, { kind: "result", index: 3 });
+  assert.deepEqual(addTx.calls[3], {
+    target: "0xBROWN::router::add_liquidity_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "100" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const checkedAddTx = createTransactionRecorder();
+  await addLiquidityWithPythRouteAndTransfer(checkedAddTx, {
+    ...pythProvider,
+    clock: "0x6",
+    pair,
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minADeposit: 11n,
+    minBDeposit: 22n,
+    minLpOut: 33n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(checkedAddTx.calls[3], {
+    target: "0xBROWN::router::add_liquidity_with_bundle_and_transfer_with_min_deposits",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "11" },
+      { kind: "u64", value: "22" },
+      { kind: "u64", value: "33" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const removeTx = createTransactionRecorder();
+  const removeResult = removeLiquidityWithPythRouteAndTransfer(removeTx, {
+    pair,
+    lpIn: "0xLP",
+    minAOut: 10n,
+    minBOut: 20n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(removeResult, { kind: "result", index: 0 });
+  assert.deepEqual(removeTx.calls[0], {
+    target: "0xBROWN::swap::remove_liquidity_with_coins_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xLP" },
+      { kind: "u64", value: "10" },
+      { kind: "u64", value: "20" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapTx = createTransactionRecorder();
+  const zapResult = await zapWithPythRouteAndTransfer(zapTx, {
+    ...pythProvider,
+    name: "pyth zap in A transfer",
+    kind: "zap-in-a",
+    clock: "0x6",
+    pair,
+    inputA: "0xCOINA",
+    minBFromSwap: 1n,
+    minLpOut: 2n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(zapResult, {
+    name: "pyth zap in A transfer",
+    kind: "zap-in-a",
+    providerId: "pyth",
+    zapResult: { kind: "result", index: 3 }
+  });
+  assert.deepEqual(zapTx.calls[3], {
+    target: "0xBROWN::router::zap_in_a_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "1" },
+      { kind: "u64", value: "2" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapOutTx = createTransactionRecorder();
+  await zapWithPythRouteAndTransfer(zapOutTx, {
+    ...pythProvider,
+    name: "pyth zap out B transfer",
+    kind: "zap-out-b",
+    clock: "0x6",
+    pair,
+    lpIn: "0xLP",
+    minOut: 44n,
+    recipient: "0xRECIPIENT"
+  });
+  assert.deepEqual(zapOutTx.calls[3], {
+    target: "0xBROWN::router::zap_out_b_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xLP" },
+      { kind: "u64", value: "44" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+});
+
 test("swapExactInputWithPythRoute plans a reverse two-hop PTB route from token path", async () => {
   const tx = createTransactionRecorder();
   const result = await swapExactInputWithPythRoute(tx, {

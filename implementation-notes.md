@@ -2010,3 +2010,7 @@
   - Finding: single-hop Pyth state-sequence monotonicity was covered, while typed two-hop route monotonicity was only pinned before route reserves changed.
   - Decision: add a two-hop Pyth route test that executes `A -> B -> C` and `C -> B -> A` bundle swaps, then checks exact-input and exact-output route quote monotonicity against the mutated pools. This is coverage-only; route quote logic did not change.
   - Verification: `rtk sui move test test_router_pyth_bundle_route_quotes_remain_monotonic_after_state_sequence --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.
+- 2026-06-18 Pyth route recipient convenience SDK parity slice:
+  - Finding: Move and low-level SDK builders already exposed recipient-aware add/remove/zap transfer entrypoints, and launch route cases could transfer outputs to `recipient`, but the Pyth convenience route layer only exposed returning add/remove/zap wrappers.
+  - Decision: add thin `addLiquidityWithPythRouteAndTransfer`, `removeLiquidityWithPythRouteAndTransfer`, and `zapWithPythRouteAndTransfer` wrappers. Add/zap build a Pyth bundle before calling the recipient-aware bundle entrypoint; remove-liquidity stays oracle-free and calls the coin transfer entrypoint.
+  - RED/GREEN: `rtk npm test --prefix sdk/router -- --test-name-pattern "Pyth route transfer convenience wrappers"` first failed on missing exports, then passed 214/214 after wiring the wrappers and branch coverage for checked add-liquidity plus zap-out transfer.

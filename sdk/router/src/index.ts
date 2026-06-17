@@ -1564,8 +1564,16 @@ export interface AddLiquidityWithPythRouteOptions
     >,
     PythRouteProviderOptions {}
 
+export interface AddLiquidityWithPythRouteAndTransferOptions
+  extends AddLiquidityWithPythRouteOptions {
+  recipient: string;
+}
+
 export type RemoveLiquidityWithPythRouteOptions =
   RemoveLiquidityWithRegisteredRouteOptions<PythRoutePriceHopOptions>;
+
+export type RemoveLiquidityWithPythRouteAndTransferOptions =
+  RemoveLiquidityWithPythRouteOptions & { recipient: string };
 
 export interface QuoteExactInputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
@@ -1617,6 +1625,11 @@ export type ZapWithPythRouteOptions =
   | ZapInAWithPythRouteOptions
   | ZapInBWithPythRouteOptions
   | ZapOutWithPythRouteOptions;
+
+export type ZapWithPythRouteAndTransferOptions =
+  | (ZapInAWithPythRouteOptions & { recipient: string })
+  | (ZapInBWithPythRouteOptions & { recipient: string })
+  | (ZapOutWithPythRouteOptions & { recipient: string });
 
 export interface FlashBorrowWithPythRouteOptions extends PythRouteProviderOptions {
   name?: string;
@@ -7231,6 +7244,79 @@ export function removeLiquidityWithPythRoute(
   return removeLiquidityWithRegisteredRoute(tx, options);
 }
 
+async function buildSinglePythPairBundle(
+  tx: TransactionLike,
+  options: PythRouteProviderOptions & {
+    clock: ObjectInput;
+    pair: PythRoutePriceHopOptions;
+  }
+): Promise<TransactionArgument> {
+  const priceBundles = await buildPythRoutePriceBundles(tx, {
+    priceFeedConnection: options.priceFeedConnection,
+    pythClient: options.pythClient,
+    clock: options.clock,
+    hops: [options.pair]
+  });
+  return routeBundleAt(priceBundles, 0);
+}
+
+export async function addLiquidityWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: AddLiquidityWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythPairBundle(tx, options);
+  const commonOptions = {
+    packageId: options.pair.packageId,
+    typeA: options.pair.typeA,
+    typeB: options.pair.typeB,
+    priceBundle,
+    clock: options.clock,
+    pool: options.pair.pool,
+    inputA: options.inputA,
+    inputB: options.inputB,
+    recipient: options.recipient
+  };
+  const minADeposit = options.minADeposit;
+  const minBDeposit = options.minBDeposit;
+  const hasMinADeposit = minADeposit !== undefined;
+  const hasMinBDeposit = minBDeposit !== undefined;
+  if (hasMinADeposit !== hasMinBDeposit) {
+    throw new Error(
+      "BrownFi add-liquidity route requires minADeposit and minBDeposit together"
+    );
+  }
+
+  if (hasMinADeposit && hasMinBDeposit) {
+    return addLiquidityWithBundleAndTransferWithMinDeposits({
+      ...commonOptions,
+      minADeposit,
+      minBDeposit,
+      minLpOut: options.minLpOut
+    })(tx);
+  }
+
+  return addLiquidityWithBundleAndTransfer({
+    ...commonOptions,
+    minLpOut: options.minLpOut
+  })(tx);
+}
+
+export function removeLiquidityWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: RemoveLiquidityWithPythRouteAndTransferOptions
+): TransactionArgument {
+  return removeLiquidityWithCoinsAndTransfer({
+    packageId: options.pair.packageId,
+    typeA: options.pair.typeA,
+    typeB: options.pair.typeB,
+    pool: options.pair.pool,
+    lpIn: options.lpIn,
+    minAOut: options.minAOut,
+    minBOut: options.minBOut,
+    recipient: options.recipient
+  })(tx);
+}
+
 export async function zapWithPythRoute(
   tx: TransactionLike,
   options: ZapWithPythRouteOptions
@@ -7268,6 +7354,55 @@ export async function zapWithPythRoute(
     lpIn: options.lpIn,
     minOut: options.minOut
   });
+}
+
+export async function zapWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: ZapWithPythRouteAndTransferOptions
+): Promise<RegisteredRouteCaseZapTransactionResult> {
+  const priceBundle = await buildSinglePythPairBundle(tx, options);
+  const commonOptions = {
+    packageId: options.pair.packageId,
+    typeA: options.pair.typeA,
+    typeB: options.pair.typeB,
+    priceBundle,
+    clock: options.clock,
+    pool: options.pair.pool,
+    recipient: options.recipient
+  };
+  const zapResult =
+    options.kind === "zap-in-a"
+      ? zapInAWithBundleAndTransfer({
+          ...commonOptions,
+          inputA: options.inputA,
+          minBFromSwap: options.minBFromSwap,
+          minLpOut: options.minLpOut
+        })(tx)
+      : options.kind === "zap-in-b"
+        ? zapInBWithBundleAndTransfer({
+            ...commonOptions,
+            inputB: options.inputB,
+            minAFromSwap: options.minAFromSwap,
+            minLpOut: options.minLpOut
+          })(tx)
+        : options.kind === "zap-out-a"
+          ? zapOutAWithBundleAndTransfer({
+              ...commonOptions,
+              lpIn: options.lpIn,
+              minOut: options.minOut
+            })(tx)
+          : zapOutBWithBundleAndTransfer({
+              ...commonOptions,
+              lpIn: options.lpIn,
+              minOut: options.minOut
+            })(tx);
+
+  return {
+    name: options.name ?? `pyth ${options.kind} route`,
+    kind: options.kind,
+    providerId: "pyth",
+    zapResult
+  };
 }
 
 export async function flashBorrowWithPythRoute(
