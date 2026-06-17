@@ -1868,3 +1868,7 @@
   - Finding: two-hop route monotonicity coverage still used only 9-decimal tokens, leaving mixed-decimal route rounding unpinned.
   - Decision: add a mixed-decimal typed route fixture with 6-decimal A, 9-decimal B, and 12-decimal C pools, then cover exact-input and exact-output route quote monotonicity in both route directions.
   - RED/GREEN: `rtk sui move test mixed_decimal_exact --allow-dirty --build-env testnet --warnings-are-errors` first failed on missing test fixture helper `create_pyth_test_route_with_balances_and_decimals`, then passed 2/2 after adding the helper and tests.
+- 2026-06-17 Pyth state-sequence monotonicity coverage slice:
+  - Finding: quote monotonicity coverage checked initial pool state, but did not prove the property after actual state-changing Pyth bundle swaps mutate reserves.
+  - Decision: add a state-sequence Move test that performs A-to-B and B-to-A Pyth bundle swaps, then checks exact-input and exact-output quote monotonicity against the updated pool state.
+  - Verification: `rtk sui move test state_sequence --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1 immediately; no production change was required.

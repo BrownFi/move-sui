@@ -1517,6 +1517,91 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_pyth_bundle_quotes_remain_monotonic_after_state_sequence() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts(&mut scenario, 10_000_000_000, 10_000_000_000);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+
+            let b_out = swap::swap_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                balance::create_for_testing<A>(500_000_000),
+                0
+            );
+            let a_out = swap::swap_b_for_a_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                balance::create_for_testing<B>(300_000_000),
+                0
+            );
+
+            let (a_small_out, a_small_raw, a_small_cutoff) =
+                swap::quote_a_for_b_with_bundle(&bundle, &clock, &pool, 100_000_000);
+            let (a_large_out, a_large_raw, a_large_cutoff) =
+                swap::quote_a_for_b_with_bundle(&bundle, &clock, &pool, 200_000_000);
+            let (b_small_out, b_small_raw, b_small_cutoff) =
+                swap::quote_b_for_a_with_bundle(&bundle, &clock, &pool, 100_000_000);
+            let (b_large_out, b_large_raw, b_large_cutoff) =
+                swap::quote_b_for_a_with_bundle(&bundle, &clock, &pool, 200_000_000);
+
+            let (a_small_in, a_small_effective_out) =
+                swap::quote_a_for_exact_b_with_bundle(&bundle, &clock, &pool, 100_000_000);
+            let (a_large_in, a_large_effective_out) =
+                swap::quote_a_for_exact_b_with_bundle(&bundle, &clock, &pool, 200_000_000);
+            let (b_small_in, b_small_effective_out) =
+                swap::quote_b_for_exact_a_with_bundle(&bundle, &clock, &pool, 100_000_000);
+            let (b_large_in, b_large_effective_out) =
+                swap::quote_b_for_exact_a_with_bundle(&bundle, &clock, &pool, 200_000_000);
+
+            assert!(a_large_out >= a_small_out, 0);
+            assert!(a_large_raw >= a_small_raw, 1);
+            assert!(a_large_cutoff >= a_small_cutoff, 2);
+            assert!(b_large_out >= b_small_out, 3);
+            assert!(b_large_raw >= b_small_raw, 4);
+            assert!(b_large_cutoff >= b_small_cutoff, 5);
+            assert!(a_small_effective_out == 100_000_000, 6);
+            assert!(a_large_effective_out == 200_000_000, 7);
+            assert!(a_large_in >= a_small_in, 8);
+            assert!(b_small_effective_out == 100_000_000, 9);
+            assert!(b_large_effective_out == 200_000_000, 10);
+            assert!(b_large_in >= b_small_in, 11);
+
+            balance::destroy_for_testing(b_out);
+            balance::destroy_for_testing(a_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_add_liquidity_pyth_bundle_mints_from_raw_representable_six_decimal_quote_deposit() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool_with_amounts_and_decimals(
