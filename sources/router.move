@@ -1182,6 +1182,34 @@ public fun swap_a_for_exact_c_via_b_with_bundles<A, B, C>(
     )
 }
 
+#[allow(lint(self_transfer))]
+public fun swap_a_for_exact_c_via_b_with_bundles_and_transfer<A, B, C>(
+    price_bundle_ab: &PriceBundle,
+    price_bundle_bc: &PriceBundle,
+    clock: &Clock,
+    pool_ab: &mut Pool<A, B>,
+    pool_bc: &mut Pool<B, C>,
+    input: Coin<A>,
+    amount_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_a, remaining_b, c_out) = swap_a_for_exact_c_via_b_with_bundles(
+        price_bundle_ab,
+        price_bundle_bc,
+        clock,
+        pool_ab,
+        pool_bc,
+        input,
+        amount_out,
+        ctx
+    );
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_a), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(c_out), recipient, ctx);
+}
+
 public fun swap_a_for_exact_c_via_b_with_reversed_second_bundle<A, B, C>(
     price_bundle_ab: &PriceBundle,
     price_bundle_cb: &PriceBundle,
@@ -1422,6 +1450,34 @@ public fun swap_c_for_exact_a_via_b_with_bundles<A, B, C>(
         coin::from_balance(remaining_b, ctx),
         coin::from_balance(a_out, ctx)
     )
+}
+
+#[allow(lint(self_transfer))]
+public fun swap_c_for_exact_a_via_b_with_bundles_and_transfer<A, B, C>(
+    price_bundle_ab: &PriceBundle,
+    price_bundle_bc: &PriceBundle,
+    clock: &Clock,
+    pool_ab: &mut Pool<A, B>,
+    pool_bc: &mut Pool<B, C>,
+    input: Coin<C>,
+    amount_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_c, remaining_b, a_out) = swap_c_for_exact_a_via_b_with_bundles(
+        price_bundle_ab,
+        price_bundle_bc,
+        clock,
+        pool_ab,
+        pool_bc,
+        input,
+        amount_out,
+        ctx
+    );
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_c), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(a_out), recipient, ctx);
 }
 
 public fun quote_c_for_exact_a_via_b_with_bundles<A, B, C>(

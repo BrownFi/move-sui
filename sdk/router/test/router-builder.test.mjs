@@ -162,6 +162,7 @@ import {
   swapAForExactBWithPythRoute,
   swapAForExactCViaB,
   swapAForExactCViaBWithBundles,
+  swapAForExactCViaBWithBundlesAndTransfer,
   swapAForExactCViaBWithPythRoute,
   swapExactAForB,
   swapExactAForBAndTransfer,
@@ -172,6 +173,7 @@ import {
   swapBForExactAWithPythRoute,
   swapCForExactAViaB,
   swapCForExactAViaBWithBundles,
+  swapCForExactAViaBWithBundlesAndTransfer,
   swapCForExactAViaBWithPythRoute,
   swapExactInputWithRegisteredRoute,
   swapExactInputWithPythRoute,
@@ -11017,4 +11019,68 @@ test("swapCForExactAViaBWithBundles builds the reverse typed two-hop exact-outpu
       { kind: "u64", value: "666" }
     ]
   });
+});
+
+test("typed two-hop bundle exact-output transfer builders target recipient-aware router functions", () => {
+  const tx = createTransactionRecorder();
+  swapAForExactCViaBWithBundlesAndTransfer({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    priceBundleAB: { kind: "result", index: 0 },
+    priceBundleBC: { kind: "result", index: 1 },
+    clock: "0x6",
+    poolAB: "0xPOOLAB",
+    poolBC: "0xPOOLBC",
+    input: { kind: "result", index: 2 },
+    amountOut: 555n,
+    recipient: "0xRECIPIENT"
+  })(tx);
+
+  swapCForExactAViaBWithBundlesAndTransfer({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    priceBundleAB: { kind: "result", index: 3 },
+    priceBundleBC: { kind: "result", index: 4 },
+    clock: "0x6",
+    poolAB: "0xPOOLAB",
+    poolBC: "0xPOOLBC",
+    input: "0xCOINC",
+    amountOut: 666n,
+    recipient: "0xRECIPIENT"
+  })(tx);
+
+  assert.deepEqual(tx.calls, [
+    {
+      target: "0xBROWN::router::swap_a_for_exact_c_via_b_with_bundles_and_transfer",
+      typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+      arguments: [
+        { kind: "result", index: 0 },
+        { kind: "result", index: 1 },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" },
+        { kind: "object", id: "0xPOOLBC" },
+        { kind: "result", index: 2 },
+        { kind: "u64", value: "555" },
+        { kind: "address", value: "0xRECIPIENT" }
+      ]
+    },
+    {
+      target: "0xBROWN::router::swap_c_for_exact_a_via_b_with_bundles_and_transfer",
+      typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+      arguments: [
+        { kind: "result", index: 3 },
+        { kind: "result", index: 4 },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" },
+        { kind: "object", id: "0xPOOLBC" },
+        { kind: "object", id: "0xCOINC" },
+        { kind: "u64", value: "666" },
+        { kind: "address", value: "0xRECIPIENT" }
+      ]
+    }
+  ]);
 });

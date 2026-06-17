@@ -2107,6 +2107,11 @@ export interface SwapAForExactCViaBWithBundlesOptions {
   amountOut: U64Input;
 }
 
+export interface SwapAForExactCViaBWithBundlesAndTransferOptions
+  extends SwapAForExactCViaBWithBundlesOptions {
+  recipient: string;
+}
+
 export interface SwapAForExactCViaBWithReversedSecondBundleOptions {
   packageId: string;
   typeA: string;
@@ -2160,6 +2165,11 @@ export interface SwapCForExactAViaBWithBundlesOptions {
   poolBC: ObjectInput;
   input: ObjectInput;
   amountOut: U64Input;
+}
+
+export interface SwapCForExactAViaBWithBundlesAndTransferOptions
+  extends SwapCForExactAViaBWithBundlesOptions {
+  recipient: string;
 }
 
 export interface QuoteCForExactAViaBWithBundlesOptions {
@@ -8345,6 +8355,24 @@ export function swapAForExactCViaBWithBundles(
     });
 }
 
+export function swapAForExactCViaBWithBundlesAndTransfer(
+  options: SwapAForExactCViaBWithBundlesAndTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(
+        options.packageId,
+        "swap_a_for_exact_c_via_b_with_bundles_and_transfer"
+      ),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...twoHopBundleArgs(tx, options),
+        tx.pure.u64(options.amountOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function swapAForExactCViaBWithReversedSecondBundle(
   options: SwapAForExactCViaBWithReversedSecondBundleOptions
 ): TransactionThunk {
@@ -8397,5 +8425,23 @@ export function swapCForExactAViaBWithBundles(
       target: routerTarget(options.packageId, "swap_c_for_exact_a_via_b_with_bundles"),
       typeArguments: routeTypeArguments(options),
       arguments: [...twoHopBundleArgs(tx, options), tx.pure.u64(options.amountOut)]
+    });
+}
+
+export function swapCForExactAViaBWithBundlesAndTransfer(
+  options: SwapCForExactAViaBWithBundlesAndTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(
+        options.packageId,
+        "swap_c_for_exact_a_via_b_with_bundles_and_transfer"
+      ),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...twoHopBundleArgs(tx, options),
+        tx.pure.u64(options.amountOut),
+        pureAddress(tx, options.recipient)
+      ]
     });
 }
