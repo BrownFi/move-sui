@@ -1872,3 +1872,7 @@
   - Finding: quote monotonicity coverage checked initial pool state, but did not prove the property after actual state-changing Pyth bundle swaps mutate reserves.
   - Decision: add a state-sequence Move test that performs A-to-B and B-to-A Pyth bundle swaps, then checks exact-input and exact-output quote monotonicity against the updated pool state.
   - Verification: `rtk sui move test state_sequence --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1 immediately; no production change was required.
+- 2026-06-17 Pyth both-token mixed-decimal swap coverage slice:
+  - Finding: Pyth bundle swap decimal coverage pinned 6/9, 9/6, 12/9, and 9/12 pools, but not pools where both token sides differ from BrownFi's 9-decimal internal scale.
+  - Decision: add 6/12 and 12/6 Pyth bundle swap tests for exact-input output scaling and exact-output required-input scaling, with explicit raw output/input constants before state-changing execution.
+  - Verification: `rtk sui move test between_ --allow-dirty --build-env testnet --warnings-are-errors` passed 4/4 immediately; no production change was required.
