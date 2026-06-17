@@ -1860,3 +1860,7 @@
   - Finding: Pyth source tests covered one negative-exponent bundle value and exponent metadata digesting, but did not directly assert `pyth_source` reading confidence conversion or positive-exponent normalization.
   - Decision: add BrownFi-owned Pyth source reading tests for negative-exponent floor-to-9-decimal conversion and positive-exponent scale-up conversion. Both assert normalized price, normalized confidence, and stored BrownFi reading decimals.
   - Verification: `rtk sui move test normalizes_ --allow-dirty --build-env testnet --warnings-are-errors` passed 9/9, including the two new Pyth conversion cases; no production change was required.
+- 2026-06-17 Pyth two-hop route monotonicity coverage slice:
+  - Finding: single-hop Pyth bundle quote monotonicity was covered, but typed two-hop Pyth route quotes were only covered by value and round-trip checks.
+  - Decision: add typed `A -> B -> C` and `C -> B -> A` route quote monotonicity tests for both exact-input and exact-output helpers. This is coverage-only because the existing router quote path already implements the behavior.
+  - Verification: `rtk sui move test route_quotes_are_monotonic --allow-dirty --build-env testnet --warnings-are-errors` passed 2/2.
