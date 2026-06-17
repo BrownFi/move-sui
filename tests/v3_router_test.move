@@ -661,6 +661,106 @@ module brownfi_amm::v3_router_test {
     }
 
     #[test]
+    fun test_router_swap_a_for_exact_b_direct_transfer_sends_output_to_recipient_and_refunds_sender() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let input_a = coin::from_balance(balance::create_for_testing<A>(100_110), ctx(&mut scenario));
+
+            router::swap_a_for_exact_b_and_transfer(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &mut pool,
+                input_a,
+                99_994,
+                ADDR2,
+                ctx(&mut scenario)
+            );
+
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let remaining_a = take_from_sender<Coin<A>>(&scenario);
+            assert!(coin::value(&remaining_a) == 10, 0);
+            balance::destroy_for_testing(coin::into_balance(remaining_a));
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let b_out = take_from_sender<Coin<B>>(&scenario);
+            assert!(coin::value(&b_out) == 99_994, 1);
+            balance::destroy_for_testing(coin::into_balance(b_out));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_router_swap_b_for_exact_a_direct_transfer_sends_output_to_recipient_and_refunds_sender() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let input_b = coin::from_balance(balance::create_for_testing<B>(100_110), ctx(&mut scenario));
+
+            router::swap_b_for_exact_a_and_transfer(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &mut pool,
+                input_b,
+                99_994,
+                ADDR2,
+                ctx(&mut scenario)
+            );
+
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let remaining_b = take_from_sender<Coin<B>>(&scenario);
+            assert!(coin::value(&remaining_b) == 10, 0);
+            balance::destroy_for_testing(coin::into_balance(remaining_b));
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let a_out = take_from_sender<Coin<A>>(&scenario);
+            assert!(coin::value(&a_out) == 99_994, 1);
+            balance::destroy_for_testing(coin::into_balance(a_out));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_router_exact_input_solidity_tx_sequence_executes_without_inventory_revert() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_solidity_router_sequence_pool(&mut scenario);

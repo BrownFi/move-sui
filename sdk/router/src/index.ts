@@ -1630,6 +1630,11 @@ export interface SingleHopDirectExactOutputOptions extends DirectOraclePairOptio
   amountOut: U64Input;
 }
 
+export interface SingleHopDirectExactOutputTransferOptions
+  extends SingleHopDirectExactOutputOptions {
+  recipient: string;
+}
+
 export interface AddLiquidityWithCoinsOptions extends DirectOraclePairOptions {
   inputA: ObjectInput;
   inputB: ObjectInput;
@@ -7305,6 +7310,22 @@ export function swapAForExactB(options: SingleHopDirectExactOutputOptions): Tran
     });
 }
 
+export function swapAForExactBAndTransfer(
+  options: SingleHopDirectExactOutputTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_a_for_exact_b_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.input),
+        tx.pure.u64(options.amountOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function swapBForExactA(options: SingleHopDirectExactOutputOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7314,6 +7335,22 @@ export function swapBForExactA(options: SingleHopDirectExactOutputOptions): Tran
         ...directOraclePairArgs(tx, options),
         objectArg(tx, options.input),
         tx.pure.u64(options.amountOut)
+      ]
+    });
+}
+
+export function swapBForExactAAndTransfer(
+  options: SingleHopDirectExactOutputTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_b_for_exact_a_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.input),
+        tx.pure.u64(options.amountOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }

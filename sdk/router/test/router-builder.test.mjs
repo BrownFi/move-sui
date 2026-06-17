@@ -160,6 +160,7 @@ import {
   storkRestLatestPricesResponseToSignedPrices,
   supraPullRestProofResponseToPayload,
   swapAForExactB,
+  swapAForExactBAndTransfer,
   swapAForExactBWithBundle,
   swapAForExactBWithBundleAndTransfer,
   swapAForExactBWithPythRoute,
@@ -171,6 +172,7 @@ import {
   swapExactAForBAndTransfer,
   swapExactAForBWithPythRoute,
   swapBForExactA,
+  swapBForExactAAndTransfer,
   swapBForExactAWithBundle,
   swapBForExactAWithBundleAndTransfer,
   swapBForExactAWithPythRoute,
@@ -9633,6 +9635,48 @@ test("direct coin transfer builders target recipient-aware swap entrypoints", ()
       { kind: "object", id: "0xPOOLAB" },
       { kind: "object", id: "0xCOINB" },
       { kind: "u64", value: "222" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const exactOutATx = createTransactionRecorder();
+  swapAForExactBAndTransfer({
+    ...base,
+    input: "0xCOINA",
+    amountOut: 123n
+  })(exactOutATx);
+  assert.deepEqual(exactOutATx.calls[0], {
+    target: "0xBROWN::router::swap_a_for_exact_b_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPRICEA" },
+      { kind: "object", id: "0xPRICEB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "123" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const exactOutBTx = createTransactionRecorder();
+  swapBForExactAAndTransfer({
+    ...base,
+    input: "0xCOINB",
+    amountOut: 456n
+  })(exactOutBTx);
+  assert.deepEqual(exactOutBTx.calls[0], {
+    target: "0xBROWN::router::swap_b_for_exact_a_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPRICEA" },
+      { kind: "object", id: "0xPRICEB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "456" },
       { kind: "address", value: "0xRECIPIENT" }
     ]
   });
