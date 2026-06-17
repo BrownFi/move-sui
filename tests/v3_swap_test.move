@@ -1141,6 +1141,276 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_exact_output_pyth_bundle_scales_required_input_for_twelve_decimal_quote_token() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            10_000_000_000_000,
+            10_000_000_000,
+            12,
+            9
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+            let requested_output = 1_000_000_000;
+            let expected_required_input = 1_001_055_612_000;
+            let (required_input, effective_out) = swap::quote_a_for_exact_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                requested_output
+            );
+
+            assert!(effective_out == requested_output, 0);
+            assert!(required_input == expected_required_input, required_input);
+
+            let input_a = balance::create_for_testing<A>(required_input);
+            let (remaining_a, b_out) = swap::swap_a_for_exact_b_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                requested_output
+            );
+            let (amount_a, amount_b, _) = swap::pool_balances(&pool);
+
+            assert!(balance::value(&remaining_a) == 0, 1);
+            assert!(balance::value(&b_out) == requested_output, 2);
+            assert!(amount_a == 11_001_055_612_000, 3);
+            assert!(amount_b == 9_000_000_000, 4);
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(b_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_exact_output_pyth_bundle_scales_required_input_for_twelve_decimal_base_token() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            10_000_000_000,
+            10_000_000_000_000,
+            9,
+            12
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+            let requested_output = 1_000_000_000;
+            let expected_required_input = 1_001_055_612_000;
+            let (required_input, effective_out) = swap::quote_b_for_exact_a_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                requested_output
+            );
+
+            assert!(effective_out == requested_output, 0);
+            assert!(required_input == expected_required_input, required_input);
+
+            let input_b = balance::create_for_testing<B>(required_input);
+            let (remaining_b, a_out) = swap::swap_b_for_exact_a_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_b,
+                requested_output
+            );
+            let (amount_a, amount_b, _) = swap::pool_balances(&pool);
+
+            assert!(balance::value(&remaining_b) == 0, 1);
+            assert!(balance::value(&a_out) == requested_output, 2);
+            assert!(amount_a == 9_000_000_000, 3);
+            assert!(amount_b == 11_001_055_612_000, 4);
+
+            balance::destroy_for_testing(remaining_b);
+            balance::destroy_for_testing(a_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_exact_input_pyth_bundle_scales_output_for_twelve_decimal_base_token() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            10_000_000_000,
+            10_000_000_000_000,
+            9,
+            12
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+            let input_amount = 1_000_000_000;
+            let expected_output = 998_945_566_000;
+            let (amount_out, raw_output, cutoff_output) = swap::quote_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                input_amount
+            );
+
+            assert!(amount_out == expected_output, amount_out);
+            assert!(raw_output == expected_output, raw_output);
+            assert!(cutoff_output == expected_output, cutoff_output);
+
+            let input_a = balance::create_for_testing<A>(input_amount);
+            let b_out = swap::swap_a_for_b_with_bundle(&bundle, &clock, &mut pool, input_a, 0);
+            let (amount_a, amount_b, _) = swap::pool_balances(&pool);
+
+            assert!(balance::value(&b_out) == expected_output, 1);
+            assert!(amount_a == 11_000_000_000, 2);
+            assert!(amount_b == 9_001_054_434_000, 3);
+
+            balance::destroy_for_testing(b_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_exact_input_pyth_bundle_scales_output_for_twelve_decimal_quote_token() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            10_000_000_000_000,
+            10_000_000_000,
+            12,
+            9
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+            let input_amount = 1_000_000_000;
+            let expected_output = 998_945_566_000;
+            let (amount_out, raw_output, cutoff_output) = swap::quote_b_for_a_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                input_amount
+            );
+
+            assert!(amount_out == expected_output, amount_out);
+            assert!(raw_output == expected_output, raw_output);
+            assert!(cutoff_output == expected_output, cutoff_output);
+
+            let input_b = balance::create_for_testing<B>(input_amount);
+            let a_out = swap::swap_b_for_a_with_bundle(&bundle, &clock, &mut pool, input_b, 0);
+            let (amount_a, amount_b, _) = swap::pool_balances(&pool);
+
+            assert!(balance::value(&a_out) == expected_output, 1);
+            assert!(amount_a == 9_001_054_434_000, 2);
+            assert!(amount_b == 11_000_000_000, 3);
+
+            balance::destroy_for_testing(a_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_add_liquidity_pyth_bundle_mints_from_raw_representable_six_decimal_quote_deposit() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool_with_amounts_and_decimals(

@@ -1848,3 +1848,7 @@
   - Finding: Pyth bundle add-liquidity decimal coverage pinned 6-decimal quote/base token floors, but not the opposite case where token raw precision exceeds BrownFi's 9-decimal internal scale.
   - Decision: add 12-decimal quote and 12-decimal base add-liquidity tests. They prove LP minting uses only raw-representable 9-decimal value and returns unvalued extra raw precision as residual coin balance.
   - Verification: `rtk sui move test test_add_liquidity_pyth_bundle_mints_from_raw_representable_twelve_decimal --allow-dirty --build-env testnet --warnings-are-errors` passed 2/2 immediately; no production change was required.
+- 2026-06-17 Pyth swap 12-decimal coverage slice:
+  - Finding: Pyth bundle swap decimal coverage pinned 6-decimal quote/base exact-input and exact-output paths, but not the opposite case where the input/output token has more raw precision than BrownFi's 9-decimal internal scale.
+  - Decision: add 12-decimal quote and 12-decimal base swap tests for exact-input output scaling and exact-output required-input scaling. This is coverage-only because the existing decimal conversion path already supports the behavior.
+  - Verification: `rtk sui move test twelve_decimal --allow-dirty --build-env testnet --warnings-are-errors` passed 6/6, covering the four new swap cases plus the existing two 12-decimal add-liquidity cases.
