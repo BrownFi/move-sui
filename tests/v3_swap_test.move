@@ -751,6 +751,40 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    #[expected_failure(abort_code = 0, location = brownfi_amm::math)]
+    fun test_quote_a_for_exact_b_with_bundle_aborts_when_required_input_overflows_raw_token_amount() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            1_000_000_000_000_000_000,
+            1_000_000_000_000_000_000,
+            18,
+            9
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let bundle = pyth_one_dollar_bundle(&pool, &clock);
+
+            let (required_input, effective_out) = swap::quote_a_for_exact_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                999_999_999_999_999_999
+            );
+
+            assert!(required_input > 0, 0);
+            assert!(effective_out > 0, 1);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_swap_b_for_a_with_bundle_uses_pyth_reading_bundle() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool(&mut scenario);

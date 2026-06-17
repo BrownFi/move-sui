@@ -1884,3 +1884,7 @@
   - Finding: the architecture required reserve boundary coverage, and `swap::add_liquidity_with_bundle` already rejects raw pool balances that would cross `MAX_POOL_BALANCE`, but the active Pyth bundle path did not have a targeted test for that cap.
   - Decision: add a Pyth bundle add-liquidity expected-abort test with both reserves just below the raw cap and a deposit that crosses it. This is coverage-only; no production logic changed.
   - Verification: `rtk sui move test test_add_liquidity_with_bundle_rejects_reserve_above_cap --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.
+- 2026-06-17 Pyth exact-output quote overflow coverage slice:
+  - Finding: math-unit tests covered checked converter overflow, but no public Pyth quote path pinned failure when the BrownFi V3 backward formula computes a required input that cannot fit in a raw `u64` coin amount.
+  - Decision: add a bundle exact-output quote test with an 18-decimal input token and near-full 9-decimal output reserve. The quote must abort at `math::u256_to_u64_checked` instead of returning an unrepresentable raw input.
+  - RED/GREEN: the first focused run without `expected_failure` aborted in `brownfi_amm::math` with code `0` from `swap::quote_a_for_exact_b_with_bundle`; after marking that abort expected, `rtk sui move test test_quote_a_for_exact_b_with_bundle_aborts_when_required_input_overflows_raw_token_amount --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.
