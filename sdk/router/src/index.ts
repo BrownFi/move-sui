@@ -1762,6 +1762,10 @@ export interface ZapInAWithBundleOptions extends PairTypesOptions {
   minLpOut: U64Input;
 }
 
+export interface ZapInAWithBundleTransferOptions extends ZapInAWithBundleOptions {
+  recipient: string;
+}
+
 export interface ZapInBWithBundleOptions extends PairTypesOptions {
   priceBundle: TransactionArgument;
   clock: ObjectInput;
@@ -1771,12 +1775,20 @@ export interface ZapInBWithBundleOptions extends PairTypesOptions {
   minLpOut: U64Input;
 }
 
+export interface ZapInBWithBundleTransferOptions extends ZapInBWithBundleOptions {
+  recipient: string;
+}
+
 export interface ZapOutWithBundleOptions extends PairTypesOptions {
   priceBundle: TransactionArgument;
   clock: ObjectInput;
   pool: ObjectInput;
   lpIn: ObjectInput;
   minOut: U64Input;
+}
+
+export interface ZapOutWithBundleTransferOptions extends ZapOutWithBundleOptions {
+  recipient: string;
 }
 
 export interface RemoveLiquidityWithCoinsOptions extends PairTypesOptions {
@@ -7325,6 +7337,23 @@ export function zapInAWithBundle(options: ZapInAWithBundleOptions): TransactionT
     });
 }
 
+export function zapInAWithBundleAndTransfer(
+  options: ZapInAWithBundleTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_in_a_with_bundle_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.inputA),
+        tx.pure.u64(options.minBFromSwap),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function zapInBWithBundle(options: ZapInBWithBundleOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7335,6 +7364,23 @@ export function zapInBWithBundle(options: ZapInBWithBundleOptions): TransactionT
         objectArg(tx, options.inputB),
         tx.pure.u64(options.minAFromSwap),
         tx.pure.u64(options.minLpOut)
+      ]
+    });
+}
+
+export function zapInBWithBundleAndTransfer(
+  options: ZapInBWithBundleTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_in_b_with_bundle_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minAFromSwap),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }
@@ -7352,6 +7398,22 @@ export function zapOutAWithBundle(options: ZapOutWithBundleOptions): Transaction
     });
 }
 
+export function zapOutAWithBundleAndTransfer(
+  options: ZapOutWithBundleTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_out_a_with_bundle_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.lpIn),
+        tx.pure.u64(options.minOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function zapOutBWithBundle(options: ZapOutWithBundleOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7361,6 +7423,22 @@ export function zapOutBWithBundle(options: ZapOutWithBundleOptions): Transaction
         ...singleHopBundleArgs(tx, options),
         objectArg(tx, options.lpIn),
         tx.pure.u64(options.minOut)
+      ]
+    });
+}
+
+export function zapOutBWithBundleAndTransfer(
+  options: ZapOutWithBundleTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "zap_out_b_with_bundle_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.lpIn),
+        tx.pure.u64(options.minOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }

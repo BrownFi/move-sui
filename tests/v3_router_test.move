@@ -2,7 +2,7 @@
 module brownfi_amm::v3_router_test {
     use std::type_name;
     use sui::balance;
-    use sui::coin;
+    use sui::coin::{Self, Coin};
     use sui::clock::Clock;
     use sui::event;
     use sui::object;
@@ -18,7 +18,7 @@ module brownfi_amm::v3_router_test {
     use brownfi_amm::helpers_test::{Self as test_helpers, A, B, C};
     use brownfi_amm::math;
     use brownfi_amm::oracle_gateway;
-    use brownfi_amm::pool::{Self, Pool};
+    use brownfi_amm::pool::{Self, LP, Pool};
     use brownfi_amm::pyth_source;
     use brownfi_amm::router;
     use brownfi_amm::swap;
@@ -3014,6 +3014,246 @@ module brownfi_amm::v3_router_test {
             price_info::destroy(pio_b);
             return_shared(clock);
             return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_router_zap_in_a_with_bundle_transfer_sends_lp_to_recipient_and_refunds_sender() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool);
+            let input_a = coin::from_balance(balance::create_for_testing<A>(200_000), ctx(&mut scenario));
+
+            router::zap_in_a_with_bundle_and_transfer(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                0,
+                0,
+                ADDR2,
+                ctx(&mut scenario)
+            );
+
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let lp = take_from_sender<Coin<LP<A, B>>>(&scenario);
+            assert!(coin::value(&lp) > 0, 0);
+            balance::destroy_for_testing(coin::into_balance(lp));
+        };
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let remaining_a = take_from_sender<Coin<A>>(&scenario);
+            assert!(coin::value(&remaining_a) > 0, 1);
+            balance::destroy_for_testing(coin::into_balance(remaining_a));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_router_zap_in_b_with_bundle_transfer_sends_lp_to_recipient_and_refunds_sender() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool);
+            let input_b = coin::from_balance(balance::create_for_testing<B>(200_000), ctx(&mut scenario));
+
+            router::zap_in_b_with_bundle_and_transfer(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_b,
+                0,
+                0,
+                ADDR2,
+                ctx(&mut scenario)
+            );
+
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let lp = take_from_sender<Coin<LP<A, B>>>(&scenario);
+            assert!(coin::value(&lp) > 0, 0);
+            balance::destroy_for_testing(coin::into_balance(lp));
+        };
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let remaining_b = take_from_sender<Coin<B>>(&scenario);
+            assert!(coin::value(&remaining_b) > 0, 1);
+            balance::destroy_for_testing(coin::into_balance(remaining_b));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_router_zap_out_a_with_bundle_transfer_sends_output_to_recipient() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool);
+            let input_a = coin::from_balance(balance::create_for_testing<A>(100_000), ctx(&mut scenario));
+            let input_b = coin::from_balance(balance::create_for_testing<B>(100_000), ctx(&mut scenario));
+            let (remaining_a, remaining_b, lp) = router::add_liquidity_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                0,
+                ctx(&mut scenario)
+            );
+
+            router::zap_out_a_with_bundle_and_transfer(
+                &bundle,
+                &clock,
+                &mut pool,
+                lp,
+                0,
+                ADDR2,
+                ctx(&mut scenario)
+            );
+
+            balance::destroy_for_testing(coin::into_balance(remaining_a));
+            balance::destroy_for_testing(coin::into_balance(remaining_b));
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let a_out = take_from_sender<Coin<A>>(&scenario);
+            assert!(coin::value(&a_out) > 100_000, 0);
+            balance::destroy_for_testing(coin::into_balance(a_out));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_router_zap_out_b_with_bundle_transfer_sends_output_to_recipient() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool);
+            let input_a = coin::from_balance(balance::create_for_testing<A>(100_000), ctx(&mut scenario));
+            let input_b = coin::from_balance(balance::create_for_testing<B>(100_000), ctx(&mut scenario));
+            let (remaining_a, remaining_b, lp) = router::add_liquidity_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                0,
+                ctx(&mut scenario)
+            );
+
+            router::zap_out_b_with_bundle_and_transfer(
+                &bundle,
+                &clock,
+                &mut pool,
+                lp,
+                0,
+                ADDR2,
+                ctx(&mut scenario)
+            );
+
+            balance::destroy_for_testing(coin::into_balance(remaining_a));
+            balance::destroy_for_testing(coin::into_balance(remaining_b));
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let b_out = take_from_sender<Coin<B>>(&scenario);
+            assert!(coin::value(&b_out) > 100_000, 0);
+            balance::destroy_for_testing(coin::into_balance(b_out));
         };
 
         test_scenario::end(scenario);

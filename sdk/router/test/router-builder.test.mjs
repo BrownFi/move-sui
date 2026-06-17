@@ -197,10 +197,14 @@ import {
   zapInA,
   zapInB,
   zapInAWithBundle,
+  zapInAWithBundleAndTransfer,
   zapInBWithBundle,
+  zapInBWithBundleAndTransfer,
   zapOutA,
   zapOutB,
   zapOutAWithBundle,
+  zapOutAWithBundleAndTransfer,
+  zapOutBWithBundleAndTransfer,
   zapOutBWithBundle
 } from "../dist/index.js";
 
@@ -9803,6 +9807,100 @@ test("zap-out bundle builders target router functions with Move argument order",
       { kind: "object", id: "0xPOOLAB" },
       { kind: "result", index: 2 },
       { kind: "u64", value: "1313" }
+    ]
+  });
+});
+
+test("bundle zap transfer builders target recipient-aware router entrypoints", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    priceBundle: { kind: "result", index: 0 },
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    recipient: "0xRECIPIENT"
+  };
+
+  const zapInATx = createTransactionRecorder();
+  zapInAWithBundleAndTransfer({
+    ...base,
+    inputA: "0xCOINA",
+    minBFromSwap: 808n,
+    minLpOut: 909n
+  })(zapInATx);
+  assert.deepEqual(zapInATx.calls[0], {
+    target: "0xBROWN::router::zap_in_a_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 0 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "808" },
+      { kind: "u64", value: "909" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapInBTx = createTransactionRecorder();
+  zapInBWithBundleAndTransfer({
+    ...base,
+    priceBundle: { kind: "result", index: 1 },
+    inputB: { kind: "result", index: 2 },
+    minAFromSwap: 1_010n,
+    minLpOut: 1_111n
+  })(zapInBTx);
+  assert.deepEqual(zapInBTx.calls[0], {
+    target: "0xBROWN::router::zap_in_b_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 1 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "result", index: 2 },
+      { kind: "u64", value: "1010" },
+      { kind: "u64", value: "1111" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapOutATx = createTransactionRecorder();
+  zapOutAWithBundleAndTransfer({
+    ...base,
+    lpIn: "0xLP",
+    minOut: 1_212n
+  })(zapOutATx);
+  assert.deepEqual(zapOutATx.calls[0], {
+    target: "0xBROWN::router::zap_out_a_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 0 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xLP" },
+      { kind: "u64", value: "1212" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const zapOutBTx = createTransactionRecorder();
+  zapOutBWithBundleAndTransfer({
+    ...base,
+    priceBundle: { kind: "result", index: 1 },
+    lpIn: { kind: "result", index: 2 },
+    minOut: 1_313n
+  })(zapOutBTx);
+  assert.deepEqual(zapOutBTx.calls[0], {
+    target: "0xBROWN::router::zap_out_b_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 1 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "result", index: 2 },
+      { kind: "u64", value: "1313" },
+      { kind: "address", value: "0xRECIPIENT" }
     ]
   });
 });
