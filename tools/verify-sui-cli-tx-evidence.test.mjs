@@ -466,6 +466,26 @@ test("verifySuiCliTxEvidenceConfigFile can verify a pre-fetched tx JSON file", (
   assert.equal(result.digest, SWAP_DIGEST);
 });
 
+test("verifySuiCliTxEvidenceConfigFile rejects all evidence with one tx JSON file", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "brownfi-sui-cli-tx-json-all-"));
+  const txJsonFile = path.join(root, "setup.json");
+  fs.writeFileSync(txJsonFile, txBlockResult({
+    digest: SETUP_DIGEST,
+    moveCalls: [],
+    eventTypes: []
+  }));
+
+  assert.throws(
+    () =>
+      verifySuiCliTxEvidenceConfigFile({
+        config: fixtureConfig(),
+        all: true,
+        txJsonFile
+      }),
+    /Cannot verify all launch matrix evidence entries from one tx JSON file/
+  );
+});
+
 test("verifySuiCliTxEvidenceConfigFile rejects mismatched tx JSON digest", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "brownfi-sui-cli-tx-json-"));
   const txJsonFile = path.join(root, "swap.json");

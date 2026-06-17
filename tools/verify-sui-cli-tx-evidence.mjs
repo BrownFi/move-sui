@@ -445,6 +445,9 @@ export function verifySuiCliTxEvidenceConfigFile({
   const matrixConfig = loadLaunchMatrixConfigFile({ config, requireLiveValues: true });
   const rawConfig = readJson(config);
   if (all) {
+    if (txJsonFile !== undefined) {
+      throw new Error("Cannot verify all launch matrix evidence entries from one tx JSON file");
+    }
     return loadAllEvidence(rawConfig).map(({ txName: evidenceName, evidence }) =>
       verifySuiTxEvidence({
         network: matrixConfig.network,
