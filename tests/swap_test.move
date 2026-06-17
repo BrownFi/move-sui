@@ -185,6 +185,15 @@ module brownfi_amm::swap_test {
             return_shared(pool);
         };
 
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = swap::EZeroOutput)]
+    fun test_swap_a_for_b_rejects_zero_output_dust_input() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 20000, 10000);
+
         next_tx(&mut scenario, ADDR2);
         {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
@@ -196,10 +205,6 @@ module brownfi_amm::swap_test {
 
             let input_a = balance::create_for_testing<A>(1);
             let b_out = swap::swap_a_for_b(&oracle, &pio_a, &pio_b, &clock, &mut pool, input_a, 0);
-
-            let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
-            assert!(amount_a == 21301 && amount_b == 8702 && lp_supply == 30000, 0);
-            assert!(balance::value(&b_out) == 0, 0);
 
             balance::destroy_for_testing(b_out);
 
@@ -245,6 +250,15 @@ module brownfi_amm::swap_test {
             return_shared(pool);
         };
 
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = swap::EZeroOutput)]
+    fun test_swap_b_for_a_rejects_zero_output_dust_input() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 20000, 10000);
+
         next_tx(&mut scenario, ADDR2);
         {
             let mut pool = take_shared<Pool<A, B>>(&scenario);
@@ -256,10 +270,6 @@ module brownfi_amm::swap_test {
 
             let input_b = balance::create_for_testing<B>(1);
             let a_out = swap::swap_b_for_a(&oracle, &pio_a, &pio_b, &clock, &mut pool, input_b, 0);
-
-            let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
-            assert!(amount_a == 18702 && amount_b == 11301 && lp_supply == 30000, 0);
-            assert!(balance::value(&a_out) == 0, 0);
 
             balance::destroy_for_testing(a_out);
 

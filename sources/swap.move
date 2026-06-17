@@ -30,6 +30,7 @@ const ECutoffLimitReached: u64 = 13;
 const ESwapsPaused: u64 = 14;
 const EAddLiquidityPaused: u64 = 15;
 const EUnsupportedTokenDecimals: u64 = 16;
+const EZeroOutput: u64 = 17;
 
 const PRECISION: u64 = 100_000_000; // 10^8 for precision
 const PRICE_SCALE: u128 = 1_000_000_000; // 10^9 normalized absolute oracle prices
@@ -1698,7 +1699,7 @@ fun v3_amount_out_without_cutoff(
         fee,
         (PRECISION as u128)
     );
-    if (pseudo_in == 0 || parsed_reserve_out == 0) return 0;
+    assert!(pseudo_in > 0 && parsed_reserve_out > 0, EZeroOutput);
 
     let q = Q32 as u256;
     let two_q = q * 2;
@@ -1736,11 +1737,13 @@ fun v3_amount_out_without_cutoff(
         (left_numerator - sqrt_term) / denominator
     };
 
-    math::parse_amount_from_standard_decimals(
+    let output_raw = math::parse_amount_from_standard_decimals(
         output_decimals,
         math::u256_to_u64_checked(output_standard),
         STANDARD_DECIMALS
-    )
+    );
+    assert!(output_raw > 0, EZeroOutput);
+    output_raw
 }
 
 fun v3_amount_out_cutoff(

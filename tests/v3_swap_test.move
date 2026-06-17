@@ -77,6 +77,98 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    #[expected_failure(abort_code = swap::EZeroOutput)]
+    fun test_swap_a_for_b_with_bundle_rejects_zero_output_dust_input() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let reading_a = pyth_source::read_price_a(&pio_a, &clock, &pool);
+            let reading_b = pyth_source::read_price_b(&pio_b, &clock, &pool);
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+
+            let input_a = balance::create_for_testing<A>(1);
+            let b_out = swap::swap_a_for_b_with_bundle(&bundle, &clock, &mut pool, input_a, 0);
+
+            balance::destroy_for_testing(b_out);
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = swap::EZeroOutput)]
+    fun test_swap_b_for_a_with_bundle_rejects_zero_output_dust_input() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let reading_a = pyth_source::read_price_a(&pio_a, &clock, &pool);
+            let reading_b = pyth_source::read_price_b(&pio_b, &clock, &pool);
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+
+            let input_b = balance::create_for_testing<B>(1);
+            let a_out = swap::swap_b_for_a_with_bundle(&bundle, &clock, &mut pool, input_b, 0);
+
+            balance::destroy_for_testing(a_out);
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_swap_a_for_b_with_bundle_emits_price_bundle_used_event() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool(&mut scenario);
