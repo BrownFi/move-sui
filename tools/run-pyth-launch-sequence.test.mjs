@@ -270,6 +270,24 @@ test("parsePythLaunchSequenceArgs accepts explicit runtime config", async () => 
   assert.equal(args.runtimeConfig, "runtime.local.json");
 });
 
+test("parsePythLaunchSequenceArgs accepts quote preflight", async () => {
+  const { parsePythLaunchSequenceArgs } = await import("./run-pyth-launch-sequence.mjs");
+
+  const args = parsePythLaunchSequenceArgs([
+    "--network",
+    "testnet",
+    "--feeds",
+    "feeds.json",
+    "--runtime",
+    "runtime.mjs",
+    "--out-dir",
+    "out",
+    "--preflight-quotes"
+  ]);
+
+  assert.equal(args.preflightQuotes, true);
+});
+
 test("parsePythLaunchSequenceArgs accepts pool-only values files", async () => {
   const { parsePythLaunchSequenceArgs } = await import("./run-pyth-launch-sequence.mjs");
 
@@ -999,11 +1017,151 @@ test("runPythLaunchSequence writes launch artifacts and submits routes in order"
     poolConfig: poolConfigOut,
     poolResult: poolResultOut,
     matrix: matrixOut,
+    quotePreflight: path.join(outDir, "quote-preflight.json"),
     submit: submitOut,
     protocolLpClaim: path.join(outDir, "protocol-lp-claim.json"),
     summary: summaryOut
   });
   assert.equal(report.status, "success");
+});
+
+test("runPythLaunchSequence can preflight quote cases before submitting routes", async () => {
+  const { runPythLaunchSequence } = await import("./run-pyth-launch-sequence.mjs");
+  const root = fixtureRoot();
+  const outDir = path.join(root, "out");
+  const calls = [];
+
+  const testCoins = {
+    status: "success",
+    transactionDigest: "digest-testcoins",
+    packageId: "0xtestcoins",
+    replacements: {
+      TYPE_A: "0xtestcoins::coin_a::COIN_A",
+      TYPE_B: "0xtestcoins::coin_b::COIN_B",
+      INPUT_COIN_A: "0xinputa",
+      INPUT_COIN_B: "0xinputb",
+      TOKEN_A_DECIMALS: 9,
+      TOKEN_B_DECIMALS: 9
+    }
+  };
+  const publish = {
+    status: "success",
+    transactionDigest: "digest-brownfi",
+    packageId: "0xbrownfi",
+    publishObjects: {
+      packageId: "0xbrownfi",
+      poolCreatorCap: "0xpoolcap"
+    }
+  };
+  const poolCreate = {
+    status: "success",
+    transactionDigest: "digest-pool",
+    pool: "0xpool",
+    lpCoin: "0xlp",
+    replacements: {
+      POOL: "0xpool",
+      LP_COIN: "0xlp"
+    }
+  };
+  const quotePreflight = {
+    summary: {
+      routeCaseCount: 0,
+      quoteCaseCount: 5,
+      totalCaseCount: 5,
+      providerIds: ["pyth"],
+      routeCases: [],
+      quoteCases: [
+        {
+          name: "pyth current testnet exact output round-trip quote",
+          kind: "exact-output-round-trip-quote",
+          providerId: "pyth"
+        }
+      ]
+    }
+  };
+  const submit = {
+    summary: {
+      routeCaseCount: 1,
+      providerIds: ["pyth"],
+      routeCases: []
+    },
+    txEvidence: []
+  };
+
+  const report = await runPythLaunchSequence({
+    root,
+    network: "testnet",
+    launchConfig: "configs/launch/pyth-current-testnet.json",
+    poolTemplate: "configs/launch/pyth-current-testnet.pool.example.json",
+    matrixTemplate: "configs/launch/pyth-current-testnet.matrix.example.json",
+    feeds: "configs/launch/pyth-current-testnet.feeds.beta-usdt-sdai.json",
+    runtime: "tools/pyth-launch-runtime.mjs",
+    runtimeConfig: "runtime.local.json",
+    outDir,
+    useRtk: true,
+    preflightQuotes: true,
+    gasReadiness: {
+      activeAddress: "0xsender",
+      minMist: "100000000"
+    },
+    dependencies: {
+      publishLaunchTestCoins(options) {
+        calls.push(["publish-test-coins", options]);
+        return testCoins;
+      },
+      publishLaunchPackage(options) {
+        calls.push(["publish-brownfi", options]);
+        return publish;
+      },
+      materializePythLaunchPoolConfig(options) {
+        calls.push(["materialize-pool", options]);
+        return { status: "success", out: options.out };
+      },
+      async createPythLaunchPoolConfig(options) {
+        calls.push(["create-pool", options]);
+        return poolCreate;
+      },
+      materializeLaunchMatrix(options) {
+        calls.push(["materialize-matrix", options]);
+        return { status: "success", out: options.out };
+      },
+      async runLaunchMatrixPreflightConfigFile(options) {
+        calls.push(["preflight-quotes", options]);
+        return quotePreflight;
+      },
+      async submitLaunchMatrixRoutesConfigFile(options) {
+        calls.push(["submit-matrix", options]);
+        return submit;
+      }
+    }
+  });
+
+  const matrixOut = path.join(outDir, "matrix.json");
+  const quotePreflightOut = path.join(outDir, "quote-preflight.json");
+  assert.deepEqual(calls.map(([name]) => name), [
+    "publish-test-coins",
+    "publish-brownfi",
+    "materialize-pool",
+    "create-pool",
+    "materialize-matrix",
+    "preflight-quotes",
+    "submit-matrix"
+  ]);
+  assert.deepEqual(calls[5][1], {
+    config: matrixOut,
+    launchConfig: "configs/launch/pyth-current-testnet.json",
+    runtime: "tools/pyth-launch-runtime.mjs",
+    runtimeConfig: "runtime.local.json",
+    quoteOnly: true,
+    gasReadiness: {
+      activeAddress: "0xsender",
+      minMist: "100000000",
+      useRtk: true
+    }
+  });
+  assert.deepEqual(readJson(quotePreflightOut), quotePreflight);
+  assert.deepEqual(report.results.quotePreflight, quotePreflight);
+  assert.deepEqual(report.artifacts.quotePreflight, quotePreflightOut);
 });
 
 test("runPythLaunchSequence reuses existing successful tx artifacts when requested", async () => {

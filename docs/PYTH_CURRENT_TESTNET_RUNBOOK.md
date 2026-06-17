@@ -243,7 +243,7 @@ rtk node tools/verify-sui-cli-tx-evidence.mjs \
 
 ## Fresh Live Launch
 
-This publishes launch test coins, publishes the BrownFi current-Pyth package, creates a Pyth-backed pool, enables flash for that pool when the pool template sets `flashEnabled: true`, verifies setup evidence when `--verify-tx-evidence` is set, submits exact-input, exact-output, result-aware exact-output, add/remove, zap-in/zap-out, and flash-borrow route cases, writes artifacts under `OUT_DIR`, and verifies landed route evidence. The checked `pyth-current-testnet.live-evidence.matrix.json` is verifier-only for the latest landed Pyth setup, swap, liquidity, zap, flash, and result-aware exact-output transactions.
+This publishes launch test coins, publishes the BrownFi current-Pyth package, creates a Pyth-backed pool, enables flash for that pool when the pool template sets `flashEnabled: true`, optionally dry-runs quote-only cases with `--preflight-quotes`, verifies setup evidence when `--verify-tx-evidence` is set, submits exact-input, exact-output, result-aware exact-output, add/remove, zap-in/zap-out, and flash-borrow route cases, writes artifacts under `OUT_DIR`, and verifies landed route evidence. The checked `pyth-current-testnet.live-evidence.matrix.json` is verifier-only for the latest landed Pyth setup, swap, liquidity, zap, flash, and result-aware exact-output transactions.
 
 ```sh
 OUT_DIR=/private/tmp/brownfi-pyth-current-testnet-$(date +%Y%m%d-%H%M%S)
@@ -267,6 +267,7 @@ rtk "$NODE24" tools/run-pyth-launch-sequence.mjs \
   --expected-module pyth_source \
   --expected-module flash \
   --expected-module wormhole_link \
+  --preflight-quotes \
   --verify-tx-evidence \
   --tx-evidence-rpc-url "$BROWNFI_SUI_RPC_URL" \
   --tx-evidence-use-rtk \
@@ -291,11 +292,12 @@ The sequence writes:
 - `$OUT_DIR/pool.json`
 - `$OUT_DIR/pool-result.json`
 - `$OUT_DIR/matrix.json`
+- `$OUT_DIR/quote-preflight.json` when `--preflight-quotes` is set
 - `$OUT_DIR/submit.json`
 - `$OUT_DIR/protocol-lp-claim.json` when protocol fee setup is enabled
 - `$OUT_DIR/summary.json`
 
-`summary.json` includes generated `setupEvidence` for the test-coin publish, BrownFi package publish, pool-create, optional protocol-fee setup, and optional flash-enable transactions. When `--verify-tx-evidence` is set, it also includes `setupVerification`; route evidence and route verification remain in `submit.json`. Protocol-LP claim evidence and the configured fee recipient are written under `results.protocolLpClaim` when protocol fee setup is enabled.
+`summary.json` includes generated `setupEvidence` for the test-coin publish, BrownFi package publish, pool-create, optional protocol-fee setup, and optional flash-enable transactions. When `--preflight-quotes` is set, quote-only dry-run results are written to `quote-preflight.json` and summarized under `results.quotePreflight`. When `--verify-tx-evidence` is set, it also includes `setupVerification`; route evidence and route verification remain in `submit.json`. Protocol-LP claim evidence and the configured fee recipient are written under `results.protocolLpClaim` when protocol fee setup is enabled.
 
 If setup transactions already landed but later verification failed, rerun with:
 

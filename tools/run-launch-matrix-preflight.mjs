@@ -14,6 +14,7 @@ function usage() {
   console.error(
     [
       "Usage: node tools/run-launch-matrix-preflight.mjs --config <file> [--launch-config <file>] --runtime <module>",
+      "       node tools/run-launch-matrix-preflight.mjs --config <file> [--launch-config <file>] --runtime <module> [--runtime-config <file>]",
       "       node tools/run-launch-matrix-preflight.mjs --config <file> [--launch-config <file>] --runtime <module> --check-gas --active-address <address> [--rpc-url <url>] [--min-gas-mist <n>] [--use-rtk]",
       "       add --quote-only to dry-run only quote cases from a mixed matrix",
       "",
@@ -33,6 +34,8 @@ function parseArgs(argv) {
       args.launchConfig = argv[++i];
     } else if (arg === "--runtime") {
       args.runtime = argv[++i];
+    } else if (arg === "--runtime-config") {
+      args.runtimeConfig = argv[++i];
     } else if (arg === "--quote-only") {
       args.quoteOnly = true;
     } else if (arg === "--check-gas") {
@@ -77,14 +80,14 @@ function maybeCheckGasReadiness(matrixConfig, gasReadiness) {
   });
 }
 
-async function loadRuntime(runtimePath, config) {
+async function loadRuntime(runtimePath, config, runtimeConfig) {
   const runtimeUrl = pathToFileURL(path.resolve(runtimePath)).href;
   const runtimeModule = await import(runtimeUrl);
   const createRuntime = runtimeModule.createLaunchMatrixRuntime ?? runtimeModule.default;
   if (typeof createRuntime !== "function") {
     throw new Error("Launch matrix runtime module must export createLaunchMatrixRuntime");
   }
-  const runtime = await createRuntime({ config });
+  const runtime = await createRuntime({ config, runtimeConfig });
   if (runtime === null || typeof runtime !== "object") {
     throw new Error("Launch matrix runtime factory must return an object");
   }
@@ -115,6 +118,7 @@ export async function runLaunchMatrixPreflightConfigFile({
   config,
   launchConfig,
   runtime,
+  runtimeConfig,
   quoteOnly = false,
   gasReadiness
 }) {
@@ -124,7 +128,7 @@ export async function runLaunchMatrixPreflightConfigFile({
   validateLaunchMatrixConfigFile({ config, launchConfig, requireLiveValues: true });
   const matrixConfig = loadLaunchMatrixConfigFile({ config, launchConfig, requireLiveValues: true });
   maybeCheckGasReadiness(matrixConfig, gasReadiness);
-  const launchRuntime = await loadRuntime(runtime, matrixConfig);
+  const launchRuntime = await loadRuntime(runtime, matrixConfig, runtimeConfig);
   assertRuntimeNetworkMatchesConfig(launchRuntime, matrixConfig);
 
   const routeCases = quoteOnly ? [] : matrixConfig.routeCases;

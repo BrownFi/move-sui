@@ -272,6 +272,82 @@ export async function createLaunchMatrixRuntime() {
   return runtime;
 }
 
+function writeRuntimeConfigRuntime(root) {
+  const runtime = path.join(root, "runtime-config.mjs");
+  fs.writeFileSync(
+    runtime,
+    `import { createRoutePriceProviderRegistry } from ${JSON.stringify(routerDistUrl)};
+
+function createTransaction(label) {
+  return {
+    calls: [],
+    object(id) {
+      return { kind: "object", id };
+    },
+    pure: {
+      u64(value) {
+        return { kind: "u64", value: String(value) };
+      }
+    },
+    makeMoveVec(vector) {
+      return { kind: "vector", label, vector };
+    },
+    moveCall(call) {
+      const result = { kind: "result", label, index: this.calls.length };
+      const nested = (resultIndex) => ({
+        kind: "nested-result",
+        index: result.index,
+        resultIndex
+      });
+      Object.defineProperties(result, {
+        0: { value: nested(0), enumerable: false },
+        1: { value: nested(1), enumerable: false },
+        [Symbol.iterator]: {
+          value: function* iterator() {
+            yield this[0];
+            yield this[1];
+          },
+          enumerable: false
+        }
+      });
+      this.calls.push(call);
+      return result;
+    },
+    async build() {
+      return "built-" + label;
+    }
+  };
+}
+
+export async function createLaunchMatrixRuntime({ runtimeConfig }) {
+  if (runtimeConfig !== "runtime.local.json") {
+    throw new Error("runtime received unexpected runtimeConfig");
+  }
+  return {
+    network: "devnet",
+    providerRegistry: createRoutePriceProviderRegistry([
+      {
+        id: "custom",
+        async buildPriceBundles(_tx, options) {
+          return options.hops.map((hop) => ({ kind: "bundle", pool: hop.pool }));
+        }
+      }
+    ]),
+    quoteTransactionFactory(_validationCase, index) {
+      return createTransaction("quote-" + index);
+    },
+    suiClient: {
+      async dryRunTransactionBlock(input) {
+        return { effects: { status: { status: "success" } }, input };
+      }
+    }
+  };
+}
+`
+  );
+  return runtime;
+}
+
 function writeSenderRouteRuntime(root) {
   const runtime = path.join(root, "runtime-sender-route.mjs");
   fs.writeFileSync(
@@ -442,6 +518,20 @@ test("runLaunchMatrixPreflightConfigFile can dry-run only quote cases from a mix
   });
   assert.deepEqual(report.preflightResult.routeResults, []);
   assert.equal(report.preflightResult.quoteResults.length, 1);
+});
+
+test("runLaunchMatrixPreflightConfigFile forwards runtime config to runtime modules", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root);
+  const runtime = writeRuntimeConfigRuntime(root);
+
+  const report = await runLaunchMatrixPreflightConfigFile({
+    config,
+    runtime,
+    runtimeConfig: "runtime.local.json"
+  });
+
+  assert.equal(report.summary.quoteCaseCount, 1);
 });
 
 test("runLaunchMatrixPreflightConfigFile transfers route outputs when runtime exposes sender", async () => {

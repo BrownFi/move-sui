@@ -10,6 +10,7 @@ import { materializeLaunchMatrix } from "./materialize-launch-matrix.mjs";
 import { materializePythLaunchPoolConfig } from "./materialize-pyth-launch-pool.mjs";
 import { publishLaunchPackage } from "./publish-launch-package.mjs";
 import { publishLaunchTestCoins } from "./publish-launch-test-coins.mjs";
+import { runLaunchMatrixPreflightConfigFile } from "./run-launch-matrix-preflight.mjs";
 import { submitLaunchMatrixRoutesConfigFile } from "./run-launch-matrix-submit.mjs";
 import { verifySuiTxEvidence } from "./verify-sui-cli-tx-evidence.mjs";
 
@@ -23,7 +24,7 @@ function usage() {
       "Usage: node tools/run-pyth-launch-sequence.mjs --network <network> --feeds <file> --runtime <module> --out-dir <dir>",
       "       [--launch-config <file>] [--pool-template <file>] [--matrix-template <file>] [--root <dir>]",
       "       [--test-coin-package-path <dir>] [--package-out <dir>] [--runtime-config <file>] [--pool-values <file>]... [--use-rtk]",
-      "       [--resume-existing-artifacts]",
+      "       [--resume-existing-artifacts] [--preflight-quotes]",
       "       [--test-coin-gas-budget <mist>] [--package-gas-budget <mist>]",
       "       [--expected-dependency <object-id>]... [--expected-module <module>]...",
       "       [--check-gas --active-address <address> [--rpc-url <url>] [--min-gas-mist <n>]]",
@@ -84,6 +85,8 @@ export function parsePythLaunchSequenceArgs(argv) {
       args.useRtk = true;
     } else if (arg === "--resume-existing-artifacts") {
       args.resumeExistingArtifacts = true;
+    } else if (arg === "--preflight-quotes") {
+      args.preflightQuotes = true;
     } else if (arg === "--check-gas") {
       args.gasReadiness = args.gasReadiness ?? {};
     } else if (arg === "--active-address") {
@@ -183,6 +186,7 @@ function defaultDependencies() {
     materializePythLaunchPoolConfig,
     createPythLaunchPoolConfig,
     materializeLaunchMatrix,
+    runLaunchMatrixPreflightConfigFile,
     submitLaunchMatrixRoutesConfigFile,
     claimPythLaunchProtocolLpConfig,
     verifySuiTxEvidence
@@ -453,6 +457,7 @@ export async function runPythLaunchSequence({
   gasReadiness,
   useRtk = false,
   resumeExistingArtifacts = false,
+  preflightQuotes = false,
   txEvidenceVerification,
   dependencies = {}
 }) {
@@ -469,6 +474,7 @@ export async function runPythLaunchSequence({
     poolConfig: path.join(outDir, "pool.json"),
     poolResult: path.join(outDir, "pool-result.json"),
     matrix: path.join(outDir, "matrix.json"),
+    quotePreflight: path.join(outDir, "quote-preflight.json"),
     submit: path.join(outDir, "submit.json"),
     protocolLpClaim: path.join(outDir, "protocol-lp-claim.json"),
     summary: path.join(outDir, "summary.json")
@@ -542,6 +548,19 @@ export async function runPythLaunchSequence({
     launchConfig
   });
 
+  let quotePreflight;
+  if (preflightQuotes) {
+    quotePreflight = await deps.runLaunchMatrixPreflightConfigFile({
+      config: artifacts.matrix,
+      launchConfig,
+      runtime,
+      runtimeConfig,
+      quoteOnly: true,
+      gasReadiness: submitGasReadiness(gasReadiness, useRtk)
+    });
+    writeJson(artifacts.quotePreflight, quotePreflight);
+  }
+
   const submit = await deps.submitLaunchMatrixRoutesConfigFile({
     config: artifacts.matrix,
     launchConfig,
@@ -596,6 +615,7 @@ export async function runPythLaunchSequence({
       setupEvidence,
       setupVerification,
       matrixMaterialization,
+      ...(quotePreflight === undefined ? {} : { quotePreflight }),
       submit,
       ...(protocolLpClaim === undefined ? {} : { protocolLpClaim }),
       ...(protocolLpClaimVerification === undefined ? {} : { protocolLpClaimVerification })
