@@ -91,6 +91,16 @@ module brownfi_amm::helpers_test {
 
     /// Create a pool with given initial balances
     public fun create_test_pool(scenario: &mut Scenario, init_a: u64, init_b: u64) {
+        create_test_pool_with_decimals(scenario, init_a, init_b, 9, 9);
+    }
+
+    public fun create_test_pool_with_decimals(
+        scenario: &mut Scenario,
+        init_a: u64,
+        init_b: u64,
+        token_a_decimals: u8,
+        token_b_decimals: u8
+    ) {
         next_tx(scenario, @0xA);
         {
             let mut factory = test_scenario::take_shared<Factory>(scenario);
@@ -112,8 +122,8 @@ module brownfi_amm::helpers_test {
                 &clock,
                 init_a,
                 init_b,
-                9, // decimals_a
-                9, // decimals_b
+                token_a_decimals,
+                token_b_decimals,
                 ctx(scenario)
             );
             sui::transfer::public_transfer(sui::coin::from_balance(lp, ctx(scenario)), @0xA);

@@ -414,6 +414,47 @@ module brownfi_amm::pool_test {
     }
 
     #[test]
+    #[expected_failure(abort_code = swap::EInsufficientLiquidity)]
+    fun test_add_liquidity_aborts_when_rounded_lp_is_zero() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool_with_decimals(
+            &mut scenario,
+            1_000_000_000_000,
+            1_000_000_000_000,
+            18,
+            18
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+
+            let input_a = balance::create_for_testing<A>(1);
+            let input_b = balance::create_for_testing<B>(1);
+            let (remaining_a, remaining_b, lp) =
+                swap::add_liquidity(&oracle, &pio_a, &pio_b, &clock, &mut pool, input_a, input_b, 0);
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(remaining_b);
+            balance::destroy_for_testing(lp);
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     #[expected_failure(abort_code = swap::EZeroInput)]
     fun test_remove_liquidity_aborts_on_zero_input_lp() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
@@ -431,6 +472,33 @@ module brownfi_amm::pool_test {
             balance::destroy_for_testing(b_out);
 
             return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = swap::EInsufficientLiquidity)]
+    fun test_remove_liquidity_aborts_when_rounded_output_is_zero() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 10000, 10000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let mut lp_coin = take_from_sender<Coin<LP<A, B>>>(&scenario);
+            let ctx = ctx(&mut scenario);
+
+            let lp_in = coin::into_balance(coin::split(&mut lp_coin, 1, ctx));
+            let factory = take_shared<Factory>(&scenario);
+            let (a_out, b_out) = swap::remove_liquidity(&mut pool, lp_in, 0, 0);
+            return_shared(factory);
+
+            balance::destroy_for_testing(a_out);
+            balance::destroy_for_testing(b_out);
+
+            return_shared(pool);
+            return_to_sender(&scenario, lp_coin);
         };
 
         test_scenario::end(scenario);

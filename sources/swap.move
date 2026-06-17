@@ -444,6 +444,7 @@ public fun add_liquidity_with_bundle<A, B>(
     };
 
     assert!(lp_to_issue >= min_lp_out, EExcessiveSlippage);
+    assert!(lp_to_issue > 0, EInsufficientLiquidity);
 
     pool::deposit_a(pool, balance::split(&mut input_a, deposit_a));
     pool::deposit_b(pool, balance::split(&mut input_b, deposit_b));
@@ -597,6 +598,7 @@ public fun remove_liquidity<A, B>(
     let b_out = math::mul_div(lp_in_amount, pool_b_amount, lp_supply_val);
     assert!(a_out >= min_a_out, EExcessiveSlippage);
     assert!(b_out >= min_b_out, EExcessiveSlippage);
+    assert!(a_out > 0 && b_out > 0, EInsufficientLiquidity);
 
     pool::burn_lp(pool, lp_in);
 
