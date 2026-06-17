@@ -36,6 +36,7 @@ export interface TransactionLike {
   moveCall(call: MoveCall): TransactionArgument;
   splitCoins?(coin: TransactionArgument, amounts: TransactionArgument[]): TransactionArgument[];
   mergeCoins?(coin: TransactionArgument, sources: TransactionArgument[]): void;
+  transferObjects?(objects: TransactionArgument[], recipient: TransactionArgument): void;
   makeMoveVec(vector: MakeMoveVec): TransactionArgument;
 }
 
@@ -991,6 +992,7 @@ export interface RegisteredRoutePreflightBaseCaseConfig<
   clock: ObjectInput;
   path: readonly string[];
   pairs: readonly THop[];
+  recipient?: string;
 }
 
 export interface RegisteredRoutePreflightInputCaseConfig<
@@ -1138,6 +1140,7 @@ export interface PreflightRegisteredExactInputRouteCase<
   name: string;
   kind: "exact-input";
   tx: SuiTransactionBlockBuilderLike;
+  recipient?: string;
 }
 
 export interface PreflightRegisteredExactOutputRouteCase<
@@ -1147,6 +1150,7 @@ export interface PreflightRegisteredExactOutputRouteCase<
   name: string;
   kind: "exact-output";
   tx: SuiTransactionBlockBuilderLike;
+  recipient?: string;
 }
 
 export interface PreflightRegisteredExactOutputRouteResultsCase<
@@ -1156,6 +1160,7 @@ export interface PreflightRegisteredExactOutputRouteResultsCase<
   name: string;
   kind: "exact-output-results";
   tx: SuiTransactionBlockBuilderLike;
+  recipient?: string;
 }
 
 export interface PreflightRegisteredAddLiquidityRouteCase<
@@ -1165,6 +1170,7 @@ export interface PreflightRegisteredAddLiquidityRouteCase<
   name: string;
   kind: "add-liquidity";
   tx: SuiTransactionBlockBuilderLike;
+  recipient?: string;
 }
 
 export interface PreflightRegisteredRemoveLiquidityRouteCase<
@@ -1175,6 +1181,7 @@ export interface PreflightRegisteredRemoveLiquidityRouteCase<
   kind: "remove-liquidity";
   tx: SuiTransactionBlockBuilderLike;
   providerId: string;
+  recipient?: string;
 }
 
 export interface PreflightRegisteredZapInARouteCase<
@@ -1190,6 +1197,7 @@ export interface PreflightRegisteredZapInARouteCase<
   inputA: ObjectInput;
   minBFromSwap: U64Input;
   minLpOut: U64Input;
+  recipient?: string;
 }
 
 export interface PreflightRegisteredZapInBRouteCase<
@@ -1205,6 +1213,7 @@ export interface PreflightRegisteredZapInBRouteCase<
   inputB: ObjectInput;
   minAFromSwap: U64Input;
   minLpOut: U64Input;
+  recipient?: string;
 }
 
 export interface PreflightRegisteredZapOutRouteCase<
@@ -1219,6 +1228,7 @@ export interface PreflightRegisteredZapOutRouteCase<
   pair: THop;
   lpIn: ObjectInput;
   minOut: U64Input;
+  recipient?: string;
 }
 
 export type PreflightRegisteredZapRouteCase<
@@ -1240,6 +1250,7 @@ export interface PreflightRegisteredFlashBorrowRouteCase<
   pair: THop;
   amount: U64Input;
   feeCoin: ObjectInput;
+  recipient?: string;
 }
 
 export type PreflightRegisteredRouteCase<
@@ -1259,6 +1270,7 @@ export interface PreflightRegisteredRouteCasesOptions<
 > {
   suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
   cases: readonly PreflightRegisteredRouteCase<THop>[];
+  transferRecipient?: string;
 }
 
 export interface BuildRegisteredRouteCaseTransactionsOptions<
@@ -1393,6 +1405,7 @@ export interface PreflightLaunchValidationMatrixOptions<
 > extends BuildLaunchValidationMatrixOptions<THop> {
   quoteTransactionFactory?: LaunchValidationTransactionFactory;
   suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+  transferRecipient?: string;
 }
 
 export interface LaunchValidationMatrixPreflightResult<TDryRunResult = unknown> {
@@ -3409,7 +3422,8 @@ export async function preflightLaunchValidationMatrix<
   const matrix = buildLaunchValidationMatrix(options);
   const routeResults = await preflightRegisteredRouteCases({
     suiClient: options.suiClient,
-    cases: matrix.routeCases
+    cases: matrix.routeCases,
+    transferRecipient: options.transferRecipient
   });
   let quoteResults: LaunchValidationPreflightResult<TDryRunResult>[] = [];
   if (matrix.quoteCases.length > 0) {
@@ -5976,6 +5990,7 @@ export function buildRegisteredRoutePreflightCases<
         clock: routeCase.clock,
         path: routeCase.path,
         pairs: routeCase.pairs,
+        recipient: routeCase.recipient,
         context: routeCase.context
       };
     };
@@ -6070,6 +6085,7 @@ export function buildRegisteredRoutePreflightCases<
         inputA: routeCase.input,
         inputB: routeCase.inputB,
         minLpOut: routeCase.minLpOut,
+        recipient: commonOptions.recipient,
         context: commonOptions.context
       };
     }
@@ -6113,6 +6129,7 @@ export function buildRegisteredRoutePreflightCases<
         lpIn: routeCase.input,
         minAOut: routeCase.minAOut,
         minBOut: routeCase.minBOut,
+        recipient: commonOptions.recipient,
         context: commonOptions.context
       };
     }
@@ -6171,6 +6188,7 @@ export function buildRegisteredRoutePreflightCases<
         inputA: routeCase.input,
         minBFromSwap: routeCase.minBFromSwap,
         minLpOut: routeCase.minLpOut,
+        recipient: commonOptions.recipient,
         context: commonOptions.context
       };
     }
@@ -6229,6 +6247,7 @@ export function buildRegisteredRoutePreflightCases<
         inputB: routeCase.input,
         minAFromSwap: routeCase.minAFromSwap,
         minLpOut: routeCase.minLpOut,
+        recipient: commonOptions.recipient,
         context: commonOptions.context
       };
     }
@@ -6286,6 +6305,7 @@ export function buildRegisteredRoutePreflightCases<
         pair: route[0].pair,
         lpIn: routeCase.input,
         minOut: routeCase.minOut,
+        recipient: commonOptions.recipient,
         context: commonOptions.context
       };
     }
@@ -6337,6 +6357,7 @@ export function buildRegisteredRoutePreflightCases<
         pair: route[0].pair,
         amount: routeCase.amount,
         feeCoin: routeCase.feeCoin,
+        recipient: commonOptions.recipient,
         context: commonOptions.context
       };
     }
@@ -6349,6 +6370,247 @@ export function buildRegisteredRoutePreflightCases<
   });
 }
 
+interface RegisteredRouteCaseOutputTransferGroup {
+  recipient: string;
+  outputs: readonly (TransactionArgument | undefined)[];
+}
+
+function transactionArgumentResultAt(
+  result: TransactionArgument,
+  index: number,
+  fieldName: string
+): TransactionArgument {
+  return transactionResultAt(result as TransactionResult, index, fieldName);
+}
+
+function registeredRouteCaseResultOutputs(
+  routeResult: RegisteredRouteCaseTransactionResult
+): TransactionArgument[] {
+  if (routeResult.kind === "exact-input") {
+    return [routeResult.swapResult];
+  }
+  if (routeResult.kind === "exact-output-results") {
+    return [...routeResult.changeCoins, routeResult.output];
+  }
+  if (routeResult.kind === "add-liquidity") {
+    return [
+      transactionArgumentResultAt(
+        routeResult.liquidityResult,
+        0,
+        "add-liquidity remaining coin A"
+      ),
+      transactionArgumentResultAt(
+        routeResult.liquidityResult,
+        1,
+        "add-liquidity remaining coin B"
+      ),
+      transactionArgumentResultAt(routeResult.liquidityResult, 2, "add-liquidity LP coin")
+    ];
+  }
+  if (routeResult.kind === "remove-liquidity") {
+    return [
+      transactionArgumentResultAt(routeResult.liquidityResult, 0, "remove-liquidity coin A"),
+      transactionArgumentResultAt(routeResult.liquidityResult, 1, "remove-liquidity coin B")
+    ];
+  }
+  if (routeResult.kind === "zap-in-a" || routeResult.kind === "zap-in-b") {
+    return [
+      transactionArgumentResultAt(routeResult.zapResult, 0, "zap-in remaining input-side coin"),
+      transactionArgumentResultAt(routeResult.zapResult, 1, "zap-in remaining paired coin"),
+      transactionArgumentResultAt(routeResult.zapResult, 2, "zap-in LP coin")
+    ];
+  }
+  if (routeResult.kind === "zap-out-a" || routeResult.kind === "zap-out-b") {
+    return [routeResult.zapResult];
+  }
+  if (routeResult.kind === "flash-borrow-a" || routeResult.kind === "flash-borrow-b") {
+    return [];
+  }
+  if (routeResult.kind === "exact-output") {
+    const swapResult = routeResult.swapResult as Partial<Record<number, TransactionArgument>>;
+    if (swapResult[0] !== undefined && swapResult[1] !== undefined) {
+      return [
+        transactionArgumentResultAt(routeResult.swapResult, 0, "exact-output change coin"),
+        transactionArgumentResultAt(routeResult.swapResult, 1, "exact-output output coin")
+      ];
+    }
+    return [routeResult.swapResult];
+  }
+  throw new Error(
+    `Unsupported BrownFi registered route case kind: ${String(
+      (routeResult as { kind?: unknown }).kind
+    )}`
+  );
+}
+
+function registeredRouteCaseResultTransferGroups(
+  routeResult: RegisteredRouteCaseTransactionResult,
+  senderAddress: string,
+  recipientAddress?: string
+): RegisteredRouteCaseOutputTransferGroup[] {
+  const defaultRecipient = recipientAddress ?? senderAddress;
+  if (recipientAddress === undefined || recipientAddress === senderAddress) {
+    return [{ recipient: senderAddress, outputs: registeredRouteCaseResultOutputs(routeResult) }];
+  }
+  if (routeResult.kind === "exact-input") {
+    return [{ recipient: recipientAddress, outputs: [routeResult.swapResult] }];
+  }
+  if (routeResult.kind === "exact-output-results") {
+    return [
+      { recipient: senderAddress, outputs: routeResult.changeCoins },
+      { recipient: recipientAddress, outputs: [routeResult.output] }
+    ];
+  }
+  if (routeResult.kind === "add-liquidity") {
+    return [
+      {
+        recipient: senderAddress,
+        outputs: [
+          transactionArgumentResultAt(
+            routeResult.liquidityResult,
+            0,
+            "add-liquidity remaining coin A"
+          ),
+          transactionArgumentResultAt(
+            routeResult.liquidityResult,
+            1,
+            "add-liquidity remaining coin B"
+          )
+        ]
+      },
+      {
+        recipient: recipientAddress,
+        outputs: [
+          transactionArgumentResultAt(routeResult.liquidityResult, 2, "add-liquidity LP coin")
+        ]
+      }
+    ];
+  }
+  if (routeResult.kind === "remove-liquidity") {
+    return [{ recipient: recipientAddress, outputs: registeredRouteCaseResultOutputs(routeResult) }];
+  }
+  if (routeResult.kind === "zap-in-a" || routeResult.kind === "zap-in-b") {
+    return [
+      {
+        recipient: senderAddress,
+        outputs: [
+          transactionArgumentResultAt(routeResult.zapResult, 0, "zap-in remaining input-side coin"),
+          transactionArgumentResultAt(routeResult.zapResult, 1, "zap-in remaining paired coin")
+        ]
+      },
+      {
+        recipient: recipientAddress,
+        outputs: [transactionArgumentResultAt(routeResult.zapResult, 2, "zap-in LP coin")]
+      }
+    ];
+  }
+  if (routeResult.kind === "zap-out-a" || routeResult.kind === "zap-out-b") {
+    return [{ recipient: recipientAddress, outputs: [routeResult.zapResult] }];
+  }
+  if (routeResult.kind === "exact-output") {
+    const swapResult = routeResult.swapResult as Partial<Record<number, TransactionArgument>>;
+    if (swapResult[0] !== undefined && swapResult[1] !== undefined) {
+      return [
+        {
+          recipient: senderAddress,
+          outputs: [
+            transactionArgumentResultAt(routeResult.swapResult, 0, "exact-output change coin")
+          ]
+        },
+        {
+          recipient: recipientAddress,
+          outputs: [
+            transactionArgumentResultAt(routeResult.swapResult, 1, "exact-output output coin")
+          ]
+        }
+      ];
+    }
+    return [{ recipient: defaultRecipient, outputs: [routeResult.swapResult] }];
+  }
+  throw new Error(
+    `Unsupported BrownFi registered route case kind: ${String(
+      (routeResult as { kind?: unknown }).kind
+    )}`
+  );
+}
+
+function optionalRegisteredRoutePreflightRecipient(routeCase: {
+  recipient?: string;
+}): string | undefined {
+  if (routeCase.recipient === undefined) return undefined;
+  if (typeof routeCase.recipient !== "string" || routeCase.recipient.length === 0) {
+    throw new Error("BrownFi route preflight recipient must be a non-empty address when present");
+  }
+  return routeCase.recipient;
+}
+
+function transferRegisteredRouteCaseResultOutputs(
+  tx: TransactionLike,
+  routeResult: RegisteredRouteCaseTransactionResult,
+  options: { transferRecipient?: string; recipient?: string }
+): void {
+  const senderAddress = options.transferRecipient;
+  if (senderAddress === undefined) return;
+  if (typeof senderAddress !== "string" || senderAddress.length === 0) {
+    throw new Error("BrownFi route preflight transferRecipient must be a non-empty address");
+  }
+  const recipientAddress = optionalRegisteredRoutePreflightRecipient(options);
+  const groups = registeredRouteCaseResultTransferGroups(
+    routeResult,
+    senderAddress,
+    recipientAddress
+  );
+  const nonEmptyGroups = groups
+    .map((group) => ({
+      recipient: group.recipient,
+      outputs: group.outputs.filter(
+        (output): output is TransactionArgument => output !== undefined
+      )
+    }))
+    .filter((group) => group.outputs.length > 0);
+  if (nonEmptyGroups.length === 0) return;
+  if (typeof tx.transferObjects !== "function") {
+    throw new Error("BrownFi route preflight transaction builder must support transferObjects");
+  }
+  if (typeof tx.pure.address !== "function") {
+    throw new Error("BrownFi route preflight transaction builder must support pure address values");
+  }
+
+  for (const group of nonEmptyGroups) {
+    tx.transferObjects(group.outputs, tx.pure.address(group.recipient));
+  }
+}
+
+function registeredRouteCasePreflightContext<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+>(routeCase: PreflightRegisteredRouteCase<THop>): string {
+  if (routeCase.context !== undefined) return routeCase.context;
+  if (routeCase.kind === "exact-input") {
+    return `BrownFi ${routeCase.name} exact-input route preflight`;
+  }
+  if (routeCase.kind === "exact-output-results") {
+    return `BrownFi ${routeCase.name} exact-output route-results preflight`;
+  }
+  if (routeCase.kind === "add-liquidity") {
+    return `BrownFi ${routeCase.name} add-liquidity preflight`;
+  }
+  if (routeCase.kind === "remove-liquidity") {
+    return `BrownFi ${routeCase.name} remove-liquidity preflight`;
+  }
+  if (
+    routeCase.kind === "zap-in-a" ||
+    routeCase.kind === "zap-in-b" ||
+    routeCase.kind === "zap-out-a" ||
+    routeCase.kind === "zap-out-b"
+  ) {
+    return `BrownFi ${routeCase.name} zap preflight`;
+  }
+  if (routeCase.kind === "flash-borrow-a" || routeCase.kind === "flash-borrow-b") {
+    return `BrownFi ${routeCase.name} flash preflight`;
+  }
+  return `BrownFi ${routeCase.name} exact-output route preflight`;
+}
+
 export async function preflightRegisteredRouteCases<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions,
   TDryRunResult = unknown
@@ -6357,165 +6619,21 @@ export async function preflightRegisteredRouteCases<
 ): Promise<PreflightRegisteredRouteCaseResult<TDryRunResult>[]> {
   const results: PreflightRegisteredRouteCaseResult<TDryRunResult>[] = [];
   for (const routeCase of options.cases) {
-    if (routeCase.kind === "exact-input") {
-      const result = await preflightSwapExactInputWithRegisteredRoute({
-        tx: routeCase.tx,
-        suiClient: options.suiClient,
-        providerRegistry: routeCase.providerRegistry,
-        providerId: routeCase.providerId,
-        clock: routeCase.clock,
-        path: routeCase.path,
-        pairs: routeCase.pairs,
-        input: routeCase.input,
-        minOutputs: routeCase.minOutputs,
-        context:
-          routeCase.context ?? `BrownFi ${routeCase.name} exact-input route preflight`
-      });
-      results.push({
-        name: routeCase.name,
-        kind: routeCase.kind,
-        providerId: routeCase.providerId,
-        ...result
-      });
-      continue;
-    }
-
-    if (routeCase.kind === "exact-output-results") {
-      const result = await preflightSwapExactOutputWithRegisteredRouteResults({
-        tx: routeCase.tx,
-        suiClient: options.suiClient,
-        providerRegistry: routeCase.providerRegistry,
-        providerId: routeCase.providerId,
-        clock: routeCase.clock,
-        path: routeCase.path,
-        pairs: routeCase.pairs,
-        input: routeCase.input,
-        amountOut: routeCase.amountOut,
-        context:
-          routeCase.context ??
-          `BrownFi ${routeCase.name} exact-output route-results preflight`
-      });
-      results.push({
-        name: routeCase.name,
-        kind: routeCase.kind,
-        providerId: routeCase.providerId,
-        ...result
-      });
-      continue;
-    }
-
-    if (routeCase.kind === "add-liquidity") {
-      const result = await preflightAddLiquidityWithRegisteredRoute({
-        tx: routeCase.tx,
-        suiClient: options.suiClient,
-        providerRegistry: routeCase.providerRegistry,
-        providerId: routeCase.providerId,
-        clock: routeCase.clock,
-        pair: routeCase.pair,
-        inputA: routeCase.inputA,
-        inputB: routeCase.inputB,
-        minLpOut: routeCase.minLpOut,
-        context:
-          routeCase.context ?? `BrownFi ${routeCase.name} add-liquidity preflight`
-      });
-      results.push({
-        name: routeCase.name,
-        kind: routeCase.kind,
-        providerId: routeCase.providerId,
-        ...result
-      });
-      continue;
-    }
-
-    if (routeCase.kind === "remove-liquidity") {
-      const result = await preflightRemoveLiquidityWithRegisteredRoute({
-        tx: routeCase.tx,
-        suiClient: options.suiClient,
-        pair: routeCase.pair,
-        lpIn: routeCase.lpIn,
-        minAOut: routeCase.minAOut,
-        minBOut: routeCase.minBOut,
-        context:
-          routeCase.context ?? `BrownFi ${routeCase.name} remove-liquidity preflight`
-      });
-      results.push({
-        name: routeCase.name,
-        kind: routeCase.kind,
-        providerId: routeCase.providerId,
-        ...result
-      });
-      continue;
-    }
-
-    if (
-      routeCase.kind === "zap-in-a" ||
-      routeCase.kind === "zap-in-b" ||
-      routeCase.kind === "zap-out-a" ||
-      routeCase.kind === "zap-out-b"
-    ) {
-      const result = await preflightZapWithRegisteredRoute({
-        ...routeCase,
-        suiClient: options.suiClient,
-        context: routeCase.context ?? `BrownFi ${routeCase.name} zap preflight`
-      });
-      results.push({
-        name: routeCase.name,
-        kind: routeCase.kind,
-        providerId: routeCase.providerId,
-        ...result
-      });
-      continue;
-    }
-
-    if (routeCase.kind === "flash-borrow-a" || routeCase.kind === "flash-borrow-b") {
-      const result = await preflightFlashBorrowWithRegisteredRoute({
-        tx: routeCase.tx,
-        suiClient: options.suiClient,
-        providerRegistry: routeCase.providerRegistry,
-        providerId: routeCase.providerId,
-        clock: routeCase.clock,
-        pair: routeCase.pair,
-        amount: routeCase.amount,
-        feeCoin: routeCase.feeCoin,
-        kind: routeCase.kind,
-        name: routeCase.name,
-        context: routeCase.context ?? `BrownFi ${routeCase.name} flash preflight`
-      });
-      results.push({
-        name: routeCase.name,
-        kind: routeCase.kind,
-        providerId: routeCase.providerId,
-        ...result
-      });
-      continue;
-    }
-
-    if (routeCase.kind === "exact-output") {
-      const result = await preflightSwapExactOutputWithRegisteredRoute({
-        tx: routeCase.tx,
-        suiClient: options.suiClient,
-        providerRegistry: routeCase.providerRegistry,
-        providerId: routeCase.providerId,
-        clock: routeCase.clock,
-        path: routeCase.path,
-        pairs: routeCase.pairs,
-        input: routeCase.input,
-        amountOut: routeCase.amountOut,
-        context: routeCase.context ?? `BrownFi ${routeCase.name} exact-output route preflight`
-      });
-      results.push({
-        name: routeCase.name,
-        kind: routeCase.kind,
-        providerId: routeCase.providerId,
-        ...result
-      });
-      continue;
-    }
-
-    throw new Error(
-      `Unsupported BrownFi registered route case kind: ${String(
-        (routeCase as { kind?: unknown }).kind
-      )}`
+    const routeResult = await buildRegisteredRouteCaseTransaction(routeCase);
+    transferRegisteredRouteCaseResultOutputs(routeCase.tx, routeResult, {
+      transferRecipient: options.transferRecipient,
+      recipient: routeCase.recipient
+    });
+    const dryRunResult = await buildAndPreflightTransactionBlock({
+      tx: routeCase.tx,
+      suiClient: options.suiClient,
+      context: registeredRouteCasePreflightContext(routeCase)
+    });
+    results.push(
+      {
+        ...routeResult,
+        dryRunResult
+      } as PreflightRegisteredRouteCaseResult<TDryRunResult>
     );
   }
   return results;

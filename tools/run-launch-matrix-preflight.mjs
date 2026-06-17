@@ -128,12 +128,17 @@ export async function runLaunchMatrixPreflightConfigFile({
   assertRuntimeNetworkMatchesConfig(launchRuntime, matrixConfig);
 
   const routeCases = quoteOnly ? [] : matrixConfig.routeCases;
+  const transferRecipient =
+    typeof launchRuntime.sender === "string" && launchRuntime.sender.length > 0
+      ? launchRuntime.sender
+      : undefined;
   return runLaunchValidationMatrixPreflight({
     providerRegistry: launchRuntime.providerRegistry,
     routeTransactionFactory: launchRuntime.routeTransactionFactory,
     quoteTransactionFactory: launchRuntime.quoteTransactionFactory,
     suiClient: launchRuntime.suiClient,
     routeLimits: matrixConfig.routeLimits,
+    transferRecipient,
     routeCases,
     quoteCases: matrixConfig.quoteCases
   });

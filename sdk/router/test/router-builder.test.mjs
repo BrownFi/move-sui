@@ -223,6 +223,7 @@ const PYTH_FEED_B = `0x${"02".repeat(32)}`;
 function createTransactionRecorder() {
   return {
     calls: [],
+    transfers: [],
     gas: { kind: "gas" },
     splits: [],
     merges: [],
@@ -293,6 +294,9 @@ function createTransactionRecorder() {
     },
     mergeCoins(coin, sources) {
       this.merges.push({ coin, sources });
+    },
+    transferObjects(objects, recipient) {
+      this.transfers.push({ objects, recipient });
     },
     makeMoveVec(vector) {
       this.vectors.push(vector);
@@ -6743,6 +6747,85 @@ test("preflightRegisteredRouteCases supports result-aware exact-output route cas
   ]);
 });
 
+test("preflightRegisteredRouteCases can transfer route outputs before dry-run", async () => {
+  const tx = createTransactionRecorder();
+  const calls = [];
+  tx.build = async (input) => {
+    calls.push({
+      kind: "build",
+      input,
+      moveCallCount: tx.calls.length,
+      transfers: tx.transfers.slice()
+    });
+    return "matrix-exact-output-bytes";
+  };
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      calls.push({ kind: "dryRun", input });
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const registry = createRoutePriceProviderRegistry([
+    {
+      id: "custom",
+      async buildPriceBundles() {
+        return [{ kind: "bundle", id: "ab" }];
+      }
+    }
+  ]);
+
+  const results = await preflightRegisteredRouteCases({
+    suiClient,
+    transferRecipient: "0xSENDER",
+    cases: [
+      {
+        name: "custom exact-output A/B",
+        kind: "exact-output",
+        tx,
+        providerRegistry: registry,
+        providerId: "custom",
+        path: ["A", "B"],
+        clock: "0x6",
+        pairs: [
+          {
+            packageId: "0xBROWN",
+            typeA: "A",
+            typeB: "B",
+            pool: "0xPOOLAB"
+          }
+        ],
+        input: "0xCOINA",
+        amountOut: 55n,
+        recipient: "0xRECIPIENT"
+      }
+    ]
+  });
+
+  assert.equal(results.length, 1);
+  assert.deepEqual(tx.transfers, [
+    {
+      objects: [{ kind: "nested-result", index: 0, resultIndex: 0 }],
+      recipient: { kind: "address", value: "0xSENDER" }
+    },
+    {
+      objects: [{ kind: "nested-result", index: 0, resultIndex: 1 }],
+      recipient: { kind: "address", value: "0xRECIPIENT" }
+    }
+  ]);
+  assert.deepEqual(calls, [
+    {
+      kind: "build",
+      input: { client: suiClient },
+      moveCallCount: 1,
+      transfers: tx.transfers
+    },
+    { kind: "dryRun", input: { transactionBlock: "matrix-exact-output-bytes" } }
+  ]);
+});
+
 test("preflightRegisteredRouteCases labels failed case dry-runs", async () => {
   const tx = createTransactionRecorder();
   tx.build = async () => "AQID";
@@ -7051,6 +7134,75 @@ test("buildRegisteredRoutePreflightCases hydrates flash borrow configs for prefl
       coin: { kind: "nested-result", index: 0, resultIndex: 0 },
       sources: [{ kind: "object", id: "0xFEEA" }]
     }
+  ]);
+});
+
+test("preflightRegisteredRouteCases skips output transfers for flash cases", async () => {
+  const tx = createTransactionRecorder();
+  delete tx.transferObjects;
+  tx.build = async () => "flash-no-outputs-bytes";
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const registry = createRoutePriceProviderRegistry([
+    {
+      id: "custom",
+      async buildPriceBundles() {
+        return [{ kind: "bundle", id: "ab" }];
+      }
+    }
+  ]);
+
+  const results = await preflightRegisteredRouteCases({
+    suiClient,
+    transferRecipient: "0xSENDER",
+    cases: [
+      {
+        name: "custom flash A",
+        kind: "flash-borrow-a",
+        tx,
+        providerRegistry: registry,
+        providerId: "custom",
+        clock: "0xCLOCK",
+        pair: {
+          packageId: "0xBROWN",
+          typeA: "A",
+          typeB: "B",
+          pool: "0xPOOLAB"
+        },
+        amount: 1_000n,
+        feeCoin: "0xFEEA"
+      }
+    ]
+  });
+
+  assert.deepEqual(
+    results.map((result) => ({
+      name: result.name,
+      kind: result.kind,
+      providerId: result.providerId,
+      dryRunResult: result.dryRunResult
+    })),
+    [
+      {
+        name: "custom flash A",
+        kind: "flash-borrow-a",
+        providerId: "custom",
+        dryRunResult: {
+          effects: { status: { status: "success" } },
+          transactionBlock: "flash-no-outputs-bytes"
+        }
+      }
+    ]
+  );
+  assert.deepEqual(tx.calls.map((call) => call.target), [
+    "0xBROWN::flash::borrow_a_with_coin",
+    "0xBROWN::flash::repay_a_with_coin"
   ]);
 });
 

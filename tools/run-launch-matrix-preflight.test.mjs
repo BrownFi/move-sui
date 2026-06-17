@@ -272,6 +272,90 @@ export async function createLaunchMatrixRuntime() {
   return runtime;
 }
 
+function writeSenderRouteRuntime(root) {
+  const runtime = path.join(root, "runtime-sender-route.mjs");
+  fs.writeFileSync(
+    runtime,
+    `import { createRoutePriceProviderRegistry } from ${JSON.stringify(routerDistUrl)};
+
+function createTransaction(label) {
+  return {
+    calls: [],
+    transfers: [],
+    object(id) {
+      return { kind: "object", id };
+    },
+    pure: {
+      u64(value) {
+        return { kind: "u64", value: String(value) };
+      },
+      address(value) {
+        return { kind: "address", value };
+      }
+    },
+    makeMoveVec(vector) {
+      return { kind: "vector", label, vector };
+    },
+    transferObjects(objects, recipient) {
+      this.transfers.push({ objects, recipient });
+    },
+    moveCall(call) {
+      const result = { kind: "result", label, index: this.calls.length };
+      const nested = (resultIndex) => ({
+        kind: "nested-result",
+        index: result.index,
+        resultIndex
+      });
+      Object.defineProperties(result, {
+        0: { value: nested(0), enumerable: false },
+        1: { value: nested(1), enumerable: false },
+        [Symbol.iterator]: {
+          value: function* iterator() {
+            yield this[0];
+            yield this[1];
+          },
+          enumerable: false
+        }
+      });
+      this.calls.push(call);
+      return result;
+    },
+    async build() {
+      return "built-" + label + "-transfers-" + this.transfers.length;
+    }
+  };
+}
+
+export async function createLaunchMatrixRuntime() {
+  return {
+    network: "devnet",
+    sender: "0xSENDER",
+    providerRegistry: createRoutePriceProviderRegistry([
+      {
+        id: "custom",
+        async buildPriceBundles(_tx, options) {
+          return options.hops.map((hop) => ({ kind: "bundle", pool: hop.pool }));
+        }
+      }
+    ]),
+    routeTransactionFactory(_routeCase, index) {
+      return createTransaction("route-" + index);
+    },
+    quoteTransactionFactory(_validationCase, index) {
+      return createTransaction("quote-" + index);
+    },
+    suiClient: {
+      async dryRunTransactionBlock(input) {
+        return { effects: { status: { status: "success" } }, input };
+      }
+    }
+  };
+}
+`
+  );
+  return runtime;
+}
+
 function writeNetworkRuntime(root, network) {
   const runtime = path.join(root, "runtime-network.mjs");
   fs.writeFileSync(
@@ -358,6 +442,23 @@ test("runLaunchMatrixPreflightConfigFile can dry-run only quote cases from a mix
   });
   assert.deepEqual(report.preflightResult.routeResults, []);
   assert.equal(report.preflightResult.quoteResults.length, 1);
+});
+
+test("runLaunchMatrixPreflightConfigFile transfers route outputs when runtime exposes sender", async () => {
+  const root = fixtureRoot();
+  const config = writeMixedMatrix(root);
+  const runtime = writeSenderRouteRuntime(root);
+
+  const report = await runLaunchMatrixPreflightConfigFile({ config, runtime });
+
+  assert.equal(
+    report.preflightResult.routeResults[0].dryRunResult.input.transactionBlock,
+    "built-route-0-transfers-1"
+  );
+  assert.equal(
+    report.preflightResult.quoteResults[0].dryRunResult.input.transactionBlock,
+    "built-quote-0-transfers-0"
+  );
 });
 
 test("runLaunchMatrixPreflightConfigFile rejects runtime network mismatch before dry-run", async () => {
