@@ -233,7 +233,7 @@ import {
 const PYTH_FEED_A = `0x${"01".repeat(32)}`;
 const PYTH_FEED_B = `0x${"02".repeat(32)}`;
 
-function createTransactionRecorder() {
+function createTransactionRecorder(options = {}) {
   return {
     calls: [],
     transfers: [],
@@ -278,23 +278,24 @@ function createTransactionRecorder() {
         index: result.index,
         resultIndex
       });
-      Object.defineProperties(result, {
-        0: {
-          value: nested(0),
-          enumerable: false
-        },
-        1: {
-          value: nested(1),
-          enumerable: false
-        },
+      const resultArity = options.resultArityForMoveCall?.(call) ?? 2;
+      const descriptors = {
         [Symbol.iterator]: {
           value: function* iterator() {
-            yield this[0];
-            yield this[1];
+            for (let i = 0; i < resultArity; i += 1) {
+              yield this[i];
+            }
           },
           enumerable: false
         }
-      });
+      };
+      for (let i = 0; i < resultArity; i += 1) {
+        descriptors[i] = {
+          value: nested(i),
+          enumerable: false
+        };
+      }
+      Object.defineProperties(result, descriptors);
       return result;
     },
     splitCoins(coin, amounts) {
@@ -6998,6 +6999,84 @@ test("preflightRegisteredRouteCases can transfer route outputs before dry-run", 
       transfers: tx.transfers
     },
     { kind: "dryRun", input: { transactionBlock: "matrix-exact-output-bytes" } }
+  ]);
+});
+
+test("preflightRegisteredRouteCases transfers two-hop exact-output changes and final output", async () => {
+  const tx = createTransactionRecorder({
+    resultArityForMoveCall(call) {
+      return call.target.endsWith("::router::swap_a_for_exact_c_via_b_with_bundles")
+        ? 3
+        : 2;
+    }
+  });
+  tx.build = async () => "matrix-two-hop-exact-output-bytes";
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const registry = createRoutePriceProviderRegistry([
+    {
+      id: "custom",
+      async buildPriceBundles() {
+        return [
+          { kind: "bundle", id: "ab" },
+          { kind: "bundle", id: "bc" }
+        ];
+      }
+    }
+  ]);
+
+  const results = await preflightRegisteredRouteCases({
+    suiClient,
+    transferRecipient: "0xSENDER",
+    cases: [
+      {
+        name: "custom exact-output A/B/C",
+        kind: "exact-output",
+        tx,
+        providerRegistry: registry,
+        providerId: "custom",
+        path: ["A", "B", "C"],
+        clock: "0x6",
+        pairs: [
+          {
+            packageId: "0xBROWN",
+            typeA: "A",
+            typeB: "B",
+            pool: "0xPOOLAB"
+          },
+          {
+            packageId: "0xBROWN",
+            typeA: "B",
+            typeB: "C",
+            pool: "0xPOOLBC"
+          }
+        ],
+        input: "0xCOINA",
+        amountOut: 55n,
+        recipient: "0xRECIPIENT"
+      }
+    ]
+  });
+
+  assert.equal(results.length, 1);
+  assert.deepEqual(tx.transfers, [
+    {
+      objects: [
+        { kind: "nested-result", index: 0, resultIndex: 0 },
+        { kind: "nested-result", index: 0, resultIndex: 1 }
+      ],
+      recipient: { kind: "address", value: "0xSENDER" }
+    },
+    {
+      objects: [{ kind: "nested-result", index: 0, resultIndex: 2 }],
+      recipient: { kind: "address", value: "0xRECIPIENT" }
+    }
   ]);
 });
 

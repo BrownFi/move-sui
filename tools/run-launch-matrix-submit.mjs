@@ -416,6 +416,13 @@ function routeResultOutputs(routeResult) {
     return [];
   }
   const swapResult = routeResult.swapResult;
+  if (swapResult?.[2] !== undefined) {
+    return [
+      transactionResultAt(swapResult, 0, "exact-output input change coin"),
+      transactionResultAt(swapResult, 1, "exact-output intermediate change coin"),
+      transactionResultAt(swapResult, 2, "exact-output output coin")
+    ];
+  }
   if (swapResult?.[0] !== undefined && swapResult?.[1] !== undefined) {
     return [
       transactionResultAt(swapResult, 0, "exact-output change coin"),
@@ -496,6 +503,21 @@ function routeResultTransferGroups(routeResult, senderAddress, recipientAddress)
     return [];
   }
   const swapResult = routeResult.swapResult;
+  if (swapResult?.[2] !== undefined) {
+    return [
+      {
+        recipient: senderAddress,
+        outputs: [
+          transactionResultAt(swapResult, 0, "exact-output input change coin"),
+          transactionResultAt(swapResult, 1, "exact-output intermediate change coin")
+        ]
+      },
+      {
+        recipient: recipientAddress,
+        outputs: [transactionResultAt(swapResult, 2, "exact-output output coin")]
+      }
+    ];
+  }
   if (swapResult?.[0] !== undefined && swapResult?.[1] !== undefined) {
     return [
       {

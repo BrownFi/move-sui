@@ -6596,6 +6596,17 @@ function registeredRouteCaseResultOutputs(
   }
   if (routeResult.kind === "exact-output") {
     const swapResult = routeResult.swapResult as Partial<Record<number, TransactionArgument>>;
+    if (swapResult[2] !== undefined) {
+      return [
+        transactionArgumentResultAt(routeResult.swapResult, 0, "exact-output input change coin"),
+        transactionArgumentResultAt(
+          routeResult.swapResult,
+          1,
+          "exact-output intermediate change coin"
+        ),
+        transactionArgumentResultAt(routeResult.swapResult, 2, "exact-output output coin")
+      ];
+    }
     if (swapResult[0] !== undefined && swapResult[1] !== undefined) {
       return [
         transactionArgumentResultAt(routeResult.swapResult, 0, "exact-output change coin"),
@@ -6680,6 +6691,31 @@ function registeredRouteCaseResultTransferGroups(
   }
   if (routeResult.kind === "exact-output") {
     const swapResult = routeResult.swapResult as Partial<Record<number, TransactionArgument>>;
+    if (swapResult[2] !== undefined) {
+      return [
+        {
+          recipient: senderAddress,
+          outputs: [
+            transactionArgumentResultAt(
+              routeResult.swapResult,
+              0,
+              "exact-output input change coin"
+            ),
+            transactionArgumentResultAt(
+              routeResult.swapResult,
+              1,
+              "exact-output intermediate change coin"
+            )
+          ]
+        },
+        {
+          recipient: recipientAddress,
+          outputs: [
+            transactionArgumentResultAt(routeResult.swapResult, 2, "exact-output output coin")
+          ]
+        }
+      ];
+    }
     if (swapResult[0] !== undefined && swapResult[1] !== undefined) {
       return [
         {

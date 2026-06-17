@@ -100,6 +100,17 @@ function writeRuntime(root, options = {}) {
     runtime,
     `import { createRoutePriceProviderRegistry } from ${JSON.stringify(routerDistUrl)};
 
+function resultArityForMoveCall(call) {
+  const target = call.target ?? "";
+  if (target.includes("::router::add_liquidity_with_bundle")) return 3;
+  if (target.includes("::router::zap_in_")) return 3;
+  if (target.includes("for_exact") && target.includes("via_b")) return 3;
+  if (target.includes("for_exact")) return 2;
+  if (target.includes("::router::remove_liquidity_with_coins")) return 2;
+  if (target.includes("::flash::borrow_")) return 2;
+  return 1;
+}
+
 function createTransaction(label) {
   return {
     calls: [],
@@ -128,19 +139,21 @@ function createTransaction(label) {
         index: result.index,
         resultIndex
       });
-      Object.defineProperties(result, {
-        0: { value: nested(0), enumerable: false },
-        1: { value: nested(1), enumerable: false },
-        2: { value: nested(2), enumerable: false },
+      const resultArity = resultArityForMoveCall(call);
+      const descriptors = {
         [Symbol.iterator]: {
           value: function* iterator() {
-            yield this[0];
-            yield this[1];
-            yield this[2];
+            for (let i = 0; i < resultArity; i += 1) {
+              yield this[i];
+            }
           },
           enumerable: false
         }
-      });
+      };
+      for (let i = 0; i < resultArity; i += 1) {
+        descriptors[i] = { value: nested(i), enumerable: false };
+      }
+      Object.defineProperties(result, descriptors);
       this.calls.push(call);
       return result;
     },
@@ -389,6 +402,44 @@ test("submitLaunchMatrixRoutesConfigFile sends exact-output output to recipient 
   const runtime = writeRuntime(root, {
     requireTransfers: true,
     expectedTransferObjectCounts: [[1, 1]],
+    expectedTransferRecipients: [["0xabc", "0xdef"]]
+  });
+
+  const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
+
+  assert.equal(report.summary.routeCaseCount, 1);
+});
+
+test("submitLaunchMatrixRoutesConfigFile sends two-hop exact-output final output to recipient and refunds both changes", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root, {
+    routeLimits: {
+      maxHops: 2,
+      maxOracleSourcesPerHop: 1,
+      maxAmmSourcesPerHop: 0,
+      maxUpdatePayloadBytes: 0
+    },
+    routeCases: [
+      {
+        name: "custom two-hop exact output route",
+        kind: "exact-output",
+        providerId: "custom",
+        clock: "0x6",
+        path: [
+          "0x1::coin_a::COIN_A",
+          "0x1::coin_b::COIN_B",
+          "0x1::coin_c::COIN_C"
+        ],
+        pairs: [routePair(), routePairBC()],
+        input: "0x3",
+        amountOut: "1",
+        recipient: "0xdef"
+      }
+    ]
+  });
+  const runtime = writeRuntime(root, {
+    requireTransfers: true,
+    expectedTransferObjectCounts: [[2, 1]],
     expectedTransferRecipients: [["0xabc", "0xdef"]]
   });
 
