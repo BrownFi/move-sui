@@ -129,6 +129,38 @@ test("verifySuiCliDryRunEvidenceConfigFile rejects missing expected events", () 
   );
 });
 
+test("verifySuiCliDryRunEvidenceConfigFile rejects missing duplicate expected events", () => {
+  const config = fixtureConfig();
+  const matrix = JSON.parse(fs.readFileSync(config, "utf8"));
+  matrix.routeCases[0].suiCliDryRun.expectedEventTypes = [
+    "0x1::events::OracleQuorumUsed",
+    "0x1::events::SwapExecuted",
+    "0x1::events::SwapExecuted"
+  ];
+  writeJson(config, matrix);
+
+  assert.throws(
+    () =>
+      verifySuiCliDryRunEvidenceConfigFile({
+        config,
+        caseName: "devnet smoke exact input swap dry-run",
+        execFileSync() {
+          return JSON.stringify({
+            effects: {
+              status: { status: "success" },
+              transactionDigest: "DRY_RUN_DIGEST"
+            },
+            events: [
+              { type: "0x1::events::OracleQuorumUsed" },
+              { type: "0x1::events::SwapExecuted" }
+            ]
+          });
+        }
+      }),
+    /Sui CLI dry-run missing expected event 0x1::events::SwapExecuted/
+  );
+});
+
 test("verifySuiCliDryRunEvidenceConfigFile can run Sui through rtk", () => {
   const calls = [];
   verifySuiCliDryRunEvidenceConfigFile({

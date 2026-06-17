@@ -129,10 +129,16 @@ function eventTypes(result) {
 }
 
 function assertExpectedEventsPresent(actualEventTypes, expectedEventTypes) {
+  const remaining = new Map();
+  for (const eventType of actualEventTypes) {
+    remaining.set(eventType, (remaining.get(eventType) ?? 0) + 1);
+  }
   for (const expected of expectedEventTypes) {
-    if (!actualEventTypes.includes(expected)) {
+    const count = remaining.get(expected) ?? 0;
+    if (count === 0) {
       throw new Error(`Sui CLI dry-run missing expected event ${expected}`);
     }
+    remaining.set(expected, count - 1);
   }
 }
 

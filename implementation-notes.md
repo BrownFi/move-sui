@@ -1980,3 +1980,7 @@
   - Finding: after count-aware evidence verification, launch-submit generated one swap event expectation set regardless of route hop count, while multi-hop exact-input and result-aware exact-output routes execute one state-changing BrownFi swap per hop.
   - Decision: generate swap-route event expectations from the resolved route, repeating `OracleQuorumUsed`, `Sync`, `PriceBundleUsed`, `SwapExecuted`, and `Swap` once per hop and using each hop package ID.
   - RED/GREEN: focused submit test first failed because a three-hop exact-input route reported only five events instead of fifteen. After the per-hop event generation fix, the submit test file passed 23/23 and `rtk node --test tools/*.test.mjs` passed 173/173.
+- 2026-06-17 dry-run evidence multiplicity slice:
+  - Finding: landed-tx evidence verification was count-aware, but configured Sui CLI dry-run evidence still treated expected events as a set. A multi-hop dry-run with duplicate expected event types could pass after observing only one occurrence.
+  - Decision: make the dry-run expected-event assertion consume actual event types as a multiset, preserving the existing matrix schema and error wording.
+  - RED/GREEN: focused dry-run verifier tests first failed because duplicate expected events did not throw, then passed 4/4 after the count-aware assertion. `rtk node --test tools/*.test.mjs` passed 174/174.
