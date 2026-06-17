@@ -1708,17 +1708,33 @@ export interface SwapExactAForCViaBOptions extends DirectOracleRouteOptions {
   minCOut: U64Input;
 }
 
+export interface SwapExactAForCViaBTransferOptions extends SwapExactAForCViaBOptions {
+  recipient: string;
+}
+
 export interface SwapExactCForAViaBOptions extends DirectOracleRouteOptions {
   minBOut: U64Input;
   minAOut: U64Input;
+}
+
+export interface SwapExactCForAViaBTransferOptions extends SwapExactCForAViaBOptions {
+  recipient: string;
 }
 
 export interface SwapAForExactCViaBOptions extends DirectOracleRouteOptions {
   amountOut: U64Input;
 }
 
+export interface SwapAForExactCViaBTransferOptions extends SwapAForExactCViaBOptions {
+  recipient: string;
+}
+
 export interface SwapCForExactAViaBOptions extends DirectOracleRouteOptions {
   amountOut: U64Input;
+}
+
+export interface SwapCForExactAViaBTransferOptions extends SwapCForExactAViaBOptions {
+  recipient: string;
 }
 
 export interface BuildUpdatedPythPriceBundleFromFeedsOptions extends PairTypesOptions {
@@ -7633,6 +7649,22 @@ export function swapExactAForCViaB(options: SwapExactAForCViaBOptions): Transact
     });
 }
 
+export function swapExactAForCViaBAndTransfer(
+  options: SwapExactAForCViaBTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_exact_a_for_c_via_b_and_transfer"),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...directOracleRouteArgs(tx, options),
+        tx.pure.u64(options.minBOut),
+        tx.pure.u64(options.minCOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function swapExactCForAViaB(options: SwapExactCForAViaBOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7646,6 +7678,22 @@ export function swapExactCForAViaB(options: SwapExactCForAViaBOptions): Transact
     });
 }
 
+export function swapExactCForAViaBAndTransfer(
+  options: SwapExactCForAViaBTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_exact_c_for_a_via_b_and_transfer"),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...directOracleRouteArgs(tx, options),
+        tx.pure.u64(options.minBOut),
+        tx.pure.u64(options.minAOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function swapAForExactCViaB(options: SwapAForExactCViaBOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
@@ -7655,12 +7703,42 @@ export function swapAForExactCViaB(options: SwapAForExactCViaBOptions): Transact
     });
 }
 
+export function swapAForExactCViaBAndTransfer(
+  options: SwapAForExactCViaBTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_a_for_exact_c_via_b_and_transfer"),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...directOracleRouteArgs(tx, options),
+        tx.pure.u64(options.amountOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
 export function swapCForExactAViaB(options: SwapCForExactAViaBOptions): TransactionThunk {
   return (tx) =>
     tx.moveCall({
       target: routerTarget(options.packageId, "swap_c_for_exact_a_via_b"),
       typeArguments: routeTypeArguments(options),
       arguments: [...directOracleRouteArgs(tx, options), tx.pure.u64(options.amountOut)]
+    });
+}
+
+export function swapCForExactAViaBAndTransfer(
+  options: SwapCForExactAViaBTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_c_for_exact_a_via_b_and_transfer"),
+      typeArguments: routeTypeArguments(options),
+      arguments: [
+        ...directOracleRouteArgs(tx, options),
+        tx.pure.u64(options.amountOut),
+        pureAddress(tx, options.recipient)
+      ]
     });
 }
 

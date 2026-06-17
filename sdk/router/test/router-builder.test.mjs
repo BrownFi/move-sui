@@ -165,6 +165,7 @@ import {
   swapAForExactBWithBundleAndTransfer,
   swapAForExactBWithPythRoute,
   swapAForExactCViaB,
+  swapAForExactCViaBAndTransfer,
   swapAForExactCViaBWithBundles,
   swapAForExactCViaBWithBundlesAndTransfer,
   swapAForExactCViaBWithPythRoute,
@@ -177,6 +178,7 @@ import {
   swapBForExactAWithBundleAndTransfer,
   swapBForExactAWithPythRoute,
   swapCForExactAViaB,
+  swapCForExactAViaBAndTransfer,
   swapCForExactAViaBWithBundles,
   swapCForExactAViaBWithBundlesAndTransfer,
   swapCForExactAViaBWithPythRoute,
@@ -185,6 +187,7 @@ import {
   swapExactAForBWithBundle,
   swapExactAForBWithBundleAndTransfer,
   swapExactAForCViaB,
+  swapExactAForCViaBAndTransfer,
   swapExactAForCViaBWithBundles,
   swapExactAForCViaBWithBundlesAndTransfer,
   swapExactAForCViaBWithPythRoute,
@@ -194,6 +197,7 @@ import {
   swapExactBForAWithBundleAndTransfer,
   swapExactBForAWithPythRoute,
   swapExactCForAViaB,
+  swapExactCForAViaBAndTransfer,
   swapExactCForAViaBWithBundles,
   swapExactCForAViaBWithBundlesAndTransfer,
   swapExactCForAViaBWithPythRoute,
@@ -9871,6 +9875,84 @@ test("direct typed two-hop OracleAdapter compatibility builders target router fu
       options: base,
       target: "swap_c_for_exact_a_via_b",
       trailing: [{ kind: "u64", value: "40" }]
+    }
+  ];
+
+  for (const testCase of cases) {
+    const tx = createTransactionRecorder();
+    testCase.builder(testCase.options)(tx);
+
+    assert.deepEqual(tx.calls[0], {
+      target: `0xBROWN::router::${testCase.target}`,
+      typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+      arguments: [
+        { kind: "object", id: "0xORACLE" },
+        { kind: "object", id: "0xPRICEA" },
+        { kind: "object", id: "0xPRICEB" },
+        { kind: "object", id: "0xPRICEC" },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" },
+        { kind: "object", id: "0xPOOLBC" },
+        { kind: "object", id: "0xCOIN" },
+        ...testCase.trailing
+      ]
+    });
+  }
+});
+
+test("direct typed two-hop transfer builders target recipient-aware router functions", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    typeC: "0x1::c::C",
+    oracle: "0xORACLE",
+    priceInfoObjectA: "0xPRICEA",
+    priceInfoObjectB: "0xPRICEB",
+    priceInfoObjectC: "0xPRICEC",
+    clock: "0x6",
+    poolAB: "0xPOOLAB",
+    poolBC: "0xPOOLBC",
+    input: "0xCOIN",
+    minBOut: 10n,
+    minCOut: 20n,
+    minAOut: 30n,
+    amountOut: 40n,
+    recipient: "0xRECIPIENT"
+  };
+
+  const cases = [
+    {
+      builder: swapExactAForCViaBAndTransfer,
+      options: base,
+      target: "swap_exact_a_for_c_via_b_and_transfer",
+      trailing: [
+        { kind: "u64", value: "10" },
+        { kind: "u64", value: "20" },
+        { kind: "address", value: "0xRECIPIENT" }
+      ]
+    },
+    {
+      builder: swapExactCForAViaBAndTransfer,
+      options: base,
+      target: "swap_exact_c_for_a_via_b_and_transfer",
+      trailing: [
+        { kind: "u64", value: "10" },
+        { kind: "u64", value: "30" },
+        { kind: "address", value: "0xRECIPIENT" }
+      ]
+    },
+    {
+      builder: swapAForExactCViaBAndTransfer,
+      options: base,
+      target: "swap_a_for_exact_c_via_b_and_transfer",
+      trailing: [{ kind: "u64", value: "40" }, { kind: "address", value: "0xRECIPIENT" }]
+    },
+    {
+      builder: swapCForExactAViaBAndTransfer,
+      options: base,
+      target: "swap_c_for_exact_a_via_b_and_transfer",
+      trailing: [{ kind: "u64", value: "40" }, { kind: "address", value: "0xRECIPIENT" }]
     }
   ];
 
