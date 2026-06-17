@@ -125,6 +125,18 @@ The default contract set is `current`. Pass `--contract-set upgraded` only when 
 
 These commands query Sui JSON-RPC and verify that the checked current-Pyth setup and route digests landed successfully. Package publish setup checks verify digest, successful effects, and the published package ID from object changes. Pool creation checks verify the pool ID, LP coin ID, expected BrownFi Move call, and expected events. Route checks verify expected BrownFi Move calls and events.
 
+Verify every checked setup and route evidence entry in one pass:
+
+```sh
+rtk node tools/verify-sui-cli-tx-evidence.mjs \
+  --config configs/launch/pyth-current-testnet.live-evidence.matrix.json \
+  --all \
+  --rpc-url https://fullnode.testnet.sui.io:443 \
+  --use-rtk
+```
+
+Individual evidence checks remain useful when isolating a failed digest:
+
 ```sh
 rtk node tools/verify-sui-cli-tx-evidence.mjs \
   --config configs/launch/pyth-current-testnet.live-evidence.matrix.json \

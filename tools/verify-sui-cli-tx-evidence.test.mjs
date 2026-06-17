@@ -222,6 +222,35 @@ test("verifySuiCliTxEvidenceConfigFile verifies configured setup object changes"
   assert.equal(result.digest, SETUP_DIGEST);
 });
 
+test("verifySuiCliTxEvidenceConfigFile can verify every configured setup and route evidence entry", () => {
+  const calls = [];
+  const result = verifySuiCliTxEvidenceConfigFile({
+    config: fixtureConfig(),
+    all: true,
+    execFileSync(command, args) {
+      calls.push({ command, args });
+      const digest = args[args.indexOf("tx-block") + 1];
+      return txBlockResult({
+        digest,
+        moveCalls: digest === SWAP_DIGEST ? ["0x1::devnet_smoke::swap_smoke_for_sui"] : [],
+        eventTypes:
+          digest === SWAP_DIGEST
+            ? ["0x1::events::OracleQuorumUsed", "0x1::events::SwapExecuted"]
+            : []
+      });
+    }
+  });
+
+  assert.deepEqual(
+    result.map((entry) => entry.txName),
+    ["setup:brownfiPackage", "setup:pool", "swap"]
+  );
+  assert.deepEqual(
+    calls.map((call) => call.args[call.args.indexOf("tx-block") + 1]),
+    [SETUP_DIGEST, SETUP_DIGEST, SWAP_DIGEST]
+  );
+});
+
 test("verifySuiCliTxEvidenceConfigFile rejects missing configured setup object changes", () => {
   assert.throws(
     () =>

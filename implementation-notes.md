@@ -1896,3 +1896,8 @@
   - Finding: SDK/PTB coverage already proved generic registered-route quote round trips, but the Pyth convenience route helpers had not been pinned in the same composed exact-output-then-exact-input quote shape.
   - Decision: add a Pyth route test that first builds an exact-output quote chain, then feeds its required input handle into the matching exact-input Pyth route quote chain in the same transaction recorder while proving Pyth feed updates are deduped per route quote build.
   - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "Pyth route exact-output quote handles"` passed with the new coverage; no production code change was required.
+- 2026-06-17 Pyth live-evidence verifier batch slice:
+  - Finding: the current-Pyth live-evidence runbook had complete setup and route tx evidence, but the verifier only accepted one `--setup` or `--tx` selection per invocation, making full launch proof noisy and easier to run partially.
+  - Decision: add `--all` / `all: true` verifier support that checks setup evidence first, then route `txEvidence` entries in config order, reusing the same digest/status/object-change/Move-call/event assertions as single-entry verification.
+  - RED/GREEN: `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs --test-name-pattern "every configured setup"` first failed on the single-selection guard, then passed after adding batch verification.
+  - Verification: `rtk node --test tools/*.test.mjs` passed 163/163; `rtk node tools/verify-sui-cli-tx-evidence.mjs --config configs/launch/pyth-current-testnet.live-evidence.matrix.json --all --rpc-url https://fullnode.testnet.sui.io:443 --use-rtk` verified all checked current-Pyth setup and route tx evidence against testnet RPC.

@@ -11,6 +11,7 @@ function usage() {
     [
       "Usage: node tools/verify-sui-cli-tx-evidence.mjs --config <file> --tx <name> [--use-rtk]",
       "       node tools/verify-sui-cli-tx-evidence.mjs --config <file> --setup <name> [--use-rtk]",
+      "       node tools/verify-sui-cli-tx-evidence.mjs --config <file> --all [--use-rtk]",
       "       node tools/verify-sui-cli-tx-evidence.mjs --config <file> --tx <name> --rpc-url <url> [--use-rtk]",
       "       node tools/verify-sui-cli-tx-evidence.mjs --config <file> --tx <name> --tx-json <file>",
       "",
@@ -30,6 +31,8 @@ function parseArgs(argv) {
       args.txName = argv[++i];
     } else if (arg === "--setup") {
       args.setupName = argv[++i];
+    } else if (arg === "--all") {
+      args.all = true;
     } else if (arg === "--tx-json") {
       args.txJsonFile = argv[++i];
     } else if (arg === "--rpc-url") {
@@ -44,10 +47,12 @@ function parseArgs(argv) {
     }
   }
 
-  if (
-    !args.config ||
-    ((args.txName === undefined) === (args.setupName === undefined))
-  ) {
+  const selectorCount = [
+    args.txName !== undefined,
+    args.setupName !== undefined,
+    args.all === true
+  ].filter(Boolean).length;
+  if (!args.config || selectorCount !== 1) {
     usage();
     process.exit(2);
   }
@@ -101,6 +106,48 @@ function loadSetupEvidence(rawConfig, setupName) {
     throw new Error(`Launch matrix setup evidence ${setupName} must be an object`);
   }
   return entry;
+}
+
+function loadAllEvidence(rawConfig) {
+  const entries = [];
+  if (rawConfig.setupEvidence !== undefined) {
+    const setupEntries = rawConfig.setupEvidence;
+    if (
+      setupEntries === null ||
+      typeof setupEntries !== "object" ||
+      Array.isArray(setupEntries)
+    ) {
+      throw new Error("Launch matrix config setupEvidence must be an object when present");
+    }
+    for (const [setupName, evidence] of Object.entries(setupEntries)) {
+      requireString(setupName, "Launch matrix setup evidence name");
+      if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) {
+        throw new Error(`Launch matrix setup evidence ${setupName} must be an object`);
+      }
+      entries.push({ txName: `setup:${setupName}`, evidence });
+    }
+  }
+
+  if (rawConfig.txEvidence !== undefined) {
+    const txEntries = rawConfig.txEvidence;
+    if (!Array.isArray(txEntries)) {
+      throw new Error("Launch matrix config txEvidence must be an array when present");
+    }
+    for (const evidence of txEntries) {
+      if (evidence === null || typeof evidence !== "object" || Array.isArray(evidence)) {
+        throw new Error("Launch matrix tx evidence entries must be objects");
+      }
+      entries.push({
+        txName: requireString(evidence.name, "Launch matrix tx evidence name"),
+        evidence
+      });
+    }
+  }
+
+  if (entries.length === 0) {
+    throw new Error("Launch matrix config must declare setupEvidence or txEvidence entries");
+  }
+  return entries;
 }
 
 function txBlockArgs(network, digest) {
@@ -377,6 +424,7 @@ export function verifySuiCliTxEvidenceConfigFile({
   config,
   txName,
   setupName,
+  all = false,
   txJsonFile,
   rpcUrl,
   useRtk = false,
@@ -385,12 +433,33 @@ export function verifySuiCliTxEvidenceConfigFile({
   execFileSync = defaultExecFileSync
 }) {
   if (!config) throw new Error("Missing launch matrix config path");
-  if ((txName === undefined) === (setupName === undefined)) {
-    throw new Error("Specify exactly one launch matrix tx evidence name or setup evidence name");
+  const selectorCount = [
+    txName !== undefined,
+    setupName !== undefined,
+    all === true
+  ].filter(Boolean).length;
+  if (selectorCount !== 1) {
+    throw new Error("Specify exactly one launch matrix tx evidence name, setup evidence name, or all");
   }
 
   const matrixConfig = loadLaunchMatrixConfigFile({ config, requireLiveValues: true });
   const rawConfig = readJson(config);
+  if (all) {
+    return loadAllEvidence(rawConfig).map(({ txName: evidenceName, evidence }) =>
+      verifySuiTxEvidence({
+        network: matrixConfig.network,
+        evidence,
+        txName: evidenceName,
+        txJsonFile,
+        rpcUrl,
+        useRtk,
+        rpcRetries,
+        rpcRetryDelayMs,
+        execFileSync
+      })
+    );
+  }
+
   const evidence =
     setupName === undefined
       ? loadTxEvidence(rawConfig, txName)
