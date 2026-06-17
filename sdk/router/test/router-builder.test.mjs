@@ -5,7 +5,9 @@ import {
   addLiquidityWithCoins,
   addLiquidityWithCoinsAndTransfer,
   addLiquidityWithRegisteredRoute,
+  addLiquidityWithBundleAndTransferWithMinDeposits,
   addLiquidityWithBundleAndTransfer,
+  addLiquidityWithBundleWithMinDeposits,
   assertDryRunTransactionBlockSucceeded,
   buildPythHermesConnectionConfig,
   buildAndDryRunTransactionBlock,
@@ -6511,6 +6513,8 @@ test("preflightRegisteredRouteCases builds and dry-runs Pyth exact-output and li
         ],
         input: "0xCOINA",
         inputB: "0xCOINB",
+        minADeposit: 11n,
+        minBDeposit: 22n,
         minLpOut: 123n
       },
       {
@@ -6586,7 +6590,7 @@ test("preflightRegisteredRouteCases builds and dry-runs Pyth exact-output and li
         "0xBROWN::pyth_source::read_price_a",
         "0xBROWN::pyth_source::read_price_b",
         "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
-        "0xBROWN::router::add_liquidity_with_bundle"
+        "0xBROWN::router::add_liquidity_with_bundle_with_min_deposits"
       ],
       ["0xBROWN::router::remove_liquidity_with_coins"]
     ]
@@ -6632,7 +6636,7 @@ test("preflightRegisteredRouteCases builds and dry-runs Pyth exact-output and li
         "0xBROWN::pyth_source::read_price_a",
         "0xBROWN::pyth_source::read_price_b",
         "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
-        "0xBROWN::router::add_liquidity_with_bundle"
+        "0xBROWN::router::add_liquidity_with_bundle_with_min_deposits"
       ]
     },
     {
@@ -7429,6 +7433,23 @@ test("buildRegisteredRoutePreflightCases rejects mismatched route config fields"
         cases: [{ ...baseCase, kind: "remove-liquidity", minBOut: 2n }]
       }),
     /BrownFi remove-liquidity preflight config requires minAOut/
+  );
+  assert.throws(
+    () =>
+      buildRegisteredRoutePreflightCases({
+        providerRegistry,
+        txFactory,
+        cases: [
+          {
+            ...baseCase,
+            kind: "add-liquidity",
+            inputB: "0xCOINB",
+            minADeposit: 1n,
+            minLpOut: 2n
+          }
+        ]
+      }),
+    /BrownFi add-liquidity preflight config requires minADeposit and minBDeposit together/
   );
   assert.throws(
     () =>
@@ -10161,6 +10182,68 @@ test("liquidity builders target router functions with Move argument order", () =
       { kind: "object", id: "0xCOINA" },
       { kind: "result", index: 4 },
       { kind: "u64", value: "808" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const checkedTx = createTransactionRecorder();
+  addLiquidityWithBundleWithMinDeposits({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    priceBundle: { kind: "result", index: 5 },
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    inputA: "0xCOINA",
+    inputB: { kind: "result", index: 6 },
+    minADeposit: 707n,
+    minBDeposit: 808n,
+    minLpOut: 909n
+  })(checkedTx);
+
+  assert.deepEqual(checkedTx.calls[0], {
+    target: "0xBROWN::router::add_liquidity_with_bundle_with_min_deposits",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 5 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "result", index: 6 },
+      { kind: "u64", value: "707" },
+      { kind: "u64", value: "808" },
+      { kind: "u64", value: "909" }
+    ]
+  });
+
+  const checkedTransferTx = createTransactionRecorder();
+  addLiquidityWithBundleAndTransferWithMinDeposits({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    priceBundle: { kind: "result", index: 7 },
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    inputA: "0xCOINA",
+    inputB: { kind: "result", index: 8 },
+    minADeposit: 111n,
+    minBDeposit: 222n,
+    minLpOut: 333n,
+    recipient: "0xRECIPIENT"
+  })(checkedTransferTx);
+
+  assert.deepEqual(checkedTransferTx.calls[0], {
+    target: "0xBROWN::router::add_liquidity_with_bundle_and_transfer_with_min_deposits",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 7 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "result", index: 8 },
+      { kind: "u64", value: "111" },
+      { kind: "u64", value: "222" },
+      { kind: "u64", value: "333" },
       { kind: "address", value: "0xRECIPIENT" }
     ]
   });

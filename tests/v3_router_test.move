@@ -3657,6 +3657,56 @@ module brownfi_amm::v3_router_test {
     }
 
     #[test]
+    #[expected_failure(abort_code = router::EInsufficientBAmount)]
+    fun test_router_add_liquidity_with_bundle_with_min_deposits_rejects_unreachable_min_b() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool);
+            let input_a = coin::from_balance(balance::create_for_testing<A>(200_000), ctx(&mut scenario));
+            let input_b = coin::from_balance(balance::create_for_testing<B>(100_000), ctx(&mut scenario));
+
+            let (remaining_a, remaining_b, lp) = router::add_liquidity_with_bundle_with_min_deposits(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                0,
+                100_001,
+                0,
+                ctx(&mut scenario)
+            );
+
+            balance::destroy_for_testing(coin::into_balance(remaining_a));
+            balance::destroy_for_testing(coin::into_balance(remaining_b));
+            balance::destroy_for_testing(coin::into_balance(lp));
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     #[expected_failure(abort_code = swap::EExcessiveSlippage)]
     fun test_router_remove_liquidity_after_bundle_add_rejects_unreachable_min_a() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);

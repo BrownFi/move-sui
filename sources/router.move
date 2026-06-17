@@ -14,6 +14,8 @@ use brownfi_oracle::oracle::OracleAdapter;
 
 const ERouterDisabled: u64 = 1;
 const ERouteLimitExceeded: u64 = 2;
+const EInsufficientAAmount: u64 = 3;
+const EInsufficientBAmount: u64 = 4;
 
 const MAX_HOPS: u8 = 2;
 
@@ -223,6 +225,36 @@ public fun add_liquidity_with_bundle<A, B>(
     )
 }
 
+public fun add_liquidity_with_bundle_with_min_deposits<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_a: Coin<A>,
+    input_b: Coin<B>,
+    min_a_deposit: u64,
+    min_b_deposit: u64,
+    min_lp_out: u64,
+    ctx: &mut TxContext
+): (Coin<A>, Coin<B>, Coin<LP<A, B>>) {
+    let input_a_value = coin::value(&input_a);
+    let input_b_value = coin::value(&input_b);
+    let (remaining_a, remaining_b, lp) = add_liquidity_with_bundle(
+        price_bundle,
+        clock,
+        pool,
+        input_a,
+        input_b,
+        min_lp_out,
+        ctx
+    );
+    let deposited_a = input_a_value - coin::value(&remaining_a);
+    let deposited_b = input_b_value - coin::value(&remaining_b);
+    assert!(deposited_a >= min_a_deposit, EInsufficientAAmount);
+    assert!(deposited_b >= min_b_deposit, EInsufficientBAmount);
+
+    (remaining_a, remaining_b, lp)
+}
+
 #[allow(lint(self_transfer))]
 public fun add_liquidity_with_bundle_and_transfer<A, B>(
     price_bundle: &PriceBundle,
@@ -241,6 +273,37 @@ public fun add_liquidity_with_bundle_and_transfer<A, B>(
         pool,
         input_a,
         input_b,
+        min_lp_out,
+        ctx
+    );
+
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_a), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(lp), lp_recipient, ctx);
+}
+
+#[allow(lint(self_transfer))]
+public fun add_liquidity_with_bundle_and_transfer_with_min_deposits<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_a: Coin<A>,
+    input_b: Coin<B>,
+    min_a_deposit: u64,
+    min_b_deposit: u64,
+    min_lp_out: u64,
+    lp_recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_a, remaining_b, lp) = add_liquidity_with_bundle_with_min_deposits(
+        price_bundle,
+        clock,
+        pool,
+        input_a,
+        input_b,
+        min_a_deposit,
+        min_b_deposit,
         min_lp_out,
         ctx
     );

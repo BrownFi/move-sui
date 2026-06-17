@@ -773,6 +773,8 @@ export interface AddLiquidityWithRegisteredRouteOptions<
   pair: THop;
   inputA: ObjectInput;
   inputB: ObjectInput;
+  minADeposit?: U64Input;
+  minBDeposit?: U64Input;
   minLpOut: U64Input;
 }
 
@@ -1033,6 +1035,8 @@ export interface RegisteredRoutePreflightAddLiquidityCaseConfig<
 > extends RegisteredRoutePreflightInputCaseConfig<THop> {
   kind: "add-liquidity";
   inputB: ObjectInput;
+  minADeposit?: U64Input;
+  minBDeposit?: U64Input;
   minLpOut: U64Input;
   amountOut?: never;
   minOutputs?: never;
@@ -1787,7 +1791,18 @@ export interface AddLiquidityWithBundleOptions extends PairTypesOptions {
   minLpOut: U64Input;
 }
 
+export interface AddLiquidityWithBundleWithMinDepositsOptions
+  extends AddLiquidityWithBundleOptions {
+  minADeposit: U64Input;
+  minBDeposit: U64Input;
+}
+
 export interface AddLiquidityWithBundleTransferOptions extends AddLiquidityWithBundleOptions {
+  recipient: string;
+}
+
+export interface AddLiquidityWithBundleTransferWithMinDepositsOptions
+  extends AddLiquidityWithBundleWithMinDepositsOptions {
   recipient: string;
 }
 
@@ -5343,7 +5358,7 @@ export async function addLiquidityWithRegisteredRoute<
     hops: [options.pair]
   });
 
-  return addLiquidityWithBundle({
+  const commonOptions = {
     packageId: options.pair.packageId,
     typeA: options.pair.typeA,
     typeB: options.pair.typeB,
@@ -5351,7 +5366,29 @@ export async function addLiquidityWithRegisteredRoute<
     clock: options.clock,
     pool: options.pair.pool,
     inputA: options.inputA,
-    inputB: options.inputB,
+    inputB: options.inputB
+  };
+  const minADeposit = options.minADeposit;
+  const minBDeposit = options.minBDeposit;
+  const hasMinADeposit = minADeposit !== undefined;
+  const hasMinBDeposit = minBDeposit !== undefined;
+  if (hasMinADeposit !== hasMinBDeposit) {
+    throw new Error(
+      "BrownFi add-liquidity route requires minADeposit and minBDeposit together"
+    );
+  }
+
+  if (hasMinADeposit && hasMinBDeposit) {
+    return addLiquidityWithBundleWithMinDeposits({
+      ...commonOptions,
+      minADeposit,
+      minBDeposit,
+      minLpOut: options.minLpOut
+    })(tx);
+  }
+
+  return addLiquidityWithBundle({
+    ...commonOptions,
     minLpOut: options.minLpOut
   })(tx);
 }
@@ -5745,6 +5782,8 @@ export async function preflightAddLiquidityWithRegisteredRoute<
     pair: options.pair,
     inputA: options.inputA,
     inputB: options.inputB,
+    minADeposit: options.minADeposit,
+    minBDeposit: options.minBDeposit,
     minLpOut: options.minLpOut
   });
   const dryRunResult = await buildAndPreflightTransactionBlock({
@@ -5977,6 +6016,8 @@ export async function buildRegisteredRouteCaseTransaction<
       pair: routeCase.pair,
       inputA: routeCase.inputA,
       inputB: routeCase.inputB,
+      minADeposit: routeCase.minADeposit,
+      minBDeposit: routeCase.minBDeposit,
       minLpOut: routeCase.minLpOut
     });
     return {
@@ -6143,6 +6184,14 @@ export function buildRegisteredRoutePreflightCases<
       if (routeCase.minOutputs !== undefined) {
         throw new Error("BrownFi add-liquidity preflight config must not set minOutputs");
       }
+      if (
+        (routeCase.minADeposit === undefined) !==
+        (routeCase.minBDeposit === undefined)
+      ) {
+        throw new Error(
+          "BrownFi add-liquidity preflight config requires minADeposit and minBDeposit together"
+        );
+      }
       validateCommonOptions();
       const route = resolveRoute(routeCase.path, routeCase.pairs);
       if (route.length !== 1) {
@@ -6162,6 +6211,8 @@ export function buildRegisteredRoutePreflightCases<
         pair: route[0].pair,
         inputA: routeCase.input,
         inputB: routeCase.inputB,
+        minADeposit: routeCase.minADeposit,
+        minBDeposit: routeCase.minBDeposit,
         minLpOut: routeCase.minLpOut,
         recipient: commonOptions.recipient,
         context: commonOptions.context
@@ -7620,6 +7671,24 @@ export function addLiquidityWithBundle(options: AddLiquidityWithBundleOptions): 
     });
 }
 
+export function addLiquidityWithBundleWithMinDeposits(
+  options: AddLiquidityWithBundleWithMinDepositsOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "add_liquidity_with_bundle_with_min_deposits"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.inputA),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minADeposit),
+        tx.pure.u64(options.minBDeposit),
+        tx.pure.u64(options.minLpOut)
+      ]
+    });
+}
+
 export function addLiquidityWithBundleAndTransfer(
   options: AddLiquidityWithBundleTransferOptions
 ): TransactionThunk {
@@ -7631,6 +7700,28 @@ export function addLiquidityWithBundleAndTransfer(
         ...singleHopBundleArgs(tx, options),
         objectArg(tx, options.inputA),
         objectArg(tx, options.inputB),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
+export function addLiquidityWithBundleAndTransferWithMinDeposits(
+  options: AddLiquidityWithBundleTransferWithMinDepositsOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(
+        options.packageId,
+        "add_liquidity_with_bundle_and_transfer_with_min_deposits"
+      ),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.inputA),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minADeposit),
+        tx.pure.u64(options.minBDeposit),
         tx.pure.u64(options.minLpOut),
         pureAddress(tx, options.recipient)
       ]
