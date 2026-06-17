@@ -1939,11 +1939,16 @@ fun check_inventory_v3(
     };
     let out_standard = math::parse_amount_to_standard_decimals(out_decimals, amount_out, STANDARD_DECIMALS);
 
-    let pre_value = base_quote_value(pre_base, pre_quote, base_price);
-    let post_value = base_quote_value(post_base, post_quote, base_price);
-    let penalty = inventory_penalty(post_base, post_quote, out_standard, base_price, is_sell, kappa);
+    let pre_value = base_quote_value_u256(pre_base, pre_quote, base_price);
+    let post_value = base_quote_value_u256(post_base, post_quote, base_price);
+    let penalty = inventory_penalty_u256(post_base, post_quote, out_standard, base_price, is_sell, kappa);
 
     assert!(post_value >= pre_value + penalty, EInvalidInventory);
+}
+
+fun base_quote_value_u256(base_amount: u64, quote_amount: u64, adj_price: u64): u256 {
+    let base_value = math::mul_div_down_u256((base_amount as u256), (adj_price as u256), (Q32 as u256));
+    base_value + (quote_amount as u256)
 }
 
 fun base_quote_value(base_amount: u64, quote_amount: u64, adj_price: u64): u128 {
@@ -1951,30 +1956,32 @@ fun base_quote_value(base_amount: u64, quote_amount: u64, adj_price: u64): u128 
     base_value + (quote_amount as u128)
 }
 
-fun inventory_penalty(
+fun inventory_penalty_u256(
     post_base: u64,
     post_quote: u64,
     amount_out: u64,
     adj_price: u64,
     is_sell: bool,
     kappa: u64
-): u128 {
-    if (amount_out == 0 || kappa == 0) return 0;
+): u256 {
+    if (amount_out == 0 || kappa == 0) return 0u256;
 
     if (is_sell) {
         assert!(post_base > 0, EInvalidInventory);
-        let base_penalty = math::mul_div_up_u128(
-            (amount_out as u128) * (amount_out as u128),
-            (kappa as u128),
-            ((post_base as u128) * 2) * Q32
+        let amount_out_u = amount_out as u256;
+        let base_penalty = math::mul_div_up_u256(
+            amount_out_u * amount_out_u,
+            (kappa as u256),
+            ((post_base as u256) * 2u256) * (Q32 as u256)
         );
-        math::mul_div_up_u128(base_penalty, (adj_price as u128), Q32)
+        math::mul_div_up_u256(base_penalty, (adj_price as u256), (Q32 as u256))
     } else {
         assert!(post_quote > 0, EInvalidInventory);
-        math::mul_div_up_u128(
-            (amount_out as u128) * (amount_out as u128),
-            (kappa as u128),
-            ((post_quote as u128) * 2) * Q32
+        let amount_out_u = amount_out as u256;
+        math::mul_div_up_u256(
+            amount_out_u * amount_out_u,
+            (kappa as u256),
+            ((post_quote as u256) * 2u256) * (Q32 as u256)
         )
     }
 }

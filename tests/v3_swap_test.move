@@ -845,6 +845,42 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_swap_exact_output_handles_large_inventory_penalty_without_raw_overflow() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts(
+            &mut scenario,
+            500_000_000_000_000_000,
+            500_000_000_000_000_000
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let bundle = pyth_one_dollar_bundle(&pool, &clock);
+            let requested_output = 100_000_000_000_000_000;
+            let input_a = balance::create_for_testing<A>(300_000_000_000_000_000);
+            let (remaining_a, b_out) = swap::swap_a_for_exact_b_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                requested_output
+            );
+
+            assert!(balance::value(&b_out) == requested_output, 0);
+            assert!(balance::value(&remaining_a) > 0, 1);
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(b_out);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     #[expected_failure(abort_code = 0, location = brownfi_amm::math)]
     fun test_quote_a_for_exact_b_with_bundle_aborts_when_required_input_overflows_raw_token_amount() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
