@@ -1744,6 +1744,11 @@ export interface SingleHopBundleExactOutputOptions extends PairTypesOptions {
   amountOut: SuiAmountInput;
 }
 
+export interface SingleHopBundleExactOutputTransferOptions
+  extends SingleHopBundleExactOutputOptions {
+  recipient: string;
+}
+
 export interface AddLiquidityWithBundleOptions extends PairTypesOptions {
   priceBundle: TransactionArgument;
   clock: ObjectInput;
@@ -7305,6 +7310,38 @@ export function swapBForExactAWithBundle(
         ...singleHopBundleArgs(tx, options),
         objectArg(tx, options.input),
         amountArg(tx, options.amountOut)
+      ]
+    });
+}
+
+export function swapAForExactBWithBundleAndTransfer(
+  options: SingleHopBundleExactOutputTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_a_for_exact_b_with_bundle_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.input),
+        amountArg(tx, options.amountOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
+export function swapBForExactAWithBundleAndTransfer(
+  options: SingleHopBundleExactOutputTransferOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "swap_b_for_exact_a_with_bundle_and_transfer"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...singleHopBundleArgs(tx, options),
+        objectArg(tx, options.input),
+        amountArg(tx, options.amountOut),
+        pureAddress(tx, options.recipient)
       ]
     });
 }

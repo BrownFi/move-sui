@@ -157,6 +157,7 @@ import {
   supraPullRestProofResponseToPayload,
   swapAForExactB,
   swapAForExactBWithBundle,
+  swapAForExactBWithBundleAndTransfer,
   swapAForExactBWithPythRoute,
   swapAForExactCViaB,
   swapAForExactCViaBWithBundles,
@@ -166,6 +167,7 @@ import {
   swapExactAForBWithPythRoute,
   swapBForExactA,
   swapBForExactAWithBundle,
+  swapBForExactAWithBundleAndTransfer,
   swapBForExactAWithPythRoute,
   swapCForExactAViaB,
   swapCForExactAViaBWithBundles,
@@ -9593,6 +9595,57 @@ test("single-hop bundle swap builders target router functions with Move argument
       ]
     });
   }
+});
+
+test("bundle exact-output transfer builders target recipient-aware router entrypoints", () => {
+  const base = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    priceBundle: { kind: "result", index: 0 },
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    recipient: "0xRECIPIENT"
+  };
+
+  const aForBTx = createTransactionRecorder();
+  swapAForExactBWithBundleAndTransfer({
+    ...base,
+    input: { kind: "result", index: 3 },
+    amountOut: 303n
+  })(aForBTx);
+  assert.deepEqual(aForBTx.calls[0], {
+    target: "0xBROWN::router::swap_a_for_exact_b_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 0 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "result", index: 3 },
+      { kind: "u64", value: "303" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const bForATx = createTransactionRecorder();
+  swapBForExactAWithBundleAndTransfer({
+    ...base,
+    priceBundle: { kind: "result", index: 1 },
+    input: "0xCOINB",
+    amountOut: 404n
+  })(bForATx);
+  assert.deepEqual(bForATx.calls[0], {
+    target: "0xBROWN::router::swap_b_for_exact_a_with_bundle_and_transfer",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 1 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "404" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
 });
 
 test("liquidity builders target router functions with Move argument order", () => {

@@ -611,6 +611,30 @@ public fun swap_a_for_exact_b_with_bundle<A, B>(
     (coin::from_balance(remaining_a, ctx), coin::from_balance(b_out, ctx))
 }
 
+#[allow(lint(self_transfer))]
+public fun swap_a_for_exact_b_with_bundle_and_transfer<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input: Coin<A>,
+    amount_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_a, b_out) = swap_a_for_exact_b_with_bundle(
+        price_bundle,
+        clock,
+        pool,
+        input,
+        amount_out,
+        ctx
+    );
+
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_a), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(b_out), recipient, ctx);
+}
+
 public fun swap_b_for_exact_a<A, B>(
     oracle: &OracleAdapter,
     price_info_object_a: &PriceInfoObject,
@@ -653,6 +677,30 @@ public fun swap_b_for_exact_a_with_bundle<A, B>(
         amount_out
     );
     (coin::from_balance(remaining_b, ctx), coin::from_balance(a_out, ctx))
+}
+
+#[allow(lint(self_transfer))]
+public fun swap_b_for_exact_a_with_bundle_and_transfer<A, B>(
+    price_bundle: &PriceBundle,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input: Coin<B>,
+    amount_out: u64,
+    recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_b, a_out) = swap_b_for_exact_a_with_bundle(
+        price_bundle,
+        clock,
+        pool,
+        input,
+        amount_out,
+        ctx
+    );
+
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(a_out), recipient, ctx);
 }
 
 public fun swap_exact_a_for_c_via_b<A, B, C>(
