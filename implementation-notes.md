@@ -1892,3 +1892,7 @@
   - Finding: exact-input Pyth bundle quote coverage did not prove the public route fails closed when a low-decimal input amount cannot be normalized into BrownFi's 9-decimal `u64` standard amount.
   - Decision: add a bundle exact-input quote test with a 0-decimal input token and an input just above the safe normalization boundary. The quote must abort in `math::parse_amount_to_standard_decimals`.
   - RED/GREEN: the first focused run without `expected_failure` aborted in `brownfi_amm::math` with code `0` from `swap::quote_a_for_b_with_bundle`; after marking that abort expected, `rtk sui move test test_quote_a_for_b_with_bundle_aborts_when_input_overflows_standard_amount --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.
+- 2026-06-17 Pyth SDK quote round-trip PTB coverage slice:
+  - Finding: SDK/PTB coverage already proved generic registered-route quote round trips, but the Pyth convenience route helpers had not been pinned in the same composed exact-output-then-exact-input quote shape.
+  - Decision: add a Pyth route test that first builds an exact-output quote chain, then feeds its required input handle into the matching exact-input Pyth route quote chain in the same transaction recorder while proving Pyth feed updates are deduped per route quote build.
+  - Verification: `rtk npm test --prefix sdk/router -- --test-name-pattern "Pyth route exact-output quote handles"` passed with the new coverage; no production code change was required.

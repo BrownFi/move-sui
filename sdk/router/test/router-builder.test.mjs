@@ -8947,6 +8947,96 @@ test("quoteExactOutputWithPythRoute updates Pyth before required-input quote cal
   });
 });
 
+test("Pyth route exact-output quote handles feed the matching exact-input quote chain", async () => {
+  const tx = createTransactionRecorder();
+  const updateCalls = [];
+  const routeOptions = {
+    path: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        updateCalls.push({ txCallCount: tx.calls.length, feedIds: [...feedIdsArg] });
+        assert.deepEqual(updatesArg, [
+          { update: "feed-a" },
+          { update: "feed-b" },
+          { update: "feed-c" }
+        ]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c"]);
+        return ["0xPRICEA", "0xPRICEB", "0xPRICEC"];
+      }
+    },
+    clock: "0x6",
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      },
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::b::B",
+        typeB: "0x1::c::C",
+        pool: "0xPOOLBC",
+        feedIds: ["feed-b", "feed-c"]
+      }
+    ]
+  };
+
+  const exactOutputQuote = await quoteExactOutputWithPythRoute(tx, {
+    ...routeOptions,
+    amountOut: 44n
+  });
+  const exactInputQuote = await quoteExactInputWithPythRoute(tx, {
+    ...routeOptions,
+    amountIn: exactOutputQuote.amounts[0]
+  });
+
+  assert.deepEqual(updateCalls, [
+    { txCallCount: 0, feedIds: ["feed-a", "feed-b", "feed-c"] },
+    { txCallCount: 8, feedIds: ["feed-a", "feed-b", "feed-c"] }
+  ]);
+  assert.deepEqual(exactOutputQuote.amounts, [
+    { kind: "nested-result", index: 7, resultIndex: 0 },
+    { kind: "nested-result", index: 7, resultIndex: 1 },
+    { kind: "nested-result", index: 6, resultIndex: 1 }
+  ]);
+  assert.deepEqual(exactInputQuote.amounts, [
+    exactOutputQuote.amounts[0],
+    { kind: "nested-result", index: 14, resultIndex: 0 },
+    { kind: "nested-result", index: 15, resultIndex: 0 }
+  ]);
+  assert.deepEqual(
+    tx.calls.map((call) => call.target),
+    [
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::swap::quote_a_for_exact_b_with_bundle",
+      "0xBROWN::swap::quote_a_for_exact_b_with_bundle",
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::swap::quote_a_for_b_with_bundle",
+      "0xBROWN::swap::quote_a_for_b_with_bundle"
+    ]
+  );
+  assert.deepEqual(tx.calls[14].arguments[3], exactOutputQuote.amounts[0]);
+});
+
 test("quoteExactOutputWithoutCutoffWithPythRoute chains raw required inputs backward", async () => {
   const tx = createTransactionRecorder();
   const result = await quoteExactOutputWithoutCutoffWithPythRoute(tx, {
