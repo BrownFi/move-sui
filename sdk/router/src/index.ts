@@ -6585,6 +6585,9 @@ function registeredRouteCaseResultTransferGroups(
   if (routeResult.kind === "zap-out-a" || routeResult.kind === "zap-out-b") {
     return [{ recipient: recipientAddress, outputs: [routeResult.zapResult] }];
   }
+  if (routeResult.kind === "flash-borrow-a" || routeResult.kind === "flash-borrow-b") {
+    return [];
+  }
   if (routeResult.kind === "exact-output") {
     const swapResult = routeResult.swapResult as Partial<Record<number, TransactionArgument>>;
     if (swapResult[0] !== undefined && swapResult[1] !== undefined) {

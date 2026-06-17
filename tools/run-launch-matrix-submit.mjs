@@ -492,6 +492,9 @@ function routeResultTransferGroups(routeResult, senderAddress, recipientAddress)
   if (routeResult.kind === "zap-out-a" || routeResult.kind === "zap-out-b") {
     return [{ recipient: recipientAddress, outputs: [routeResult.zapResult] }];
   }
+  if (routeResult.kind === "flash-borrow-a" || routeResult.kind === "flash-borrow-b") {
+    return [];
+  }
   const swapResult = routeResult.swapResult;
   if (swapResult?.[0] !== undefined && swapResult?.[1] !== undefined) {
     return [
@@ -512,16 +515,21 @@ function transferRouteResultOutputs(tx, runtime, routeResult, routeCaseConfig) {
   const senderAddress = runtimeSender(runtime, tx);
   const recipientAddress = optionalRouteRecipient(routeCaseConfig);
   const groups = routeResultTransferGroups(routeResult, senderAddress, recipientAddress);
+  const nonEmptyGroups = groups
+    .map((group) => ({
+      recipient: group.recipient,
+      outputs: group.outputs.filter((item) => item !== undefined)
+    }))
+    .filter((group) => group.outputs.length > 0);
+  if (nonEmptyGroups.length === 0) return;
   if (typeof tx.transferObjects !== "function") {
     throw new Error("Launch matrix submit transaction builder must support transferObjects");
   }
   if (typeof tx.pure?.address !== "function") {
     throw new Error("Launch matrix submit transaction builder must support pure address values");
   }
-  for (const group of groups) {
-    const outputs = group.outputs.filter((item) => item !== undefined);
-    if (outputs.length === 0) continue;
-    tx.transferObjects(outputs, tx.pure.address(group.recipient));
+  for (const group of nonEmptyGroups) {
+    tx.transferObjects(group.outputs, tx.pure.address(group.recipient));
   }
 }
 

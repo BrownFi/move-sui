@@ -7336,7 +7336,8 @@ test("preflightRegisteredRouteCases skips output transfers for flash cases", asy
           pool: "0xPOOLAB"
         },
         amount: 1_000n,
-        feeCoin: "0xFEEA"
+        feeCoin: "0xFEEA",
+        recipient: "0xRECIPIENT"
       }
     ]
   });
@@ -7364,6 +7365,7 @@ test("preflightRegisteredRouteCases skips output transfers for flash cases", asy
     "0xBROWN::flash::borrow_a_with_coin",
     "0xBROWN::flash::repay_a_with_coin"
   ]);
+  assert.deepEqual(tx.transfers, []);
 });
 
 test("buildRegisteredRoutePreflightCases rejects mismatched route config fields", () => {

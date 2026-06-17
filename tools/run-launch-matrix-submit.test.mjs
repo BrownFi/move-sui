@@ -144,9 +144,9 @@ function createTransaction(label) {
       this.calls.push(call);
       return result;
     },
-    transferObjects(objects, recipient) {
+    ${options.omitTransferObjects ? "" : `transferObjects(objects, recipient) {
       this.transfers.push({ objects, recipient });
-    },
+    },`}
     splitCoins(coin, amounts) {
       this.splits.push({ coin, amounts });
       return amounts.map((_amount, index) => ({ kind: "split", index }));
@@ -573,6 +573,30 @@ test("submitLaunchMatrixRoutesConfigFile can split configured flash fee coin amo
     ]
   });
   const runtime = writeRuntime(root, { requireSplits: true });
+
+  const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
+
+  assert.equal(report.summary.routeCaseCount, 1);
+});
+
+test("submitLaunchMatrixRoutesConfigFile skips transfer support for recipient flash routes", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root, {
+    routeCases: [
+      {
+        name: "custom flash borrow A",
+        kind: "flash-borrow-a",
+        providerId: "custom",
+        clock: "0x6",
+        path: ["0x1::coin_a::COIN_A", "0x1::coin_b::COIN_B"],
+        pairs: [routePair()],
+        amount: "1000",
+        feeCoin: "0x4",
+        recipient: "0xdef"
+      }
+    ]
+  });
+  const runtime = writeRuntime(root, { omitTransferObjects: true });
 
   const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
 
