@@ -596,24 +596,37 @@ async function maybeConfigureProtocolFee({ config, runtime, transactionFactory, 
     typeB: config.typeB,
     pool
   };
-  const tx = transactionFactory(context);
-  routerSdk.setPoolFeeTo({
-    packageId: config.packageId,
-    typeA: config.typeA,
-    typeB: config.typeB,
-    pool,
-    feeCap,
-    feeTo
-  })(tx);
-  routerSdk.setPoolProtocolFee({
-    packageId: config.packageId,
-    typeA: config.typeA,
-    typeB: config.typeB,
-    pool,
-    riskCap,
-    newProtocolFee: config.protocolFee
-  })(tx);
-  const result = await runtime.executeTransaction(tx, context);
+  const attempts = Math.max(1, nonNegativeInteger(runtime.protocolFeeSetupRetryAttempts, 6));
+  const retryDelayMs = nonNegativeInteger(runtime.protocolFeeSetupRetryDelayMs, 1000);
+  let result;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const tx = transactionFactory(context);
+    routerSdk.setPoolFeeTo({
+      packageId: config.packageId,
+      typeA: config.typeA,
+      typeB: config.typeB,
+      pool,
+      feeCap,
+      feeTo
+    })(tx);
+    routerSdk.setPoolProtocolFee({
+      packageId: config.packageId,
+      typeA: config.typeA,
+      typeB: config.typeB,
+      pool,
+      riskCap,
+      newProtocolFee: config.protocolFee
+    })(tx);
+    try {
+      result = await runtime.executeTransaction(tx, context);
+      break;
+    } catch (error) {
+      if (attempt >= attempts || !isTransientMissingObjectError(error, pool)) {
+        throw error;
+      }
+      await sleep(retryDelayMs);
+    }
+  }
   assertTransactionSucceeded(result, "Pyth launch protocol fee setup transaction");
   const digest = requireString(
     result.effects.transactionDigest,

@@ -525,6 +525,78 @@ test("createPythLaunchPoolConfig can configure protocol fee after pool creation"
   });
 });
 
+test("createPythLaunchPoolConfig retries protocol fee setup when the new shared pool is briefly unavailable", async () => {
+  const root = fixtureRoot();
+  const config = path.join(root, "pool.json");
+  writeJson(config, poolConfig({ feeCap, riskCap, feeTo, protocolFee: 10000000 }));
+  const poolTx = createTransactionRecorder();
+  const protocolFeeTxs = [];
+  const calls = [];
+  let protocolFeeAttempts = 0;
+
+  const runtime = {
+    network: "testnet",
+    protocolFeeSetupRetryAttempts: 2,
+    protocolFeeSetupRetryDelayMs: 0,
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIds) {
+        calls.push(["fetch", feedIds]);
+        return [{ update: "a-b" }];
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updates, feedIds) {
+        calls.push(["update", txArg, updates, feedIds]);
+        assert.equal(txArg, poolTx);
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    },
+    pythContractConfig: {
+      pythStateId: id("b")
+    },
+    poolTransactionFactory(context) {
+      calls.push(["tx-factory", context]);
+      if (context.kind !== "configure-protocol-fee") return poolTx;
+      const protocolFeeTx = createTransactionRecorder();
+      protocolFeeTxs.push(protocolFeeTx);
+      return protocolFeeTx;
+    },
+    async executeTransaction(txArg, context) {
+      calls.push(["execute", txArg, context]);
+      if (context.kind !== "configure-protocol-fee") {
+        assert.equal(txArg, poolTx);
+        return successfulCreatePoolResult();
+      }
+      protocolFeeAttempts += 1;
+      if (protocolFeeAttempts === 1) {
+        throw new Error(
+          'The following input objects are invalid: {"code":"notExists","object_id":"0xPOOL"}'
+        );
+      }
+      return successfulProtocolFeeSetupResult();
+    }
+  };
+
+  const report = await createPythLaunchPoolConfig({ config, runtime });
+
+  assert.equal(protocolFeeAttempts, 2);
+  assert.equal(protocolFeeTxs.length, 2);
+  assert.deepEqual(
+    protocolFeeTxs.map((tx) => tx.calls.map((call) => call.target)),
+    [
+      [
+        `${packageId}::admin::set_pool_fee_to`,
+        `${packageId}::admin::set_pool_protocol_fee`
+      ],
+      [
+        `${packageId}::admin::set_pool_fee_to`,
+        `${packageId}::admin::set_pool_protocol_fee`
+      ]
+    ]
+  );
+  assert.equal(report.protocolFeeSetup.transactionDigest, "protocol-fee-setup-digest");
+});
+
 test("createPythLaunchPoolConfig retries flash enable when the new shared pool is briefly unavailable", async () => {
   const root = fixtureRoot();
   const config = path.join(root, "pool.json");

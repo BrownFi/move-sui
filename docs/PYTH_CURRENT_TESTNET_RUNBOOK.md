@@ -146,7 +146,19 @@ rtk node tools/verify-sui-cli-tx-evidence.mjs \
 
 rtk node tools/verify-sui-cli-tx-evidence.mjs \
   --config configs/launch/pyth-current-testnet.live-evidence.matrix.json \
+  --setup protocolFeeSetup \
+  --rpc-url https://fullnode.testnet.sui.io:443 \
+  --use-rtk
+
+rtk node tools/verify-sui-cli-tx-evidence.mjs \
+  --config configs/launch/pyth-current-testnet.live-evidence.matrix.json \
   --setup flashEnable \
+  --rpc-url https://fullnode.testnet.sui.io:443 \
+  --use-rtk
+
+rtk node tools/verify-sui-cli-tx-evidence.mjs \
+  --config configs/launch/pyth-current-testnet.live-evidence.matrix.json \
+  --setup protocolLpClaim \
   --rpc-url https://fullnode.testnet.sui.io:443 \
   --use-rtk
 
@@ -159,6 +171,12 @@ rtk node tools/verify-sui-cli-tx-evidence.mjs \
 rtk node tools/verify-sui-cli-tx-evidence.mjs \
   --config configs/launch/pyth-current-testnet.live-evidence.matrix.json \
   --tx 'pyth current testnet exact output route' \
+  --rpc-url https://fullnode.testnet.sui.io:443 \
+  --use-rtk
+
+rtk node tools/verify-sui-cli-tx-evidence.mjs \
+  --config configs/launch/pyth-current-testnet.live-evidence.matrix.json \
+  --tx 'pyth current testnet exact output results route' \
   --rpc-url https://fullnode.testnet.sui.io:443 \
   --use-rtk
 
@@ -289,24 +307,26 @@ rtk "$NODE24" tools/run-pyth-launch-sequence.mjs \
 
 ## Current Known Landed Evidence
 
-The checked evidence matrix records:
+The checked evidence matrix records the 2026-06-17 protocol-fee launch:
 
-- Test coins package: `0x7b19dffb9a6ddbfc090efe4eb68c82e35b04959aa2a4bdba19c56f1e5dbc9daf`
-- Test coins digest: `YdW1X2HKziRRuS2oS2V1K76nsA4xiCZYXxZfSYHoVg4`
-- BrownFi package: `0x6cf269b8cf7391424ba17fe3ca68931310cf4c19ad356f963041d1c4c3900457`
-- BrownFi package digest: `32E7Q5fj4rRXKEjFgLTbxeNbuPYHSTavZW1WKKcgC1G2`
-- Pool: `0x0b8db42b1ef92b348ace39117ddfa3fa9b6ba30fe9f027d628ead401e3d75956`
-- Pool-create digest: `8TUKFzuZdkRPbxkCt1kUfm4YeJytHkQHa85ns1oaiB2A`
-- LP coin: `0x38df551dd94465eddcf04507724f239b9f32fee09619ae6d6ab7b373aa13cf1b`
-- Flash-enable digest: `AkxAnkeWHMSctZEq9PA8Rp7qh8rm9cQZpYvifGcsJykf`
-- Exact-input swap digest: `57k6iPtG7Hv8UqEEXPcjQvKTabM2okjUVWoniLbXizkn`
-- Exact-output swap digest: `G1EG2ijNh7gdRjuZrUM7ySJnvZTmqp8vUhdsqJ2YWwvA`
-- Result-aware exact-output digest: `Bu5ZSDGeENaDPm8StLjJxjNzKptKXJ75qz71ijQuSJNk`
-- Add-liquidity digest: `s22wmPBygVBsD1awN4NGz3XA35kSJXQwZN2MVbJthMa`
-- Remove-liquidity digest: `7p9Vm4L1iDgTzJkiuTvoJTmijdhaPtw5tXfJaY8vpKQn`
-- Zap-in-A digest: `CcUkmwNyyE79RWv2Zbb7RuzHGmgE23Sfn3EeXmHfL5KS`
-- Zap-in-B digest: `HKQ3xSD8yMpR6UicjeGex6gRX5w3HYfcBoimkyQkHXFU`
-- Zap-out-A digest: `9wNhBUbJS9Bs3sYrm6xHPCRNXTAvacpq4dLn6jETKQAu`
-- Zap-out-B digest: `DnbwDdipeGNpbJ5LeWEY8yiUNHQnPovkm3QxrjfFEk55`
-- Flash-borrow-A digest: `FDMZ3Fno11s2kNyXU1JNmAso6ThL1QjizBm9SkPSyzEh`
-- Flash-borrow-B digest: `5xL3vKTPrLBxUU8Y63QtgbWDV1wvKPZV1snUyw76dsYH`
+- Test coins package: `0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef`
+- Test coins digest: `6cFqREnD264yWR14fToWiwwfuNkXutHcpsHXfjkHqifh`
+- BrownFi package: `0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9`
+- BrownFi package digest: `13Sny17FWN4czLC2GybBRv5TPNMTBaRY4vPXkW5W9Tot`
+- Pool: `0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887`
+- Pool-create digest: `4ynf6oiMHk7wZUXFpqELwoCVwGnvmKPmoAG3L2BotrMu`
+- LP coin: `0x0417af08ac65eeca14c4b3c3eb785232469305dc1b41b5110d3f387d5ea33032`
+- Protocol-fee setup digest: `HaxcXDwFRjxfn3D15hJDnZxrzibex75o5XqcM8x4pge`
+- Flash-enable digest: `9ozBVd3vD646e5GjYW9s8yUp3ZX5eS7FyRCHyq7R5W9`
+- Protocol-LP claim digest: `AfcMRm9SQyNZ2zy8thJddAW3XftGMuVQikmuzK1zc4wH`
+- Exact-input swap digest: `HwRwdNGzGGpTWbX6ygoWbQR29JLVGQdMiwVbv5P51Af1`
+- Exact-output swap digest: `5LE3UMidsg8awmHUzSoHvXr24huRzYJUKT6AAZYGV9pM`
+- Result-aware exact-output digest: `87w8zKy94PfVWcYTzBKZHUFL74k2cpJyWsp4SSumTaVR`
+- Add-liquidity digest: `4vMiuTdNHmqqmQVyHJxLLQB87HGNyqHhLpZYhCMdjVvh`
+- Remove-liquidity digest: `A4RyrfATPS7HPWhQZAcemHqcuanoWfw6cz4ztQftKGc9`
+- Zap-in-A digest: `7VRTg2M9Uzoy1kc1NTZg6vjkhxnoVd9Xdo2UGhV6nEgx`
+- Zap-in-B digest: `G2rBTNqdkwwysCiRRfF2sKHXZ5T2VFtYHBUBAtvtM1R8`
+- Zap-out-A digest: `CBPqUWXwV8o6qiywcfxfbDBQYk68rD9BQMzfkhyRkSfm`
+- Zap-out-B digest: `9gNSeQ5EMTnjbHbUCeGTHQPZ5EWjFf9jbydbjk7PBvkJ`
+- Flash-borrow-A digest: `BtNqLWGRVTrogXAN63x52JixVL5TBeV4PeJxcjDcTkTG`
+- Flash-borrow-B digest: `85kRkpDmcEXndb2bnncTS9FRzgBrnCYUfydwrkXiLJED`
