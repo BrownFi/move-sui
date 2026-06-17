@@ -703,6 +703,7 @@ public fun swap_a_for_b_with_bundle<A, B>(
     assert!(reserve_a > 0 && reserve_b > 0, ENoLiquidity);
 
     let amount_in = balance::value(&input);
+    assert_pool_balance_can_accept_input(reserve_a, amount_in);
 
     // Get pool parameters
     let (fee, _, lambda, fee_split) = pool::get_parameters(pool);
@@ -855,6 +856,7 @@ public fun swap_b_for_a_with_bundle<A, B>(
     assert!(reserve_a > 0 && reserve_b > 0, ENoLiquidity);
 
     let amount_in = balance::value(&input);
+    assert_pool_balance_can_accept_input(reserve_b, amount_in);
 
     // Get pool parameters
     let (fee, _, lambda, fee_split) = pool::get_parameters(pool);
@@ -1156,6 +1158,7 @@ public fun swap_a_for_exact_b_with_bundle<A, B>(
 
     assert!(effective_out == amount_out, ECutoffLimitReached);
     assert!(amount_in <= balance::value(&input), EExcessiveSlippage);
+    assert_pool_balance_can_accept_input(reserve_a, amount_in);
 
     let amount_in_no_fee = math::pseudo_in_from_actual_u128(
         (amount_in as u128),
@@ -1305,6 +1308,7 @@ public fun swap_b_for_exact_a_with_bundle<A, B>(
 
     assert!(effective_out == amount_out, ECutoffLimitReached);
     assert!(amount_in <= balance::value(&input), EExcessiveSlippage);
+    assert_pool_balance_can_accept_input(reserve_b, amount_in);
 
     let amount_in_no_fee = math::pseudo_in_from_actual_u128(
         (amount_in as u128),
@@ -1668,6 +1672,13 @@ fun v3_amount_out_with_analytics(
 
     let cutoff_output = if (raw < cutoff) { raw } else { cutoff };
     (cutoff_output, raw, cutoff_output)
+}
+
+fun assert_pool_balance_can_accept_input(current_balance: u64, input_amount: u64) {
+    assert!(
+        (current_balance as u128) + (input_amount as u128) <= (MAX_POOL_BALANCE as u128),
+        EPoolBalanceTooLarge
+    );
 }
 
 fun v3_amount_out_without_cutoff(
