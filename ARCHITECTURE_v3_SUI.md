@@ -797,7 +797,7 @@ Required math tests:
 - Pyth bundle add-liquidity decimal tests now pin raw-representable LP-safe minting and residual returns for 6-decimal quote/base deposits and 12-decimal quote/base deposits; broader mixed-decimal add-liquidity matrix coverage is still pending.
 - Golden round-trip quote tests against EVM V3 fixtures. All 12 Solidity periphery `TX_CASES` and all 36 Solidity Core Module B1/B2/B3 `getAmountOut(getAmountIn(out))` rows are covered under the Solidity suite's 10 bps tolerance. Typed two-hop bundle router coverage now checks the route-level exact-output quote's required input against the corresponding exact-input quote for `A -> B -> C`; SDK/PTB builder coverage also verifies that registered-route exact-output quote handles can feed the matching exact-input quote chain in one composed transaction. Live provider-backed PTB round-trip execution remains pending.
 - Boundary tests for `kB`, `kQ`, `lambda`, `gamma`, fee, decimals, and reserves.
-- Rounding monotonicity tests.
+- Rounding monotonicity tests. Single-hop Pyth bundle exact-input quote outputs and exact-output quote required inputs are covered for both directions; broader route-level, mixed-decimal, and state-sequence monotonicity coverage remains pending.
 - Overflow bound tests. Initial coverage pins checked overflow behavior for low-decimal raw-to-standard amount scaling and `u256` to `u64` downcasts; broader swap-formula and AMM arithmetic bounds remain pending.
 - Pyth exponent/confidence conversion tests.
 - AMM sqrt-price to relative-price tests per adapter.

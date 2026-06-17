@@ -1852,3 +1852,7 @@
   - Finding: Pyth bundle swap decimal coverage pinned 6-decimal quote/base exact-input and exact-output paths, but not the opposite case where the input/output token has more raw precision than BrownFi's 9-decimal internal scale.
   - Decision: add 12-decimal quote and 12-decimal base swap tests for exact-input output scaling and exact-output required-input scaling. This is coverage-only because the existing decimal conversion path already supports the behavior.
   - Verification: `rtk sui move test twelve_decimal --allow-dirty --build-env testnet --warnings-are-errors` passed 6/6, covering the four new swap cases plus the existing two 12-decimal add-liquidity cases.
+- 2026-06-17 Pyth bundle quote monotonicity coverage slice:
+  - Finding: the architecture still listed rounding monotonicity tests as pending, while existing Pyth bundle quote tests pinned individual values but did not compare increasing input/output amounts.
+  - Decision: add single-hop Pyth bundle monotonicity tests for both swap directions: exact-input quote outputs must not decrease as input increases, and exact-output required inputs must not decrease as requested output increases.
+  - Verification: `rtk sui move test monotonic --allow-dirty --build-env testnet --warnings-are-errors` passed 2/2 immediately; no production change was required.
