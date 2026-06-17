@@ -1984,3 +1984,7 @@
   - Finding: landed-tx evidence verification was count-aware, but configured Sui CLI dry-run evidence still treated expected events as a set. A multi-hop dry-run with duplicate expected event types could pass after observing only one occurrence.
   - Decision: make the dry-run expected-event assertion consume actual event types as a multiset, preserving the existing matrix schema and error wording.
   - RED/GREEN: focused dry-run verifier tests first failed because duplicate expected events did not throw, then passed 4/4 after the count-aware assertion. `rtk node --test tools/*.test.mjs` passed 174/174.
+- 2026-06-17 zap route event evidence slice:
+  - Finding: Pyth bundle zap-in executes a swap then add-liquidity, and zap-out executes remove-liquidity then a swap. Each core operation emits `Sync`, but launch-submit and checked current-Pyth zap evidence expected only one `Sync` per zap route.
+  - Decision: strengthen zap evidence expectations to include both `Sync` occurrences. Zap-out expected event order now mirrors the Move flow: remove-liquidity evidence before swap evidence.
+  - RED/GREEN: focused launch-submit zap evidence first failed with the missing second `Sync`, then passed after updating event generation. `rtk node --test tools/*.test.mjs` passed 174/174 after updating the checked current-Pyth live evidence matrix.

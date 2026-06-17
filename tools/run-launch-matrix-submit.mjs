@@ -339,6 +339,7 @@ function expectedEventTypesForRouteCase(routeCase) {
       eventType("PriceBundleUsed"),
       eventType("SwapExecuted"),
       eventType("Swap"),
+      eventType("Sync"),
       eventType("AddLiquidity")
     ];
   }
@@ -346,10 +347,11 @@ function expectedEventTypesForRouteCase(routeCase) {
     return [
       eventType("OracleQuorumUsed"),
       eventType("Sync"),
+      eventType("RemoveLiquidity"),
+      eventType("Sync"),
       eventType("PriceBundleUsed"),
       eventType("SwapExecuted"),
-      eventType("Swap"),
-      eventType("RemoveLiquidity")
+      eventType("Swap")
     ];
   }
   if (routeCase.kind === "flash-borrow-a" || routeCase.kind === "flash-borrow-b") {

@@ -692,6 +692,7 @@ test("submitLaunchMatrixRoutesConfigFile transfers zap outputs and reports zap e
         "0x1::events::PriceBundleUsed",
         "0x1::events::SwapExecuted",
         "0x1::events::Swap",
+        "0x1::events::Sync",
         "0x1::events::AddLiquidity"
       ]
     },
@@ -702,10 +703,11 @@ test("submitLaunchMatrixRoutesConfigFile transfers zap outputs and reports zap e
       expectedEventTypes: [
         "0x1::events::OracleQuorumUsed",
         "0x1::events::Sync",
+        "0x1::events::RemoveLiquidity",
+        "0x1::events::Sync",
         "0x1::events::PriceBundleUsed",
         "0x1::events::SwapExecuted",
-        "0x1::events::Swap",
-        "0x1::events::RemoveLiquidity"
+        "0x1::events::Swap"
       ]
     }
   ]);
