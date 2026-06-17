@@ -1636,6 +1636,12 @@ export interface AddLiquidityWithCoinsOptions extends DirectOraclePairOptions {
   minLpOut: U64Input;
 }
 
+export interface AddLiquidityWithCoinsWithMinDepositsOptions
+  extends AddLiquidityWithCoinsOptions {
+  minADeposit: U64Input;
+  minBDeposit: U64Input;
+}
+
 export interface AddLiquidityWithCoinsTransferOptions extends AddLiquidityWithCoinsOptions {
   recipient: string;
 }
@@ -7351,6 +7357,24 @@ export function addLiquidityWithCoins(options: AddLiquidityWithCoinsOptions): Tr
         ...directOraclePairArgs(tx, options),
         objectArg(tx, options.inputA),
         objectArg(tx, options.inputB),
+        tx.pure.u64(options.minLpOut)
+      ]
+    });
+}
+
+export function addLiquidityWithCoinsWithMinDeposits(
+  options: AddLiquidityWithCoinsWithMinDepositsOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(options.packageId, "add_liquidity_with_coins_with_min_deposits"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.inputA),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minADeposit),
+        tx.pure.u64(options.minBDeposit),
         tx.pure.u64(options.minLpOut)
       ]
     });

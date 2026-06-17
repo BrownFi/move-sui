@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   addLiquidityWithCoins,
+  addLiquidityWithCoinsWithMinDeposits,
   addLiquidityWithCoinsAndTransfer,
   addLiquidityWithRegisteredRoute,
   addLiquidityWithBundleAndTransferWithMinDeposits,
@@ -9539,6 +9540,40 @@ test("direct add-liquidity OracleAdapter builder targets router add_liquidity_wi
       { kind: "object", id: "0xCOINA" },
       { kind: "object", id: "0xCOINB" },
       { kind: "u64", value: "999" }
+    ]
+  });
+
+  const checkedTx = createTransactionRecorder();
+  addLiquidityWithCoinsWithMinDeposits({
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    oracle: "0xORACLE",
+    priceInfoObjectA: "0xPRICEA",
+    priceInfoObjectB: "0xPRICEB",
+    clock: "0x6",
+    pool: "0xPOOLAB",
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minADeposit: 111n,
+    minBDeposit: 222n,
+    minLpOut: 333n
+  })(checkedTx);
+
+  assert.deepEqual(checkedTx.calls[0], {
+    target: "0xBROWN::router::add_liquidity_with_coins_with_min_deposits",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPRICEA" },
+      { kind: "object", id: "0xPRICEB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "111" },
+      { kind: "u64", value: "222" },
+      { kind: "u64", value: "333" }
     ]
   });
 });

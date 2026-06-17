@@ -117,6 +117,40 @@ public fun add_liquidity_with_coins<A, B>(
     )
 }
 
+public fun add_liquidity_with_coins_with_min_deposits<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_a: Coin<A>,
+    input_b: Coin<B>,
+    min_a_deposit: u64,
+    min_b_deposit: u64,
+    min_lp_out: u64,
+    ctx: &mut TxContext
+): (Coin<A>, Coin<B>, Coin<LP<A, B>>) {
+    let input_a_value = coin::value(&input_a);
+    let input_b_value = coin::value(&input_b);
+    let (remaining_a, remaining_b, lp) = add_liquidity_with_coins(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        input_a,
+        input_b,
+        min_lp_out,
+        ctx
+    );
+    let deposited_a = input_a_value - coin::value(&remaining_a);
+    let deposited_b = input_b_value - coin::value(&remaining_b);
+    assert!(deposited_a >= min_a_deposit, EInsufficientAAmount);
+    assert!(deposited_b >= min_b_deposit, EInsufficientBAmount);
+
+    (remaining_a, remaining_b, lp)
+}
+
 public fun zap_in_a<A, B>(
     oracle: &OracleAdapter,
     price_info_object_a: &PriceInfoObject,
