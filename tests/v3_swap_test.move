@@ -2132,6 +2132,136 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    fun test_add_liquidity_pyth_bundle_mints_from_raw_representable_six_decimal_quote_twelve_decimal_base_deposit() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            10_000_000,
+            10_000_000_000_000,
+            6,
+            12
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+
+            let input_a = balance::create_for_testing<A>(2_000_000);
+            let input_b = balance::create_for_testing<B>(1_000_000_000_999);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                0
+            );
+            let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
+
+            assert!(balance::value(&lp) == 2_000_000_000, 0);
+            assert!(balance::value(&remaining_a) == 1_000_000, 1);
+            assert!(balance::value(&remaining_b) == 999, 2);
+            assert!(amount_a == 11_000_000, 3);
+            assert!(amount_b == 11_000_000_000_000, 4);
+            assert!(lp_supply == 22_000_000_000, 5);
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(remaining_b);
+            balance::destroy_for_testing(lp);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_add_liquidity_pyth_bundle_mints_from_raw_representable_twelve_decimal_quote_six_decimal_base_deposit() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            10_000_000_000_000,
+            10_000_000,
+            12,
+            6
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let reading_a = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_a(&pool),
+                pool::oracle_config_data_a(&pool),
+                1_000_000_000
+            );
+            let reading_b = new_test_reading(
+                pool::oracle_source_pyth(),
+                pool::oracle_source_mask_pyth(),
+                pool::oracle_source_id_b(&pool),
+                pool::oracle_config_data_b(&pool),
+                1_000_000_000
+            );
+            let bundle = oracle_gateway::get_swap_price_bundle_from_readings(
+                &reading_a,
+                &reading_b,
+                &clock,
+                &pool
+            );
+
+            let input_a = balance::create_for_testing<A>(1_000_000_001_999);
+            let input_b = balance::create_for_testing<B>(2_000_000);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                0
+            );
+            let (amount_a, amount_b, lp_supply) = swap::pool_balances(&pool);
+
+            assert!(balance::value(&lp) == 2_000_000_000, 0);
+            assert!(balance::value(&remaining_a) == 1_999, 1);
+            assert!(balance::value(&remaining_b) == 1_000_000, 2);
+            assert!(amount_a == 11_000_000_000_000, 3);
+            assert!(amount_b == 11_000_000, 4);
+            assert!(lp_supply == 22_000_000_000, 5);
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(remaining_b);
+            balance::destroy_for_testing(lp);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_add_liquidity_with_bundle_uses_amm_valuation_floor() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool(&mut scenario);

@@ -1876,3 +1876,7 @@
   - Finding: Pyth bundle swap decimal coverage pinned 6/9, 9/6, 12/9, and 9/12 pools, but not pools where both token sides differ from BrownFi's 9-decimal internal scale.
   - Decision: add 6/12 and 12/6 Pyth bundle swap tests for exact-input output scaling and exact-output required-input scaling, with explicit raw output/input constants before state-changing execution.
   - Verification: `rtk sui move test between_ --allow-dirty --build-env testnet --warnings-are-errors` passed 4/4 immediately; no production change was required.
+- 2026-06-17 Pyth both-token mixed-decimal add-liquidity coverage slice:
+  - Finding: Pyth bundle add-liquidity decimal coverage covered single non-9-decimal quote/base sides, but not both-token 6/12 or 12/6 pools.
+  - Decision: add 6/12 and 12/6 Pyth bundle add-liquidity tests that pin LP minting, pool balances, and returned raw residuals after the second raw-representable deposit pass.
+  - RED/GREEN: `rtk sui move test decimal_quote_ --allow-dirty --build-env testnet --warnings-are-errors` first failed because the 12-decimal quote residual expected `1_000_001_999` instead of the second-pass `1_999`, then passed 12/12 after correcting the expected residual.
