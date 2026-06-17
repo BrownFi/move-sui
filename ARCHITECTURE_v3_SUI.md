@@ -799,7 +799,7 @@ Required math tests:
 - Boundary tests for `kB`, `kQ`, `lambda`, `gamma`, fee, decimals, and reserves.
 - Rounding monotonicity tests. Single-hop Pyth bundle exact-input quote outputs and exact-output quote required inputs are covered for both directions; broader route-level, mixed-decimal, and state-sequence monotonicity coverage remains pending.
 - Overflow bound tests. Initial coverage pins checked overflow behavior for low-decimal raw-to-standard amount scaling and `u256` to `u64` downcasts; broader swap-formula and AMM arithmetic bounds remain pending.
-- Pyth exponent/confidence conversion tests.
+- Pyth exponent/confidence conversion tests. BrownFi-owned Pyth source readings cover negative-exponent and positive-exponent price/confidence normalization into the 9-decimal BrownFi scale, and bundle digest coverage proves exponent metadata is committed even when normalized prices match; broader live-provider/PTB conversion evidence remains pending.
 - AMM sqrt-price to relative-price tests per adapter.
 
 ## Sui-Specific Differences From EVM

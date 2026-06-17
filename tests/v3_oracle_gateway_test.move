@@ -314,6 +314,74 @@ module brownfi_amm::v3_oracle_gateway_test {
     }
 
     #[test]
+    fun test_pyth_source_reading_normalizes_negative_exponent_confidence_to_9_decimals() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info_with_exponent(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                12_345_678_901,
+                10,
+                10,
+                true,
+                &mut scenario
+            );
+
+            let reading_a = pyth_source::read_price_a(&pio_a, &clock, &pool);
+
+            assert!(oracle_gateway::reading_price(&reading_a) == 1_234_567_890, 0);
+            assert!(oracle_gateway::reading_confidence(&reading_a) == 1, 1);
+            assert!(oracle_gateway::reading_decimals(&reading_a) == 9, 2);
+
+            price_info::destroy(pio_a);
+            return_shared(factory);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_pyth_source_reading_normalizes_positive_exponent_confidence_to_9_decimals() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let pio_a = new_pyth_price_info_with_exponent(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                2,
+                1,
+                1,
+                false,
+                &mut scenario
+            );
+
+            let reading_a = pyth_source::read_price_a(&pio_a, &clock, &pool);
+
+            assert!(oracle_gateway::reading_price(&reading_a) == 20_000_000_000, 0);
+            assert!(oracle_gateway::reading_confidence(&reading_a) == 10_000_000_000, 1);
+            assert!(oracle_gateway::reading_decimals(&reading_a) == 9, 2);
+
+            price_info::destroy(pio_a);
+            return_shared(factory);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     #[expected_failure(abort_code = oracle_gateway::EOraclePolicyMismatch)]
     fun test_pyth_source_rejects_unrepresentable_validity_window() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);

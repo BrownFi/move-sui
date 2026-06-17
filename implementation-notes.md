@@ -1856,3 +1856,7 @@
   - Finding: the architecture still listed rounding monotonicity tests as pending, while existing Pyth bundle quote tests pinned individual values but did not compare increasing input/output amounts.
   - Decision: add single-hop Pyth bundle monotonicity tests for both swap directions: exact-input quote outputs must not decrease as input increases, and exact-output required inputs must not decrease as requested output increases.
   - Verification: `rtk sui move test monotonic --allow-dirty --build-env testnet --warnings-are-errors` passed 2/2 immediately; no production change was required.
+- 2026-06-17 Pyth source exponent/confidence conversion coverage slice:
+  - Finding: Pyth source tests covered one negative-exponent bundle value and exponent metadata digesting, but did not directly assert `pyth_source` reading confidence conversion or positive-exponent normalization.
+  - Decision: add BrownFi-owned Pyth source reading tests for negative-exponent floor-to-9-decimal conversion and positive-exponent scale-up conversion. Both assert normalized price, normalized confidence, and stored BrownFi reading decimals.
+  - Verification: `rtk sui move test normalizes_ --allow-dirty --build-env testnet --warnings-are-errors` passed 9/9, including the two new Pyth conversion cases; no production change was required.
