@@ -1539,6 +1539,14 @@ export interface QuoteExactOutputWithPythRouteOptions {
   amountOut: SuiAmountInput;
 }
 
+export interface QuoteMaxBoundWithPythRouteOptions {
+  priceFeedConnection: PythPriceFeedUpdateFetcher;
+  pythClient: PythPriceFeedUpdater;
+  clock: ObjectInput;
+  path: readonly string[];
+  pairs: readonly PythRoutePriceHopOptions[];
+}
+
 export interface SwapExactAForBWithPythRouteOptions
   extends PairTypesOptions,
     PythRouteHopSourceOptions {
@@ -7085,6 +7093,25 @@ export async function quoteExactInputWithoutCutoffWithPythRoute(
     path: options.path,
     pairs: options.pairs,
     amountIn: options.amountIn
+  });
+}
+
+export async function quoteMaxBoundWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteMaxBoundWithPythRouteOptions
+): Promise<RouteQuoteResults> {
+  const providerRegistry = createRoutePriceProviderRegistry([
+    createPythRoutePriceProvider({
+      priceFeedConnection: options.priceFeedConnection,
+      pythClient: options.pythClient
+    })
+  ]);
+  return quoteMaxBoundWithRegisteredRoute(tx, {
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs
   });
 }
 

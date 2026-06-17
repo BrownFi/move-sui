@@ -8759,6 +8759,63 @@ test("quoteExactInputWithoutCutoffWithPythRoute chains raw Pyth route quote amou
   });
 });
 
+test("quoteMaxBoundWithPythRoute updates Pyth before max-bound route quote", async () => {
+  const { quoteMaxBoundWithPythRoute } = await import("../dist/index.js");
+  assert.equal(typeof quoteMaxBoundWithPythRoute, "function");
+
+  const tx = createTransactionRecorder();
+  const calls = [];
+  const result = await quoteMaxBoundWithPythRoute(tx, {
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        calls.push({ kind: "fetch", feedIds: feedIdsArg });
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(txArg.calls.length, 0);
+        calls.push({ kind: "update", updates: updatesArg, feedIds: feedIdsArg });
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    },
+    clock: "0x6",
+    path: ["0x1::a::A", "0x1::b::B"],
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      }
+    ]
+  });
+
+  assert.deepEqual(result.amounts, [
+    { kind: "nested-result", index: 3, resultIndex: 0 },
+    { kind: "nested-result", index: 3, resultIndex: 1 }
+  ]);
+  assert.deepEqual(calls, [
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"]
+    }
+  ]);
+  assert.deepEqual(
+    tx.calls.map((call) => call.target),
+    [
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::swap::quote_max_a_for_b_with_bundle"
+    ]
+  );
+});
+
 test("swapExactInputWithPythRoute plans a reverse two-hop PTB route from token path", async () => {
   const tx = createTransactionRecorder();
   const result = await swapExactInputWithPythRoute(tx, {

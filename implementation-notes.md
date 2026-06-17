@@ -1996,3 +1996,7 @@
   - Finding: the max-bound Move/router/SDK quote helpers existed, but serializable launch quote cases could not express or dry-run that Pyth quote path.
   - Decision: add a `max-bound-quote` launch-validation quote kind that hydrates through the registered provider registry, builds the Pyth reading-pair bundle, and calls the direction-selected single-hop max-bound bundle quote. Multi-hop max-bound launch configs are rejected during hydration because the underlying Move helper is single-hop.
   - RED/GREEN: `rtk npm test --prefix sdk/router` first failed with `Unknown BrownFi launch validation quote case kind: max-bound-quote`; after wiring SDK hydration/build support, the suite passed 208/208. The current-Pyth matrix template and checked live-evidence matrix now include the no-spend max-bound quote case.
+- 2026-06-17 Pyth max-bound route SDK wrapper:
+  - Finding: after registered-provider max-bound quote support landed, the SDK still lacked the Pyth-specific convenience wrapper matching the existing exact-input/exact-output Pyth route quote helpers.
+  - Decision: add `quoteMaxBoundWithPythRoute` as a thin Pyth provider-registry wrapper over `quoteMaxBoundWithRegisteredRoute`; no Move or economic behavior changes.
+  - RED/GREEN: `rtk npm test --prefix sdk/router` first failed because `quoteMaxBoundWithPythRoute` was not exported, then passed 209/209 after adding the wrapper and coverage proving Pyth updates happen before the max-bound bundle quote call.
