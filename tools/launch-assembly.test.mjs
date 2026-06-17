@@ -228,6 +228,18 @@ test("pyth current launch artifacts assemble from test coins and live feed value
     "1"
   );
   assert.equal(
+    quoteCaseByName(matrix, "pyth current testnet max-bound quote").kind,
+    "max-bound-quote"
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth current testnet max-bound quote").amountIn,
+    undefined
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth current testnet max-bound quote").amountOut,
+    undefined
+  );
+  assert.equal(
     quoteCaseByName(matrix, "pyth current testnet exact output raw quote").amountOut,
     "1"
   );

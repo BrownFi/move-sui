@@ -1066,14 +1066,19 @@ test("runPythLaunchSequence can preflight quote cases before submitting routes",
   const quotePreflight = {
     summary: {
       routeCaseCount: 0,
-      quoteCaseCount: 5,
-      totalCaseCount: 5,
+      quoteCaseCount: 6,
+      totalCaseCount: 6,
       providerIds: ["pyth"],
       routeCases: [],
       quoteCases: [
         {
           name: "pyth current testnet exact output round-trip quote",
           kind: "exact-output-round-trip-quote",
+          providerId: "pyth"
+        },
+        {
+          name: "pyth current testnet max-bound quote",
+          kind: "max-bound-quote",
           providerId: "pyth"
         }
       ]

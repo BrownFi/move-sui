@@ -800,6 +800,16 @@ export interface QuoteExactOutputWithRegisteredRouteOptions<
   amountOut: SuiAmountInput;
 }
 
+export interface QuoteMaxBoundWithRegisteredRouteOptions<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> {
+  providerRegistry: RoutePriceProviderRegistry<THop>;
+  providerId: string;
+  clock: ObjectInput;
+  path: readonly string[];
+  pairs: readonly THop[];
+}
+
 export interface RouteQuoteResults {
   quoteResults: readonly TransactionResult[];
   amounts: readonly TransactionArgument[];
@@ -861,12 +871,20 @@ export interface CreateExactOutputRoundTripRouteQuoteValidationCaseOptions<
   preflightContext?: string;
 }
 
+export interface CreateMaxBoundRouteQuoteValidationCaseOptions<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> extends QuoteMaxBoundWithRegisteredRouteOptions<THop> {
+  name: string;
+  preflightContext?: string;
+}
+
 export type LaunchValidationQuoteCaseKind =
   | "exact-input-quote"
   | "exact-input-without-cutoff-quote"
   | "exact-output-quote"
   | "exact-output-round-trip-quote"
-  | "exact-output-without-cutoff-quote";
+  | "exact-output-without-cutoff-quote"
+  | "max-bound-quote";
 
 export interface LaunchValidationQuoteBaseCaseConfig<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
@@ -899,11 +917,20 @@ export interface LaunchValidationExactOutputQuoteCaseConfig<
   amountIn?: never;
 }
 
+export interface LaunchValidationMaxBoundQuoteCaseConfig<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> extends LaunchValidationQuoteBaseCaseConfig<THop> {
+  kind: "max-bound-quote";
+  amountIn?: never;
+  amountOut?: never;
+}
+
 export type LaunchValidationQuoteCaseConfig<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 > =
   | LaunchValidationExactInputQuoteCaseConfig<THop>
-  | LaunchValidationExactOutputQuoteCaseConfig<THop>;
+  | LaunchValidationExactOutputQuoteCaseConfig<THop>
+  | LaunchValidationMaxBoundQuoteCaseConfig<THop>;
 
 export interface BuildLaunchValidationQuoteCasesOptions<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
@@ -3340,6 +3367,33 @@ export function createExactOutputWithoutCutoffRouteQuoteValidationCase<
   };
 }
 
+export function createMaxBoundRouteQuoteValidationCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+>(
+  options: CreateMaxBoundRouteQuoteValidationCaseOptions<THop>
+): LaunchValidationCase<RouteQuoteResults> {
+  const quoteOptions: QuoteMaxBoundWithRegisteredRouteOptions<THop> = {
+    providerRegistry: options.providerRegistry,
+    providerId: options.providerId,
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs
+  };
+
+  return {
+    name: options.name,
+    kind: "max-bound-quote",
+    providerId: options.providerId,
+    preflightContext: launchValidationPreflightContext(
+      options.name,
+      options.preflightContext
+    ),
+    build(tx) {
+      return quoteMaxBoundWithRegisteredRoute(tx, quoteOptions);
+    }
+  };
+}
+
 export function buildLaunchValidationQuoteCases<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 >(
@@ -3443,6 +3497,30 @@ export function buildLaunchValidationQuoteCases<
         path: quoteCase.path,
         pairs: quoteCase.pairs,
         amountOut: quoteCase.amountOut
+      });
+    }
+
+    if (quoteCase.kind === "max-bound-quote") {
+      getRoutePriceProvider(options.providerRegistry, quoteCase.providerId);
+      const route = validateLaunchRouteLimits(
+        quoteCase.name,
+        quoteCase.path,
+        quoteCase.pairs,
+        options.routeLimits
+      );
+      if (route.length !== 1) {
+        throw new Error(
+          `BrownFi launch validation ${quoteCase.name} max-bound quote requires exactly one hop: ${route.length}`
+        );
+      }
+      return createMaxBoundRouteQuoteValidationCase({
+        name: quoteCase.name,
+        providerRegistry: options.providerRegistry,
+        providerId: quoteCase.providerId,
+        preflightContext: quoteCase.preflightContext ?? quoteCase.context,
+        clock: quoteCase.clock,
+        path: quoteCase.path,
+        pairs: quoteCase.pairs
       });
     }
 
@@ -5549,6 +5627,59 @@ export async function quoteExactOutputWithoutCutoffWithRegisteredRoute<
   }
 
   return { quoteResults, amounts };
+}
+
+function quoteMaxBoundForResolvedRouteHop<THop extends RoutePriceHopOptions>(
+  tx: TransactionLike,
+  hop: ResolvedRouteHop<THop>,
+  priceBundle: TransactionArgument,
+  clock: ObjectInput
+): TransactionResult {
+  const commonOptions = {
+    packageId: hop.pair.packageId,
+    typeA: hop.pair.typeA,
+    typeB: hop.pair.typeB,
+    priceBundle,
+    clock,
+    pool: hop.pair.pool
+  };
+  const result =
+    hop.direction === "a_to_b"
+      ? quoteMaxAForBWithBundle(commonOptions)(tx)
+      : quoteMaxBForAWithBundle(commonOptions)(tx);
+  return result as TransactionResult;
+}
+
+export async function quoteMaxBoundWithRegisteredRoute<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+>(
+  tx: TransactionLike,
+  options: QuoteMaxBoundWithRegisteredRouteOptions<THop>
+): Promise<RouteQuoteResults> {
+  const route = resolveRoute(options.path, options.pairs);
+  if (route.length !== 1) {
+    throw new Error("BrownFi max-bound route quote requires exactly one hop");
+  }
+  const provider = getRoutePriceProvider(options.providerRegistry, options.providerId);
+  const priceBundles = await provider.buildPriceBundles(tx, {
+    clock: options.clock,
+    hops: route.map((hop) => hop.pair)
+  });
+
+  const quoteResult = quoteMaxBoundForResolvedRouteHop(
+    tx,
+    route[0],
+    routeBundleAt(priceBundles, 0),
+    options.clock
+  );
+
+  return {
+    quoteResults: [quoteResult],
+    amounts: [
+      transactionResultAt(quoteResult, 0, "max route input"),
+      transactionResultAt(quoteResult, 1, "max route output")
+    ]
+  };
 }
 
 function swapExactOutputForResolvedRouteHop<THop extends RoutePriceHopOptions>(

@@ -1340,6 +1340,113 @@ test("preflightLaunchValidationQuoteCases builds raw no-cutoff Pyth quote cases"
   });
 });
 
+test("preflightLaunchValidationQuoteCases builds Pyth max-bound quote cases", async () => {
+  const txs = [];
+  const createTransaction = (validationCase, index) => {
+    const tx = createTransactionRecorder();
+    tx.build = async () => `${validationCase.name}-bytes`;
+    txs[index] = tx;
+    return tx;
+  };
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const registry = createRoutePriceProviderRegistry([
+    createPythRoutePriceProvider({
+      priceFeedConnection: {
+        async getPriceFeedsUpdateData(feedIdsArg) {
+          return feedIdsArg.map((feedId) => ({ update: feedId }));
+        }
+      },
+      pythClient: {
+        async updatePriceFeeds() {
+          return ["0xPRICEA", "0xPRICEB"];
+        }
+      }
+    })
+  ]);
+  const pair = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+  const [forwardValidationCase] = buildLaunchValidationQuoteCases({
+    providerRegistry: registry,
+    cases: [
+      {
+        name: "pyth current max-bound forward quote",
+        kind: "max-bound-quote",
+        providerId: "pyth",
+        clock: "0x6",
+        path: ["0x1::a::A", "0x1::b::B"],
+        pairs: [pair]
+      }
+    ]
+  });
+  const forwardBuildTx = createTransactionRecorder();
+  const forwardBuild = await forwardValidationCase.build(forwardBuildTx);
+
+  const results = await preflightLaunchValidationQuoteCases({
+    providerRegistry: registry,
+    createTransaction,
+    suiClient,
+    cases: [
+      {
+        name: "pyth current max-bound forward quote",
+        kind: "max-bound-quote",
+        providerId: "pyth",
+        clock: "0x6",
+        path: ["0x1::a::A", "0x1::b::B"],
+        pairs: [pair]
+      },
+      {
+        name: "pyth current max-bound reverse quote",
+        kind: "max-bound-quote",
+        providerId: "pyth",
+        clock: "0x6",
+        path: ["0x1::b::B", "0x1::a::A"],
+        pairs: [pair]
+      }
+    ]
+  });
+
+  assert.deepEqual(
+    results.map((result) => [result.name, result.kind, result.providerId]),
+    [
+      ["pyth current max-bound forward quote", "max-bound-quote", "pyth"],
+      ["pyth current max-bound reverse quote", "max-bound-quote", "pyth"]
+    ]
+  );
+  assert.deepEqual(forwardBuild.amounts, [
+    { kind: "nested-result", index: 3, resultIndex: 0 },
+    { kind: "nested-result", index: 3, resultIndex: 1 }
+  ]);
+  assert.deepEqual(
+    txs.map((tx) => tx.calls.map((call) => call.target)),
+    [
+      [
+        "0xBROWN::pyth_source::read_price_a",
+        "0xBROWN::pyth_source::read_price_b",
+        "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+        "0xBROWN::swap::quote_max_a_for_b_with_bundle"
+      ],
+      [
+        "0xBROWN::pyth_source::read_price_a",
+        "0xBROWN::pyth_source::read_price_b",
+        "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+        "0xBROWN::swap::quote_max_b_for_a_with_bundle"
+      ]
+    ]
+  );
+});
+
 test("buildLaunchValidationMatrix hydrates route and quote launch sections", () => {
   const routeFactoryCalls = [];
   const providerRegistry = createRoutePriceProviderRegistry([

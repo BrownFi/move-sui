@@ -521,8 +521,8 @@ test("pyth-current testnet launch matrix matches Pyth-only launch profile", () =
 
   assert.deepEqual(summary, {
     routeCaseCount: 11,
-    quoteCaseCount: 5,
-    totalCaseCount: 16,
+    quoteCaseCount: 6,
+    totalCaseCount: 17,
     providerIds: ["pyth"],
     routeCases: [
       {
@@ -595,6 +595,11 @@ test("pyth-current testnet launch matrix matches Pyth-only launch profile", () =
       {
         name: "pyth current testnet exact output round-trip quote",
         kind: "exact-output-round-trip-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth current testnet max-bound quote",
+        kind: "max-bound-quote",
         providerId: "pyth"
       },
       {
@@ -622,8 +627,8 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
 
   assert.deepEqual(summary, {
     routeCaseCount: 11,
-    quoteCaseCount: 5,
-    totalCaseCount: 16,
+    quoteCaseCount: 6,
+    totalCaseCount: 17,
     providerIds: ["pyth"],
     routeCases: [
       {
@@ -696,6 +701,11 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
       {
         name: "pyth current testnet exact output round-trip quote",
         kind: "exact-output-round-trip-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth current testnet max-bound quote",
+        kind: "max-bound-quote",
         providerId: "pyth"
       },
       {
