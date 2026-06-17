@@ -313,8 +313,8 @@ public fun add_liquidity_with_bundle<A, B>(
 
     assert!(input_a_val > 0 && input_b_val > 0, EZeroInput);
     assert!(pool_a_val <= MAX_POOL_BALANCE && pool_b_val <= MAX_POOL_BALANCE, EPoolBalanceTooLarge);
-    assert!(pool_a_val + input_a_val <= MAX_POOL_BALANCE, EPoolBalanceTooLarge);
-    assert!(pool_b_val + input_b_val <= MAX_POOL_BALANCE, EPoolBalanceTooLarge);
+    assert_pool_balance_can_accept_input(pool_a_val, input_a_val);
+    assert_pool_balance_can_accept_input(pool_b_val, input_b_val);
 
     oracle_gateway::assert_bundle_valid_for_pool(price_bundle, pool, clock);
     let oracle_relative_price = oracle_gateway::bundle_oracle_relative_price(price_bundle);

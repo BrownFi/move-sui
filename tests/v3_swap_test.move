@@ -27,6 +27,7 @@ module brownfi_amm::v3_swap_test {
     const ADDR2: address = @0xB;
     const K_TWO: u64 = 8_589_934_592;
     const MAX_POOL_BALANCE: u64 = 1_000_000_000_000_000_000;
+    const MAX_U64: u64 = 18_446_744_073_709_551_615;
 
     #[test]
     fun test_swap_a_for_b_with_bundle_uses_pyth_reading_bundle() {
@@ -731,6 +732,39 @@ module brownfi_amm::v3_swap_test {
             let bundle = pyth_one_dollar_bundle(&pool, &clock);
 
             let input_a = balance::create_for_testing<A>(1_000);
+            let input_b = balance::create_for_testing<B>(1_000);
+            let (remaining_a, remaining_b, lp) = swap::add_liquidity_with_bundle(
+                &bundle,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                0
+            );
+
+            balance::destroy_for_testing(remaining_a);
+            balance::destroy_for_testing(remaining_b);
+            balance::destroy_for_testing(lp);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = swap::EPoolBalanceTooLarge)]
+    fun test_add_liquidity_with_bundle_rejects_input_that_overflows_cap_addition() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool(&mut scenario);
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let bundle = pyth_one_dollar_bundle(&pool, &clock);
+
+            let input_a = balance::create_for_testing<A>(MAX_U64);
             let input_b = balance::create_for_testing<B>(1_000);
             let (remaining_a, remaining_b, lp) = swap::add_liquidity_with_bundle(
                 &bundle,

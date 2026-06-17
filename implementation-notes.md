@@ -1918,3 +1918,7 @@
   - Finding: exact-input and exact-output swaps deposited the input side without checking whether `current_reserve + input` would exceed the raw `MAX_POOL_BALANCE`, so swaps could bypass the cap already enforced by pool creation and add-liquidity.
   - Decision: add one shared swap guard and call it before every state-changing input deposit: exact-input A/B use the caller input amount, while exact-output A/B use the computed required input before splitting the caller coin.
   - RED/GREEN: `rtk sui move test input_reserve_above_cap --allow-dirty --build-env testnet --warnings-are-errors` first failed because both new Pyth bundle swap cap tests completed successfully, then passed 2/2 after wiring the guard.
+- 2026-06-17 Pyth add-liquidity cap-addition overflow slice:
+  - Finding: add-liquidity already rejected deposits above `MAX_POOL_BALANCE`, but it used raw `u64` addition for the cap check, so an oversized input could abort with an arithmetic error before BrownFi's `EPoolBalanceTooLarge`.
+  - Decision: route the add-liquidity cap check through the shared u128 reserve/input guard used by swaps.
+  - RED/GREEN: `rtk sui move test input_that_overflows_cap_addition --allow-dirty --build-env testnet --warnings-are-errors` first failed with a raw arithmetic overflow at the cap check, then passed 1/1 after replacing the raw addition.
