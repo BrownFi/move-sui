@@ -785,6 +785,41 @@ module brownfi_amm::v3_swap_test {
     }
 
     #[test]
+    #[expected_failure(abort_code = 0, location = brownfi_amm::math)]
+    fun test_quote_a_for_b_with_bundle_aborts_when_input_overflows_standard_amount() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_pool_with_amounts_and_decimals(
+            &mut scenario,
+            20_000_000,
+            20_000_000_000,
+            0,
+            9
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let pool = take_shared<Pool<A, B>>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let bundle = pyth_one_dollar_bundle(&pool, &clock);
+
+            let (amount_out, raw_output, cutoff_output) = swap::quote_a_for_b_with_bundle(
+                &bundle,
+                &clock,
+                &pool,
+                18_446_744_074
+            );
+
+            assert!(amount_out > 0, 0);
+            assert!(raw_output > 0, 1);
+            assert!(cutoff_output > 0, 2);
+            return_shared(clock);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_swap_b_for_a_with_bundle_uses_pyth_reading_bundle() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool(&mut scenario);
