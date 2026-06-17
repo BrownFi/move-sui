@@ -23,6 +23,7 @@ module brownfi_amm::v3_flash_test {
     use brownfi_oracle::oracle::{Self as oracle, OracleAdapter};
 
     const ADDR1: address = @0xA;
+    const MAX_POOL_BALANCE: u64 = 1_000_000_000_000_000_000;
 
     #[test]
     #[expected_failure(abort_code = flash::EFlashDisabled)]
@@ -327,6 +328,46 @@ module brownfi_amm::v3_flash_test {
 
             assert!(brownfi_amm::pool::balance_a(&pool) == 1_000_000, 0);
             assert!(brownfi_amm::pool::balance_b(&pool) == 1_000_002, 0);
+
+            return_shared(factory);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = flash::EFlashBalanceCap)]
+    fun test_flash_borrow_rejects_fee_that_crosses_pool_balance_cap() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, MAX_POOL_BALANCE, MAX_POOL_BALANCE);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let factory = take_shared<Factory>(&scenario);
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let pause_cap = take_from_sender<PauseCap>(&scenario);
+
+            admin::set_pool_flash_enabled(&mut pool, &pause_cap, true);
+            return_to_sender<PauseCap>(&scenario, pause_cap);
+
+            let bundle = oracle_gateway::get_swap_price_bundle(&oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &pool
+            );
+            let (mut borrowed, receipt) = flash::borrow_a(&mut pool, &bundle, &clock, 1);
+            balance::join(&mut borrowed, balance::create_for_testing<A>(flash::fee_amount(&receipt)));
+            flash::repay_a(&mut pool, &bundle, &clock, borrowed, receipt);
 
             return_shared(factory);
             return_shared(oracle);

@@ -18,10 +18,12 @@ const EFlashPolicyMismatch: u64 = 6;
 const EInvalidRepayment: u64 = 7;
 const EFlashBalanceInvariant: u64 = 8;
 const EFlashPriceBundleMismatch: u64 = 9;
+const EFlashBalanceCap: u64 = 10;
 
 const DIRECTION_A: u8 = 0;
 const DIRECTION_B: u8 = 1;
 const PRECISION: u128 = 100_000_000;
+const MAX_POOL_BALANCE: u64 = 1_000_000_000_000_000_000;
 
 public struct FlashReceipt<phantom A, phantom B> {
     pool_id: ID,
@@ -48,11 +50,13 @@ public fun borrow_a<A, B>(
     assert!(amount <= pool::balance_a(pool), EInsufficientLiquidity);
 
     let fee_amount = flash_fee(amount, pool::fee(pool));
+    assert_pool_balance_after_fee(pool::balance_a(pool), fee_amount);
+    let amount_due = amount + fee_amount;
     let receipt = FlashReceipt<A, B> {
         pool_id: pool::id(pool),
         direction: DIRECTION_A,
         borrowed_amount: amount,
-        amount_due: amount + fee_amount,
+        amount_due,
         fee_amount,
         pre_balance_a: pool::balance_a(pool),
         pre_balance_b: pool::balance_b(pool),
@@ -66,7 +70,7 @@ public fun borrow_a<A, B>(
         type_name::with_defining_ids<A>(),
         DIRECTION_A,
         amount,
-        amount + fee_amount,
+        amount_due,
         fee_amount,
         oracle_gateway::bundle_policy_version(bundle),
         oracle_gateway::bundle_policy_digest(bundle),
@@ -99,11 +103,13 @@ public fun borrow_b<A, B>(
     assert!(amount <= pool::balance_b(pool), EInsufficientLiquidity);
 
     let fee_amount = flash_fee(amount, pool::fee(pool));
+    assert_pool_balance_after_fee(pool::balance_b(pool), fee_amount);
+    let amount_due = amount + fee_amount;
     let receipt = FlashReceipt<A, B> {
         pool_id: pool::id(pool),
         direction: DIRECTION_B,
         borrowed_amount: amount,
-        amount_due: amount + fee_amount,
+        amount_due,
         fee_amount,
         pre_balance_a: pool::balance_a(pool),
         pre_balance_b: pool::balance_b(pool),
@@ -117,7 +123,7 @@ public fun borrow_b<A, B>(
         type_name::with_defining_ids<B>(),
         DIRECTION_B,
         amount,
-        amount + fee_amount,
+        amount_due,
         fee_amount,
         oracle_gateway::bundle_policy_version(bundle),
         oracle_gateway::bundle_policy_digest(bundle),
@@ -264,4 +270,11 @@ public fun fee_amount<A, B>(receipt: &FlashReceipt<A, B>): u64 {
 
 fun flash_fee(amount: u64, fee: u32): u64 {
     math::mul_div_up_to_u64((amount as u128), (fee as u128), PRECISION)
+}
+
+fun assert_pool_balance_after_fee(pre_balance: u64, fee_amount: u64) {
+    assert!(
+        (pre_balance as u128) + (fee_amount as u128) <= (MAX_POOL_BALANCE as u128),
+        EFlashBalanceCap
+    );
 }
