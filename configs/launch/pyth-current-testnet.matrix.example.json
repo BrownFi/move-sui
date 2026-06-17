@@ -370,6 +370,31 @@
       "amountOut": "1"
     },
     {
+      "name": "pyth current testnet exact output round-trip quote",
+      "kind": "exact-output-round-trip-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    },
+    {
       "name": "pyth current testnet exact input raw quote",
       "kind": "exact-input-without-cutoff-quote",
       "providerId": "pyth",

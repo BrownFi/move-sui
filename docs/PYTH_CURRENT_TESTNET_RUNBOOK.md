@@ -20,7 +20,7 @@ The checked live evidence file is verifier-only:
 - `configs/launch/pyth-current-testnet.live-evidence.matrix.json`
 
 It records historical landed transactions. Its route input coin IDs may be spent, so do not submit from it.
-It also carries live-value-clean cutoff-aware and raw/no-cutoff exact-input and exact-output quote cases for coverage validation; those quote cases do not have tx evidence because they are no-spend cases.
+It also carries live-value-clean cutoff-aware and raw/no-cutoff exact-input and exact-output quote cases, plus an exact-output round-trip quote case, for coverage validation; those quote cases do not have tx evidence because they are no-spend cases.
 
 ## Requirements
 
@@ -63,7 +63,7 @@ rtk "$NODE24" tools/run-launch-matrix-preflight.mjs \
 ```
 
 The quote-only preflight skips historical route input coins from the evidence matrix.
-The 2026-06-16 testnet run returned four Pyth quote cases, including their cutoff-aware/raw quote kinds, and zero route cases.
+The 2026-06-17 testnet dry-run returned five Pyth quote cases: cutoff-aware exact input/output, exact-output round trip, and raw/no-cutoff exact input/output. It returned zero route cases in `--quote-only` mode.
 
 Check current-Pyth runtime readiness without submitting transactions:
 

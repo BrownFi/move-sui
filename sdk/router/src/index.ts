@@ -852,10 +852,18 @@ export interface CreateExactOutputRouteQuoteValidationCaseOptions<
   preflightContext?: string;
 }
 
+export interface CreateExactOutputRoundTripRouteQuoteValidationCaseOptions<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+> extends QuoteExactOutputWithRegisteredRouteOptions<THop> {
+  name: string;
+  preflightContext?: string;
+}
+
 export type LaunchValidationQuoteCaseKind =
   | "exact-input-quote"
   | "exact-input-without-cutoff-quote"
   | "exact-output-quote"
+  | "exact-output-round-trip-quote"
   | "exact-output-without-cutoff-quote";
 
 export interface LaunchValidationQuoteBaseCaseConfig<
@@ -881,7 +889,10 @@ export interface LaunchValidationExactInputQuoteCaseConfig<
 export interface LaunchValidationExactOutputQuoteCaseConfig<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 > extends LaunchValidationQuoteBaseCaseConfig<THop> {
-  kind: "exact-output-quote" | "exact-output-without-cutoff-quote";
+  kind:
+    | "exact-output-quote"
+    | "exact-output-round-trip-quote"
+    | "exact-output-without-cutoff-quote";
   amountOut: SuiAmountInput;
   amountIn?: never;
 }
@@ -3192,6 +3203,53 @@ export function createExactOutputRouteQuoteValidationCase<
   };
 }
 
+export function createExactOutputRoundTripRouteQuoteValidationCase<
+  THop extends RoutePriceHopOptions = RoutePriceHopOptions
+>(
+  options: CreateExactOutputRoundTripRouteQuoteValidationCaseOptions<THop>
+): LaunchValidationCase<RouteQuoteResults> {
+  const exactOutputOptions: QuoteExactOutputWithRegisteredRouteOptions<THop> = {
+    providerRegistry: options.providerRegistry,
+    providerId: options.providerId,
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs,
+    amountOut: options.amountOut
+  };
+
+  return {
+    name: options.name,
+    kind: "exact-output-round-trip-quote",
+    providerId: options.providerId,
+    preflightContext: launchValidationPreflightContext(
+      options.name,
+      options.preflightContext
+    ),
+    async build(tx) {
+      const exactOutputQuote = await quoteExactOutputWithRegisteredRoute(
+        tx,
+        exactOutputOptions
+      );
+      const exactInputQuote = await quoteExactInputWithRegisteredRoute(tx, {
+        providerRegistry: options.providerRegistry,
+        providerId: options.providerId,
+        clock: options.clock,
+        path: options.path,
+        pairs: options.pairs,
+        amountIn: exactOutputQuote.amounts[0]
+      });
+
+      return {
+        quoteResults: [
+          ...exactOutputQuote.quoteResults,
+          ...exactInputQuote.quoteResults
+        ],
+        amounts: exactInputQuote.amounts
+      };
+    }
+  };
+}
+
 export function createExactOutputWithoutCutoffRouteQuoteValidationCase<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 >(
@@ -3275,6 +3333,26 @@ export function buildLaunchValidationQuoteCases<
         options.routeLimits
       );
       return createExactOutputRouteQuoteValidationCase({
+        name: quoteCase.name,
+        providerRegistry: options.providerRegistry,
+        providerId: quoteCase.providerId,
+        preflightContext: quoteCase.preflightContext ?? quoteCase.context,
+        clock: quoteCase.clock,
+        path: quoteCase.path,
+        pairs: quoteCase.pairs,
+        amountOut: quoteCase.amountOut
+      });
+    }
+
+    if (quoteCase.kind === "exact-output-round-trip-quote") {
+      getRoutePriceProvider(options.providerRegistry, quoteCase.providerId);
+      validateLaunchRouteLimits(
+        quoteCase.name,
+        quoteCase.path,
+        quoteCase.pairs,
+        options.routeLimits
+      );
+      return createExactOutputRoundTripRouteQuoteValidationCase({
         name: quoteCase.name,
         providerRegistry: options.providerRegistry,
         providerId: quoteCase.providerId,

@@ -1053,6 +1053,166 @@ test("preflightLaunchValidationQuoteCases builds and dry-runs Pyth quote cases",
   ]);
 });
 
+test("preflightLaunchValidationQuoteCases builds and dry-runs Pyth exact-output round-trip quote cases", async () => {
+  const txs = [];
+  const calls = [];
+  const createTransaction = (validationCase, index) => {
+    calls.push({ kind: "createTransaction", index, name: validationCase.name });
+    const tx = createTransactionRecorder();
+    tx.build = async (input) => {
+      calls.push({
+        kind: "build",
+        index,
+        input,
+        moveCallTargets: tx.calls.map((call) => call.target)
+      });
+      return `${validationCase.name}-bytes`;
+    };
+    txs[index] = tx;
+    return tx;
+  };
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      calls.push({ kind: "dryRun", input });
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const registry = createRoutePriceProviderRegistry([
+    createPythRoutePriceProvider({
+      priceFeedConnection: {
+        async getPriceFeedsUpdateData(feedIdsArg) {
+          calls.push({ kind: "fetchPythUpdates", feedIds: feedIdsArg });
+          return feedIdsArg.map((feedId) => ({ update: feedId }));
+        }
+      },
+      pythClient: {
+        async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+          const txIndex = txs.indexOf(txArg);
+          assert.notEqual(txIndex, -1);
+          calls.push({
+            kind: "updatePyth",
+            txIndex,
+            callsBeforeUpdate: txArg.calls.length,
+            updates: updatesArg,
+            feedIds: feedIdsArg
+          });
+          return txArg.calls.length === 0
+            ? ["0xOUT_PRICEA", "0xOUT_PRICEB"]
+            : ["0xIN_PRICEA", "0xIN_PRICEB"];
+        }
+      }
+    })
+  ]);
+
+  const results = await preflightLaunchValidationQuoteCases({
+    providerRegistry: registry,
+    createTransaction,
+    suiClient,
+    cases: [
+      {
+        name: "pyth current exact output round-trip quote",
+        kind: "exact-output-round-trip-quote",
+        providerId: "pyth",
+        clock: "0x6",
+        path: ["0x1::a::A", "0x1::b::B"],
+        pairs: [
+          {
+            packageId: "0xBROWN",
+            typeA: "0x1::a::A",
+            typeB: "0x1::b::B",
+            pool: "0xPOOLAB",
+            feedIds: ["feed-a", "feed-b"]
+          }
+        ],
+        amountOut: 7n
+      }
+    ]
+  });
+
+  assert.deepEqual(
+    results.map((result) => ({
+      name: result.name,
+      kind: result.kind,
+      providerId: result.providerId,
+      dryRunResult: result.dryRunResult
+    })),
+    [
+      {
+        name: "pyth current exact output round-trip quote",
+        kind: "exact-output-round-trip-quote",
+        providerId: "pyth",
+        dryRunResult: {
+          effects: { status: { status: "success" } },
+          transactionBlock: "pyth current exact output round-trip quote-bytes"
+        }
+      }
+    ]
+  );
+  assert.deepEqual(txs[0].calls[7].arguments[3], {
+    kind: "nested-result",
+    index: 3,
+    resultIndex: 0
+  });
+  assert.deepEqual(
+    txs[0].calls.map((call) => call.target),
+    [
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::swap::quote_a_for_exact_b_with_bundle",
+      "0xBROWN::pyth_source::read_price_a",
+      "0xBROWN::pyth_source::read_price_b",
+      "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+      "0xBROWN::swap::quote_a_for_b_with_bundle"
+    ]
+  );
+  assert.deepEqual(calls, [
+    {
+      kind: "createTransaction",
+      index: 0,
+      name: "pyth current exact output round-trip quote"
+    },
+    { kind: "fetchPythUpdates", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "updatePyth",
+      txIndex: 0,
+      callsBeforeUpdate: 0,
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"]
+    },
+    { kind: "fetchPythUpdates", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "updatePyth",
+      txIndex: 0,
+      callsBeforeUpdate: 4,
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"]
+    },
+    {
+      kind: "build",
+      index: 0,
+      input: { client: suiClient },
+      moveCallTargets: [
+        "0xBROWN::pyth_source::read_price_a",
+        "0xBROWN::pyth_source::read_price_b",
+        "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+        "0xBROWN::swap::quote_a_for_exact_b_with_bundle",
+        "0xBROWN::pyth_source::read_price_a",
+        "0xBROWN::pyth_source::read_price_b",
+        "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+        "0xBROWN::swap::quote_a_for_b_with_bundle"
+      ]
+    },
+    {
+      kind: "dryRun",
+      input: { transactionBlock: "pyth current exact output round-trip quote-bytes" }
+    }
+  ]);
+});
+
 test("preflightLaunchValidationQuoteCases builds raw no-cutoff Pyth quote cases", async () => {
   const txs = [];
   const createTransaction = (validationCase, index) => {

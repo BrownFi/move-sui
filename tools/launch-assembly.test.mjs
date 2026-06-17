@@ -224,6 +224,10 @@ test("pyth current launch artifacts assemble from test coins and live feed value
     "1"
   );
   assert.equal(
+    quoteCaseByName(matrix, "pyth current testnet exact output round-trip quote").amountOut,
+    "1"
+  );
+  assert.equal(
     quoteCaseByName(matrix, "pyth current testnet exact output raw quote").amountOut,
     "1"
   );
