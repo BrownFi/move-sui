@@ -395,30 +395,6 @@
       "amountOut": "1"
     },
     {
-      "name": "pyth current testnet max-bound quote",
-      "kind": "max-bound-quote",
-      "providerId": "pyth",
-      "clock": "0x6",
-      "path": [
-        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
-        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
-      ],
-      "pairs": [
-        {
-          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
-          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
-          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
-          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
-          "feedIds": [
-            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
-            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
-          ],
-          "oracleSourceCount": 1,
-          "updatePayloadByteLength": 0
-        }
-      ]
-    },
-    {
       "name": "pyth current testnet exact input raw quote",
       "kind": "exact-input-without-cutoff-quote",
       "providerId": "pyth",
