@@ -2006,3 +2006,7 @@
   - Decision: add thin Pyth wrappers for add-liquidity, remove-liquidity, zap, and same-PTB flash borrow/repay. Add/zap/flash use the existing Pyth provider-registry path and keep provider updates before BrownFi calls; remove-liquidity delegates to the oracle-free coin remove entrypoint and does not fetch Pyth.
   - Type fix: split registered zap/flash execution case types from preflight case types, because plain PTB construction only needs `TransactionLike`; dry-run preflight still requires `SuiTransactionBlockBuilderLike`.
   - RED/GREEN: `rtk npm test --prefix sdk/router` first failed because `addLiquidityWithPythRoute`, `removeLiquidityWithPythRoute`, `zapWithPythRoute`, and `flashBorrowWithPythRoute` were not exported. After adding the wrappers and type split, the suite passed 213/213.
+- 2026-06-18 Pyth route state-sequence monotonicity coverage slice:
+  - Finding: single-hop Pyth state-sequence monotonicity was covered, while typed two-hop route monotonicity was only pinned before route reserves changed.
+  - Decision: add a two-hop Pyth route test that executes `A -> B -> C` and `C -> B -> A` bundle swaps, then checks exact-input and exact-output route quote monotonicity against the mutated pools. This is coverage-only; route quote logic did not change.
+  - Verification: `rtk sui move test test_router_pyth_bundle_route_quotes_remain_monotonic_after_state_sequence --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.

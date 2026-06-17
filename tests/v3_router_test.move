@@ -2733,6 +2733,166 @@ module brownfi_amm::v3_router_test {
     }
 
     #[test]
+    fun test_router_pyth_bundle_route_quotes_remain_monotonic_after_state_sequence() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_route_with_balances(
+            &mut scenario,
+            10_000_000_000,
+            10_000_000_000,
+            10_000_000_000,
+            10_000_000_000
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let mut pool_ab = take_shared<Pool<A, B>>(&scenario);
+            let mut pool_bc = take_shared<Pool<B, C>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_c = new_pyth_price_info(
+                x"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle_ab = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool_ab);
+            let bundle_bc = pyth_bundle_for_pool(&pio_b, &pio_c, &clock, &pool_bc);
+            let input_a = coin::from_balance(balance::create_for_testing<A>(500_000_000), ctx(&mut scenario));
+            let input_c = coin::from_balance(balance::create_for_testing<C>(300_000_000), ctx(&mut scenario));
+
+            let c_out = router::swap_exact_a_for_c_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &mut pool_ab,
+                &mut pool_bc,
+                input_a,
+                0,
+                0,
+                ctx(&mut scenario)
+            );
+            let a_out = router::swap_exact_c_for_a_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &mut pool_ab,
+                &mut pool_bc,
+                input_c,
+                0,
+                0,
+                ctx(&mut scenario)
+            );
+
+            let (_, small_b, small_c) = router::quote_exact_a_for_c_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                100_000_000
+            );
+            let (_, large_b, large_c) = router::quote_exact_a_for_c_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                200_000_000
+            );
+            let (_, small_rev_b, small_a) = router::quote_exact_c_for_a_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                100_000_000
+            );
+            let (_, large_rev_b, large_a) = router::quote_exact_c_for_a_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                200_000_000
+            );
+
+            let (small_req_a, small_req_b, small_effective_c) =
+                router::quote_a_for_exact_c_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    100_000_000
+                );
+            let (large_req_a, large_req_b, large_effective_c) =
+                router::quote_a_for_exact_c_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    200_000_000
+                );
+            let (small_req_c, small_req_rev_b, small_effective_a) =
+                router::quote_c_for_exact_a_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    100_000_000
+                );
+            let (large_req_c, large_req_rev_b, large_effective_a) =
+                router::quote_c_for_exact_a_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    200_000_000
+                );
+
+            assert!(large_b >= small_b, 0);
+            assert!(large_c >= small_c, 1);
+            assert!(large_rev_b >= small_rev_b, 2);
+            assert!(large_a >= small_a, 3);
+            assert!(small_effective_c == 100_000_000, 4);
+            assert!(large_effective_c == 200_000_000, 5);
+            assert!(large_req_a >= small_req_a, 6);
+            assert!(large_req_b >= small_req_b, 7);
+            assert!(small_effective_a == 100_000_000, 8);
+            assert!(large_effective_a == 200_000_000, 9);
+            assert!(large_req_c >= small_req_c, 10);
+            assert!(large_req_rev_b >= small_req_rev_b, 11);
+
+            balance::destroy_for_testing(coin::into_balance(c_out));
+            balance::destroy_for_testing(coin::into_balance(a_out));
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            price_info::destroy(pio_c);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool_ab);
+            return_shared(pool_bc);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_router_pyth_bundle_mixed_decimal_exact_input_route_quotes_are_monotonic_in_amount() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_route_with_balances_and_decimals(
