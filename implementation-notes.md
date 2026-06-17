@@ -1880,3 +1880,7 @@
   - Finding: Pyth bundle add-liquidity decimal coverage covered single non-9-decimal quote/base sides, but not both-token 6/12 or 12/6 pools.
   - Decision: add 6/12 and 12/6 Pyth bundle add-liquidity tests that pin LP minting, pool balances, and returned raw residuals after the second raw-representable deposit pass.
   - RED/GREEN: `rtk sui move test decimal_quote_ --allow-dirty --build-env testnet --warnings-are-errors` first failed because the 12-decimal quote residual expected `1_000_001_999` instead of the second-pass `1_999`, then passed 12/12 after correcting the expected residual.
+- 2026-06-17 Pyth add-liquidity reserve boundary coverage slice:
+  - Finding: the architecture required reserve boundary coverage, and `swap::add_liquidity_with_bundle` already rejects raw pool balances that would cross `MAX_POOL_BALANCE`, but the active Pyth bundle path did not have a targeted test for that cap.
+  - Decision: add a Pyth bundle add-liquidity expected-abort test with both reserves just below the raw cap and a deposit that crosses it. This is coverage-only; no production logic changed.
+  - Verification: `rtk sui move test test_add_liquidity_with_bundle_rejects_reserve_above_cap --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1.
