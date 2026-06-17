@@ -1976,3 +1976,7 @@
   - Finding: launch evidence expected Move calls and event types are arrays, but the verifier only checked `actual.includes(expected)`. Duplicate expected calls/events from multi-hop routes could be satisfied by one observed occurrence, weakening evidence for repeated BrownFi hop execution.
   - Decision: make `tools/verify-sui-cli-tx-evidence.mjs` consume actual values as a multiset, so each expected occurrence must be present independently while preserving the existing matrix schema and error wording.
   - RED/GREEN: focused verifier tests first failed because duplicate expected Move-call/event expectations did not throw; after the count-aware assertion patch, `rtk node --test tools/verify-sui-cli-tx-evidence.test.mjs` passed 17/17.
+- 2026-06-17 multi-hop route event evidence slice:
+  - Finding: after count-aware evidence verification, launch-submit generated one swap event expectation set regardless of route hop count, while multi-hop exact-input and result-aware exact-output routes execute one state-changing BrownFi swap per hop.
+  - Decision: generate swap-route event expectations from the resolved route, repeating `OracleQuorumUsed`, `Sync`, `PriceBundleUsed`, `SwapExecuted`, and `Swap` once per hop and using each hop package ID.
+  - RED/GREEN: focused submit test first failed because a three-hop exact-input route reported only five events instead of fifteen. After the per-hop event generation fix, the submit test file passed 23/23 and `rtk node --test tools/*.test.mjs` passed 173/173.

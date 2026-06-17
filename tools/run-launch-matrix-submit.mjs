@@ -304,6 +304,21 @@ function expectedMoveCallsForRouteCase(routeCase) {
   ];
 }
 
+function swapRouteEventTypes(route) {
+  const events = [];
+  for (const hop of route) {
+    const eventType = (name) => moveTarget(hop.pair.packageId, "events", name);
+    events.push(
+      eventType("OracleQuorumUsed"),
+      eventType("Sync"),
+      eventType("PriceBundleUsed"),
+      eventType("SwapExecuted"),
+      eventType("Swap")
+    );
+  }
+  return events;
+}
+
 function expectedEventTypesForRouteCase(routeCase) {
   const packageId = packageIdForRouteCase(routeCase);
   const eventType = (name) => `${packageId}::events::${name}`;
@@ -344,13 +359,7 @@ function expectedEventTypesForRouteCase(routeCase) {
       eventType("FlashRepaid")
     ];
   }
-  return [
-    eventType("OracleQuorumUsed"),
-    eventType("Sync"),
-    eventType("PriceBundleUsed"),
-    eventType("SwapExecuted"),
-    eventType("Swap")
-  ];
+  return swapRouteEventTypes(resolveRoute(routeCase.path, routeCase.pairs));
 }
 
 function executionStatus(executionResult) {

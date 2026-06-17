@@ -470,6 +470,67 @@ test("submitLaunchMatrixRoutesConfigFile sends two-hop exact-output final output
   assert.equal(report.summary.routeCaseCount, 1);
 });
 
+test("submitLaunchMatrixRoutesConfigFile reports per-hop event evidence for arbitrary-hop exact-input routes", async () => {
+  const root = fixtureRoot();
+  const config = writeMatrix(root, {
+    routeLimits: {
+      maxHops: 3,
+      maxOracleSourcesPerHop: 1,
+      maxAmmSourcesPerHop: 0,
+      maxUpdatePayloadBytes: 0
+    },
+    routeCases: [
+      {
+        name: "custom three-hop exact input route",
+        kind: "exact-input",
+        providerId: "custom",
+        clock: "0x6",
+        path: [
+          "0x1::coin_a::COIN_A",
+          "0x1::coin_c::COIN_C",
+          "0x1::coin_b::COIN_B",
+          "0x1::coin_d::COIN_D"
+        ],
+        pairs: [routePairAC(), routePairBC(), routePairBD()],
+        input: "0x3",
+        minOutputs: ["1", "1", "1"],
+        recipient: "0xdef"
+      }
+    ]
+  });
+  const runtime = writeRuntime(root, {
+    requireTransfers: true,
+    expectedTransferObjectCounts: [1],
+    expectedTransferRecipients: [["0xdef"]]
+  });
+
+  const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
+
+  assert.equal(report.summary.routeCaseCount, 1);
+  assert.deepEqual(report.txEvidence[0].expectedMoveCalls, [
+    "0x1::router::swap_exact_a_for_b_with_bundle",
+    "0x1::router::swap_exact_b_for_a_with_bundle",
+    "0x1::router::swap_exact_a_for_b_with_bundle"
+  ]);
+  assert.deepEqual(report.txEvidence[0].expectedEventTypes, [
+    "0x1::events::OracleQuorumUsed",
+    "0x1::events::Sync",
+    "0x1::events::PriceBundleUsed",
+    "0x1::events::SwapExecuted",
+    "0x1::events::Swap",
+    "0x1::events::OracleQuorumUsed",
+    "0x1::events::Sync",
+    "0x1::events::PriceBundleUsed",
+    "0x1::events::SwapExecuted",
+    "0x1::events::Swap",
+    "0x1::events::OracleQuorumUsed",
+    "0x1::events::Sync",
+    "0x1::events::PriceBundleUsed",
+    "0x1::events::SwapExecuted",
+    "0x1::events::Swap"
+  ]);
+});
+
 test("submitLaunchMatrixRoutesConfigFile sends arbitrary-hop exact-output-results final output to recipient", async () => {
   const root = fixtureRoot();
   const config = writeMatrix(root, {
