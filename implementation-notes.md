@@ -1864,3 +1864,7 @@
   - Finding: single-hop Pyth bundle quote monotonicity was covered, but typed two-hop Pyth route quotes were only covered by value and round-trip checks.
   - Decision: add typed `A -> B -> C` and `C -> B -> A` route quote monotonicity tests for both exact-input and exact-output helpers. This is coverage-only because the existing router quote path already implements the behavior.
   - Verification: `rtk sui move test route_quotes_are_monotonic --allow-dirty --build-env testnet --warnings-are-errors` passed 2/2.
+- 2026-06-17 Pyth mixed-decimal route monotonicity coverage slice:
+  - Finding: two-hop route monotonicity coverage still used only 9-decimal tokens, leaving mixed-decimal route rounding unpinned.
+  - Decision: add a mixed-decimal typed route fixture with 6-decimal A, 9-decimal B, and 12-decimal C pools, then cover exact-input and exact-output route quote monotonicity in both route directions.
+  - RED/GREEN: `rtk sui move test mixed_decimal_exact --allow-dirty --build-env testnet --warnings-are-errors` first failed on missing test fixture helper `create_pyth_test_route_with_balances_and_decimals`, then passed 2/2 after adding the helper and tests.

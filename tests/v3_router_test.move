@@ -2356,6 +2356,196 @@ module brownfi_amm::v3_router_test {
     }
 
     #[test]
+    fun test_router_pyth_bundle_mixed_decimal_exact_input_route_quotes_are_monotonic_in_amount() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_route_with_balances_and_decimals(
+            &mut scenario,
+            10_000_000,
+            10_000_000_000,
+            10_000_000_000,
+            10_000_000_000_000,
+            6,
+            9,
+            12
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pool_ab = take_shared<Pool<A, B>>(&scenario);
+            let pool_bc = take_shared<Pool<B, C>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_c = new_pyth_price_info(
+                x"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle_ab = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool_ab);
+            let bundle_bc = pyth_bundle_for_pool(&pio_b, &pio_c, &clock, &pool_bc);
+
+            let (_, small_b, small_c) = router::quote_exact_a_for_c_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                100_000
+            );
+            let (_, large_b, large_c) = router::quote_exact_a_for_c_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                200_000
+            );
+            let (_, small_rev_b, small_a) = router::quote_exact_c_for_a_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                100_000_000_000
+            );
+            let (_, large_rev_b, large_a) = router::quote_exact_c_for_a_via_b_with_bundles(
+                &bundle_ab,
+                &bundle_bc,
+                &clock,
+                &pool_ab,
+                &pool_bc,
+                200_000_000_000
+            );
+
+            assert!(large_b >= small_b, 0);
+            assert!(large_c >= small_c, 1);
+            assert!(large_rev_b >= small_rev_b, 2);
+            assert!(large_a >= small_a, 3);
+
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            price_info::destroy(pio_c);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool_ab);
+            return_shared(pool_bc);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_router_pyth_bundle_mixed_decimal_exact_output_route_quotes_are_monotonic_in_output() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        create_pyth_test_route_with_balances_and_decimals(
+            &mut scenario,
+            10_000_000,
+            10_000_000_000,
+            10_000_000_000,
+            10_000_000_000_000,
+            6,
+            9,
+            12
+        );
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pool_ab = take_shared<Pool<A, B>>(&scenario);
+            let pool_bc = take_shared<Pool<B, C>>(&scenario);
+            let pio_a = new_pyth_price_info(
+                x"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_b = new_pyth_price_info(
+                x"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let pio_c = new_pyth_price_info(
+                x"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                100_000_000,
+                0,
+                &mut scenario
+            );
+            let bundle_ab = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool_ab);
+            let bundle_bc = pyth_bundle_for_pool(&pio_b, &pio_c, &clock, &pool_bc);
+
+            let (small_a, small_b, small_effective_c) =
+                router::quote_a_for_exact_c_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    100_000_000_000
+                );
+            let (large_a, large_b, large_effective_c) =
+                router::quote_a_for_exact_c_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    200_000_000_000
+                );
+            let (small_c, small_rev_b, small_effective_a) =
+                router::quote_c_for_exact_a_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    100_000
+                );
+            let (large_c, large_rev_b, large_effective_a) =
+                router::quote_c_for_exact_a_via_b_with_bundles(
+                    &bundle_ab,
+                    &bundle_bc,
+                    &clock,
+                    &pool_ab,
+                    &pool_bc,
+                    200_000
+                );
+
+            assert!(small_effective_c == 100_000_000_000, 0);
+            assert!(large_effective_c == 200_000_000_000, 1);
+            assert!(large_a >= small_a, 2);
+            assert!(large_b >= small_b, 3);
+            assert!(small_effective_a == 100_000, 4);
+            assert!(large_effective_a == 200_000, 5);
+            assert!(large_c >= small_c, 6);
+            assert!(large_rev_b >= small_rev_b, 7);
+
+            price_info::destroy(pio_a);
+            price_info::destroy(pio_b);
+            price_info::destroy(pio_c);
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pool_ab);
+            return_shared(pool_bc);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     #[expected_failure(abort_code = swap::ECutoffLimitReached)]
     fun test_router_swap_a_for_exact_c_via_b_rejects_second_hop_zero_cutoff() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
@@ -4376,6 +4566,28 @@ module brownfi_amm::v3_router_test {
         init_b_for_bc: u64,
         init_c: u64
     ) {
+        create_pyth_test_route_with_balances_and_decimals(
+            scenario,
+            init_a,
+            init_b_for_ab,
+            init_b_for_bc,
+            init_c,
+            9,
+            9,
+            9
+        );
+    }
+
+    fun create_pyth_test_route_with_balances_and_decimals(
+        scenario: &mut test_scenario::Scenario,
+        init_a: u64,
+        init_b_for_ab: u64,
+        init_b_for_bc: u64,
+        init_c: u64,
+        decimals_a: u8,
+        decimals_b: u8,
+        decimals_c: u8
+    ) {
         next_tx(scenario, ADDR1);
         {
             let mut oracle = take_shared<OracleAdapter>(scenario);
@@ -4436,8 +4648,8 @@ module brownfi_amm::v3_router_test {
                 &clock,
                 balance::create_for_testing<A>(init_a),
                 balance::create_for_testing<B>(init_b_for_ab),
-                9,
-                9,
+                decimals_a,
+                decimals_b,
                 ctx(scenario)
             );
             let lp_bc = swap::create_pool_for_testing<B, C>(
@@ -4449,8 +4661,8 @@ module brownfi_amm::v3_router_test {
                 &clock,
                 balance::create_for_testing<B>(init_b_for_bc),
                 balance::create_for_testing<C>(init_c),
-                9,
-                9,
+                decimals_b,
+                decimals_c,
                 ctx(scenario)
             );
 
