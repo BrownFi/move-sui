@@ -344,3 +344,24 @@ The checked evidence matrix records the 2026-06-17 protocol-fee launch:
 - Zap-out-B digest: `9gNSeQ5EMTnjbHbUCeGTHQPZ5EWjFf9jbydbjk7PBvkJ`
 - Flash-borrow-A digest: `BtNqLWGRVTrogXAN63x52JixVL5TBeV4PeJxcjDcTkTG`
 - Flash-borrow-B digest: `85kRkpDmcEXndb2bnncTS9FRzgBrnCYUfydwrkXiLJED`
+
+Additional 2026-06-18 native SUI / test USDT evidence:
+
+- BrownFi package: `0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4`
+- Pool: `0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183`
+- USDT type: `0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT`
+- USDT metadata registry finalization digest: `AnVMW1vp3qaBJY33aXU9o81WvGi5A1mhWL7EpnCeRdic`
+- USDT shared currency object: `0x31b1b7cc75a468699c79356f312c52ea3b854eb1b4abd6e73a917d23eeac239b`
+- Initial exact-input SUI -> USDT digest: `4rz84gvfC7tccf4oHUXLDwfXLWS9VbMddm47H3SswJnf`
+- Initial add-liquidity digest: `7N93fdPcCqQD2MFCgxxUxVX3Xxg1Qcxgx7P4oSoeggQS`
+- Initial remove-liquidity digest: `RHq79ynHyCqVZBLY1YgY94fWxj1NkDmW6j4x3dHWhB9`
+- Exact-output digest: `Cvur9khNv9DZbzf78u2QgpAzPv1LXFdGJtGc674be761`
+- Result-aware exact-output digest: `GpsXRtpqMeEpcNpUXX7AN8Ra2izsFLcTT4rYovuNS2gG`
+- Zap-in-A digest: `XoPQp2RESM9gSR3Byw7f2io8WnhhJRDXWbuUAcke1X8`
+- Zap-in-B digest: `HrcYrQo6Y4zKf6H3E3dG9G8aR58nNBF3fLqQUL2tiwtY`
+- Zap-out-A digest: `8YbvXsqToZTSvhoftLWUtEZ9YhQmTYHuw9SZ55snxFPs`
+- Zap-out-B digest: `D8xh4UTNrPfVPcbYPmjYeEpCZHR1fgfbUDTSmy1RZNJB`
+- Flash-borrow-A digest: `7cUPxu8v1kAjong6iBbYsDvFNAjy8PLxcWv9c511Qqq`
+- Flash-borrow-B digest: `HxfcRu6CapUjHTF1UNEWLiFdPJZTcWouSDCjH8CvMvbw`
+
+The SUI/USDT remaining-route matrix used configured input and flash-fee coin splits during preflight, then route submission kept one submit-time split per configured amount. The final route preflight passed 8/8 before the exact-output, zap, and flash transactions above were submitted and verified.
