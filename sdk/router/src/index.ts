@@ -1549,6 +1549,11 @@ export interface SwapExactInputWithPythRouteOptions extends PythRouteProviderOpt
   minOutputs: readonly U64Input[];
 }
 
+export interface SwapExactInputWithPythRouteAndTransferOptions
+  extends SwapExactInputWithPythRouteOptions {
+  recipient: string;
+}
+
 export interface SwapExactOutputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
   path: readonly string[];
@@ -2501,6 +2506,19 @@ function pureAddress(tx: TransactionLike, value: string): TransactionArgument {
     return tx.pure.id(value);
   }
   throw new Error("Transaction builder must support pure address values");
+}
+
+function transferObjectsToAddress(
+  tx: TransactionLike,
+  objects: TransactionArgument[],
+  recipient: string,
+  context: string
+): void {
+  if (objects.length === 0) return;
+  if (typeof tx.transferObjects !== "function") {
+    throw new Error(`${context} transaction builder must support transferObjects`);
+  }
+  tx.transferObjects(objects, pureAddress(tx, recipient));
 }
 
 function pureVector(
@@ -7051,16 +7069,8 @@ function transferRegisteredRouteCaseResultOutputs(
       )
     }))
     .filter((group) => group.outputs.length > 0);
-  if (nonEmptyGroups.length === 0) return;
-  if (typeof tx.transferObjects !== "function") {
-    throw new Error("BrownFi route preflight transaction builder must support transferObjects");
-  }
-  if (typeof tx.pure.address !== "function") {
-    throw new Error("BrownFi route preflight transaction builder must support pure address values");
-  }
-
   for (const group of nonEmptyGroups) {
-    tx.transferObjects(group.outputs, tx.pure.address(group.recipient));
+    transferObjectsToAddress(tx, group.outputs, group.recipient, "BrownFi route preflight");
   }
 }
 
@@ -7147,6 +7157,15 @@ export async function swapExactInputWithPythRoute(
     input: options.input,
     minOutputs: options.minOutputs
   });
+}
+
+export async function swapExactInputWithPythRouteAndTransfer(
+  tx: TransactionLike,
+  options: SwapExactInputWithPythRouteAndTransferOptions
+): Promise<TransactionArgument> {
+  const result = await swapExactInputWithPythRoute(tx, options);
+  transferObjectsToAddress(tx, [result], options.recipient, "BrownFi Pyth exact-input route");
+  return result;
 }
 
 export async function swapExactOutputWithPythRoute(

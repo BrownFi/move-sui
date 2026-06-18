@@ -188,6 +188,7 @@ import {
   swapCForExactAViaBWithPythRoute,
   swapExactInputWithRegisteredRoute,
   swapExactInputWithPythRoute,
+  swapExactInputWithPythRouteAndTransfer,
   swapExactAForBWithBundle,
   swapExactAForBWithBundleAndTransfer,
   swapExactAForCViaB,
@@ -8609,6 +8610,170 @@ test("swapExactInputWithPythRoute plans a forward two-hop PTB route from token p
       { kind: "u64", value: "40" }
     ]
   });
+});
+
+test("swapExactInputWithPythRoute plans a three-hop PTB route from token path", async () => {
+  const tx = createTransactionRecorder();
+  const result = await swapExactInputWithPythRoute(tx, {
+    path: ["0x1::a::A", "0x1::b::B", "0x1::c::C", "0x1::d::D"],
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c", "feed-d"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(tx.calls.length, 0);
+        assert.deepEqual(updatesArg, [
+          { update: "feed-a" },
+          { update: "feed-b" },
+          { update: "feed-c" },
+          { update: "feed-d" }
+        ]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c", "feed-d"]);
+        return ["0xPRICEA", "0xPRICEB", "0xPRICEC", "0xPRICED"];
+      }
+    },
+    clock: "0x6",
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      },
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::b::B",
+        typeB: "0x1::c::C",
+        pool: "0xPOOLBC",
+        feedIds: ["feed-b", "feed-c"]
+      },
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::c::C",
+        typeB: "0x1::d::D",
+        pool: "0xPOOLCD",
+        feedIds: ["feed-c", "feed-d"]
+      }
+    ],
+    input: "0xCOINA",
+    minOutputs: [50n, 40n, 30n]
+  });
+
+  assert.deepEqual(result, { kind: "result", index: 11 });
+  assert.deepEqual(tx.calls.map((call) => call.target), [
+    "0xBROWN::pyth_source::read_price_a",
+    "0xBROWN::pyth_source::read_price_b",
+    "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+    "0xBROWN::pyth_source::read_price_a",
+    "0xBROWN::pyth_source::read_price_b",
+    "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+    "0xBROWN::pyth_source::read_price_a",
+    "0xBROWN::pyth_source::read_price_b",
+    "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+    "0xBROWN::router::swap_exact_a_for_b_with_bundle",
+    "0xBROWN::router::swap_exact_a_for_b_with_bundle",
+    "0xBROWN::router::swap_exact_a_for_b_with_bundle"
+  ]);
+  assert.deepEqual(tx.calls[9], {
+    target: "0xBROWN::router::swap_exact_a_for_b_with_bundle",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "u64", value: "50" }
+    ]
+  });
+  assert.deepEqual(tx.calls[10], {
+    target: "0xBROWN::router::swap_exact_a_for_b_with_bundle",
+    typeArguments: ["0x1::b::B", "0x1::c::C"],
+    arguments: [
+      { kind: "result", index: 5 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLBC" },
+      { kind: "result", index: 9 },
+      { kind: "u64", value: "40" }
+    ]
+  });
+  assert.deepEqual(tx.calls[11], {
+    target: "0xBROWN::router::swap_exact_a_for_b_with_bundle",
+    typeArguments: ["0x1::c::C", "0x1::d::D"],
+    arguments: [
+      { kind: "result", index: 8 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLCD" },
+      { kind: "result", index: 10 },
+      { kind: "u64", value: "30" }
+    ]
+  });
+});
+
+test("swapExactInputWithPythRouteAndTransfer transfers a three-hop route output to recipient", async () => {
+  const tx = createTransactionRecorder();
+  const result = await swapExactInputWithPythRouteAndTransfer(tx, {
+    path: ["0x1::a::A", "0x1::b::B", "0x1::c::C", "0x1::d::D"],
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c", "feed-d"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(tx.calls.length, 0);
+        assert.deepEqual(updatesArg, [
+          { update: "feed-a" },
+          { update: "feed-b" },
+          { update: "feed-c" },
+          { update: "feed-d" }
+        ]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c", "feed-d"]);
+        return ["0xPRICEA", "0xPRICEB", "0xPRICEC", "0xPRICED"];
+      }
+    },
+    clock: "0x6",
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      },
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::b::B",
+        typeB: "0x1::c::C",
+        pool: "0xPOOLBC",
+        feedIds: ["feed-b", "feed-c"]
+      },
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::c::C",
+        typeB: "0x1::d::D",
+        pool: "0xPOOLCD",
+        feedIds: ["feed-c", "feed-d"]
+      }
+    ],
+    input: "0xCOINA",
+    minOutputs: [50n, 40n, 30n],
+    recipient: "0xRECIPIENT"
+  });
+
+  assert.deepEqual(result, { kind: "result", index: 11 });
+  assert.deepEqual(tx.transfers, [
+    {
+      objects: [{ kind: "result", index: 11 }],
+      recipient: { kind: "address", value: "0xRECIPIENT" }
+    }
+  ]);
 });
 
 test("quoteExactInputWithPythRoute updates Pyth before route quote calls", async () => {

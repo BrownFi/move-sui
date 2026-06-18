@@ -2026,3 +2026,7 @@
   - Finding: after the 6/9/12 state-sequence route test, the other five decimal orderings across A/B/C were still unpinned.
   - Decision: refactor the state-sequence route monotonicity check into a decimal-parameterized helper and add the remaining 6/12/9, 9/6/12, 9/12/6, 12/6/9, and 12/9/6 cases. This is coverage-only; no production code changed.
   - Verification: `rtk sui move test mixed_decimal_route --allow-dirty --build-env testnet --warnings-are-errors` passed 6/6.
+- 2026-06-18 Pyth arbitrary exact-input route recipient SDK slice:
+  - Finding: `swapExactInputWithPythRoute` already planned three-hop exact-input Pyth routes, and launch/preflight route cases could transfer outputs, but the direct Pyth convenience layer had no arbitrary-token-path recipient helper. The existing recipient-aware Pyth swap wrappers covered only single-hop and typed two-hop Move entrypoints.
+  - Decision: add `swapExactInputWithPythRouteAndTransfer` in the SDK/PTB layer. It delegates to the existing dynamic Pyth exact-input route planner, appends a `transferObjects` command for the final output coin, and returns the same output handle. No dynamic generic Move router is introduced.
+  - RED/GREEN: the focused SDK test first failed because `swapExactInputWithPythRouteAndTransfer` was not exported. After wiring the wrapper and shared transfer helper, `rtk npm test --prefix sdk/router -- --test-name-pattern "swapExactInputWithPythRouteAndTransfer transfers"` passed 216/216.
