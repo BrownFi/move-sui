@@ -472,9 +472,9 @@ test("pyth-upgraded testnet launch matrix matches Pyth-only launch profile", () 
   });
 
   assert.deepEqual(summary, {
-    routeCaseCount: 4,
-    quoteCaseCount: 2,
-    totalCaseCount: 6,
+    routeCaseCount: 11,
+    quoteCaseCount: 6,
+    totalCaseCount: 17,
     providerIds: ["pyth"],
     routeCases: [
       {
@@ -488,6 +488,11 @@ test("pyth-upgraded testnet launch matrix matches Pyth-only launch profile", () 
         providerId: "pyth"
       },
       {
+        name: "pyth upgraded testnet exact output results route",
+        kind: "exact-output-results",
+        providerId: "pyth"
+      },
+      {
         name: "pyth upgraded testnet add liquidity",
         kind: "add-liquidity",
         providerId: "pyth"
@@ -495,6 +500,36 @@ test("pyth-upgraded testnet launch matrix matches Pyth-only launch profile", () 
       {
         name: "pyth upgraded testnet remove liquidity",
         kind: "remove-liquidity",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet zap in A",
+        kind: "zap-in-a",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet zap in B",
+        kind: "zap-in-b",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet zap out A",
+        kind: "zap-out-a",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet zap out B",
+        kind: "zap-out-b",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet flash borrow A",
+        kind: "flash-borrow-a",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet flash borrow B",
+        kind: "flash-borrow-b",
         providerId: "pyth"
       }
     ],
@@ -507,6 +542,26 @@ test("pyth-upgraded testnet launch matrix matches Pyth-only launch profile", () 
       {
         name: "pyth upgraded testnet exact output quote",
         kind: "exact-output-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet exact output round-trip quote",
+        kind: "exact-output-round-trip-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet max-bound quote",
+        kind: "max-bound-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet exact input raw quote",
+        kind: "exact-input-without-cutoff-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "pyth upgraded testnet exact output raw quote",
+        kind: "exact-output-without-cutoff-quote",
         providerId: "pyth"
       }
     ]

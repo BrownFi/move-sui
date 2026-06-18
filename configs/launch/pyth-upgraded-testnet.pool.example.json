@@ -7,6 +7,7 @@
   "typeB": "TYPE_B",
   "factory": "0xFACTORY",
   "poolCreatorCap": "0xPOOL_CREATOR_CAP",
+  "pauseCap": "0xPAUSE_CAP",
   "oracle": "0xORACLE_ADAPTER",
   "feedIds": [
     "0xBASE_FEED_ID",
@@ -15,8 +16,9 @@
   "clock": "0x6",
   "initA": "0xINIT_COIN_A",
   "initB": "0xINIT_COIN_B",
-  "initAAmount": "1000000000",
-  "initBAmount": "1000000000",
+  "initAAmount": "10000000000",
+  "initBAmount": "10000000000",
   "tokenADecimals": 9,
-  "tokenBDecimals": 9
+  "tokenBDecimals": 9,
+  "flashEnabled": true
 }

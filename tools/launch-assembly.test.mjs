@@ -111,21 +111,79 @@ test("pyth upgraded launch artifacts assemble from test coins and feed values", 
   assert.equal(pool.packageId, id("a"));
   assert.equal(pool.typeA, `${id("e")}::coin_a::COIN_A`);
   assert.equal(pool.typeB, `${id("e")}::coin_b::COIN_B`);
+  assert.equal(pool.pauseCap, id("f"));
+  assert.equal(pool.flashEnabled, true);
+  assert.equal(pool.initAAmount, "10000000000");
+  assert.equal(pool.initBAmount, "10000000000");
   assert.deepEqual(pool.feedIds, [id("6"), id("7")]);
   const exactInput = routeCaseByName(matrix, "pyth upgraded testnet exact input route");
   const exactOutput = routeCaseByName(matrix, "pyth upgraded testnet exact output route");
+  const exactOutputResults = routeCaseByName(
+    matrix,
+    "pyth upgraded testnet exact output results route"
+  );
   const addLiquidity = routeCaseByName(matrix, "pyth upgraded testnet add liquidity");
   const removeLiquidity = routeCaseByName(matrix, "pyth upgraded testnet remove liquidity");
+  const zapInA = routeCaseByName(matrix, "pyth upgraded testnet zap in A");
+  const zapInB = routeCaseByName(matrix, "pyth upgraded testnet zap in B");
+  const zapOutA = routeCaseByName(matrix, "pyth upgraded testnet zap out A");
+  const zapOutB = routeCaseByName(matrix, "pyth upgraded testnet zap out B");
+  const flashA = routeCaseByName(matrix, "pyth upgraded testnet flash borrow A");
+  const flashB = routeCaseByName(matrix, "pyth upgraded testnet flash borrow B");
   assert.equal(exactInput.pairs[0].packageId, id("a"));
   assert.equal(exactInput.pairs[0].pool, id("8"));
   assert.equal(exactInput.input, id("5"));
   assert.equal(exactOutput.input, id("5"));
   assert.equal(exactOutput.amountOut, "1");
+  assert.equal(exactOutputResults.kind, "exact-output-results");
+  assert.equal(exactOutputResults.input, id("5"));
+  assert.equal(exactOutputResults.amountOut, "1");
   assert.equal(addLiquidity.input, id("4"));
   assert.equal(addLiquidity.inputB, id("5"));
   assert.equal(removeLiquidity.input, id("9"));
+  assert.equal(removeLiquidity.inputAmount, "1000000");
+  assert.equal(zapInA.input, id("4"));
+  assert.equal(zapInA.minBFromSwap, "1");
+  assert.equal(zapInB.input, id("5"));
+  assert.equal(zapInB.minAFromSwap, "1");
+  assert.equal(zapOutA.input, id("9"));
+  assert.equal(zapOutA.inputAmount, "1000000");
+  assert.equal(zapOutB.input, id("9"));
+  assert.equal(zapOutB.minOut, "1");
+  assert.equal(flashA.kind, "flash-borrow-a");
+  assert.equal(flashA.amount, "1000");
+  assert.equal(flashA.feeCoin, id("4"));
+  assert.equal(flashA.feeCoinAmount, "1");
+  assert.equal(flashB.kind, "flash-borrow-b");
+  assert.equal(flashB.amount, "1000");
+  assert.equal(flashB.feeCoin, id("5"));
+  assert.equal(flashB.feeCoinAmount, "1");
   assert.equal(
     quoteCaseByName(matrix, "pyth upgraded testnet exact output quote").amountOut,
+    "1"
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth upgraded testnet exact output round-trip quote").amountOut,
+    "1"
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth upgraded testnet max-bound quote").kind,
+    "max-bound-quote"
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth upgraded testnet max-bound quote").amountIn,
+    undefined
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth upgraded testnet max-bound quote").amountOut,
+    undefined
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth upgraded testnet exact input raw quote").amountIn,
+    "1000000"
+  );
+  assert.equal(
+    quoteCaseByName(matrix, "pyth upgraded testnet exact output raw quote").amountOut,
     "1"
   );
 });
