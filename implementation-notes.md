@@ -2096,3 +2096,7 @@
   - Finding: the full tools suite exposed stale Pyth-upgraded materialization tests after the template expansion. Matrix materialization still asserted 4 route / 2 quote cases, and pool materialization fixtures did not include the `PauseCap` needed by the upgraded pool template's day-one flash enable path.
   - Decision: update materialization tests to the same expanded upgraded profile already checked by launch assembly, and supply `caps.PauseCap` through publish-object fixtures rather than token/feed values.
   - Verification: `rtk node --test tools/materialize-launch-matrix.test.mjs` passed 6/6 and `rtk node --test tools/materialize-pyth-launch-pool.test.mjs` passed 7/7.
+- 2026-06-18 Pyth launch architecture doc consistency:
+  - Finding: `ARCHITECTURE_v3_SUI.md` still described the Pyth-upgraded launch matrix as narrower after the upgraded template had already been expanded to match the current-Pyth single-hop surface.
+  - Decision: add a doc-consistency test that derives current/upgraded route and quote coverage from the actual matrix validator, then requires the architecture to state the shared `11` route / `6` quote case surface.
+  - RED/GREEN: `rtk node --test tools/architecture-doc.test.mjs` first failed on the stale architecture wording, then passed after updating the launch-matrix paragraph.
