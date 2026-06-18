@@ -25,7 +25,10 @@ function fixtureRoot() {
     packageId: id("a"),
     factory: id("b"),
     poolCreatorCap: id("c"),
-    oracleAdapter: id("d")
+    oracleAdapter: id("d"),
+    caps: {
+      PauseCap: id("f")
+    }
   });
   const values = path.join(root, "values.json");
   writeJson(values, {
@@ -84,6 +87,7 @@ test("materializePythLaunchPoolConfig merges publish objects and live values", (
   assert.equal(pool.typeB, `${id("2")}::coin_b::COIN_B`);
   assert.equal(pool.factory, id("b"));
   assert.equal(pool.poolCreatorCap, id("c"));
+  assert.equal(pool.pauseCap, id("f"));
   assert.equal(pool.oracle, id("d"));
   assert.deepEqual(pool.feedIds, [id("3"), id("4")]);
   assert.equal(pool.initA, id("5"));
@@ -213,6 +217,7 @@ test("materializePythLaunchPoolConfig can materialize optional protocol fee setu
     poolCreatorCap: id("c"),
     oracleAdapter: id("d"),
     caps: {
+      PauseCap: id("f"),
       FeeCap: id("7"),
       RiskCap: id("8")
     }

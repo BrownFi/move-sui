@@ -103,8 +103,8 @@ test("materializeLaunchMatrix replaces template placeholders and validates live 
   const matrix = JSON.parse(fs.readFileSync(out, "utf8"));
   assert.equal(result.status, "success");
   assert.equal(result.packageId, id("a"));
-  assert.equal(result.validation.routeCaseCount, 4);
-  assert.equal(result.validation.quoteCaseCount, 2);
+  assert.equal(result.validation.routeCaseCount, 11);
+  assert.equal(result.validation.quoteCaseCount, 6);
   const exactInput = routeCaseByName(matrix, "pyth upgraded testnet exact input route");
   const exactOutput = routeCaseByName(matrix, "pyth upgraded testnet exact output route");
   const addLiquidity = routeCaseByName(matrix, "pyth upgraded testnet add liquidity");

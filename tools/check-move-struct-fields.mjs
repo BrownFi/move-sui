@@ -9,6 +9,8 @@ const DEFAULT_ROOTS = [
   "packages/oracle/sources",
   "packages/stork-sui/sources",
   "packages/supra-sui/sources",
+  "packages/launch-test-coins/sources",
+  "packages/usdt-test-coin/sources",
 ];
 
 function usage() {
