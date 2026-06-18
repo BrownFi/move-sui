@@ -210,6 +210,7 @@ import {
   swapExactOutputWithRegisteredRouteResults,
   swapExactOutputWithPythRoute,
   swapExactOutputWithPythRouteResults,
+  swapExactOutputWithPythRouteResultsAndTransfer,
   updateMultipleStorkTemporalNumericValuesEvmWithGasFee,
   updateMultipleStorkTemporalNumericValuesEvmWithSignedPrices,
   updateMultipleStorkTemporalNumericValuesEvm,
@@ -9738,6 +9739,82 @@ test("swapExactOutputWithPythRouteResults quote-chains a three-hop Pyth route", 
     resultIndex: 1
   });
   assert.deepEqual(tx.calls[13].arguments[4], { kind: "u64", value: "55" });
+});
+
+test("swapExactOutputWithPythRouteResultsAndTransfer refunds changes and transfers output", async () => {
+  const tx = createTransactionRecorder();
+  const result = await swapExactOutputWithPythRouteResultsAndTransfer(tx, {
+    path: ["A", "C", "B", "D"],
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-c", "feed-b", "feed-d"]);
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(tx.calls.length, 0);
+        assert.deepEqual(updatesArg, [
+          { update: "feed-a" },
+          { update: "feed-c" },
+          { update: "feed-b" },
+          { update: "feed-d" }
+        ]);
+        assert.deepEqual(feedIdsArg, ["feed-a", "feed-c", "feed-b", "feed-d"]);
+        return ["0xPRICEA", "0xPRICEC", "0xPRICEB", "0xPRICED"];
+      }
+    },
+    clock: "0x6",
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "A",
+        typeB: "C",
+        pool: "0xPOOLAC",
+        feedIds: ["feed-a", "feed-c"]
+      },
+      {
+        packageId: "0xBROWN",
+        typeA: "B",
+        typeB: "C",
+        pool: "0xPOOLBC",
+        feedIds: ["feed-b", "feed-c"]
+      },
+      {
+        packageId: "0xBROWN",
+        typeA: "B",
+        typeB: "D",
+        pool: "0xPOOLBD",
+        feedIds: ["feed-b", "feed-d"]
+      }
+    ],
+    input: "0xCOINA",
+    amountOut: 55n,
+    refundRecipient: "0xSENDER",
+    recipient: "0xRECIPIENT"
+  });
+
+  assert.deepEqual(result.changeCoins, [
+    { kind: "nested-result", index: 11, resultIndex: 0 },
+    { kind: "nested-result", index: 12, resultIndex: 0 },
+    { kind: "nested-result", index: 13, resultIndex: 0 }
+  ]);
+  assert.deepEqual(result.output, { kind: "nested-result", index: 13, resultIndex: 1 });
+  assert.deepEqual(tx.transfers, [
+    {
+      objects: [
+        { kind: "nested-result", index: 11, resultIndex: 0 },
+        { kind: "nested-result", index: 12, resultIndex: 0 },
+        { kind: "nested-result", index: 13, resultIndex: 0 }
+      ],
+      recipient: { kind: "address", value: "0xSENDER" }
+    },
+    {
+      objects: [{ kind: "nested-result", index: 13, resultIndex: 1 }],
+      recipient: { kind: "address", value: "0xRECIPIENT" }
+    }
+  ]);
 });
 
 test("createSupraPushRoutePriceProvider plugs Supra push readings into registered routes", async () => {

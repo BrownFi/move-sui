@@ -1562,6 +1562,12 @@ export interface SwapExactOutputWithPythRouteOptions extends PythRouteProviderOp
   amountOut: U64Input;
 }
 
+export interface SwapExactOutputWithPythRouteResultsAndTransferOptions
+  extends SwapExactOutputWithPythRouteOptions {
+  refundRecipient: string;
+  recipient: string;
+}
+
 export interface AddLiquidityWithPythRouteOptions
   extends Omit<
       AddLiquidityWithRegisteredRouteOptions<PythRoutePriceHopOptions>,
@@ -7198,6 +7204,26 @@ export async function swapExactOutputWithPythRouteResults(
     input: options.input,
     amountOut: options.amountOut
   });
+}
+
+export async function swapExactOutputWithPythRouteResultsAndTransfer(
+  tx: TransactionLike,
+  options: SwapExactOutputWithPythRouteResultsAndTransferOptions
+): Promise<SwapExactOutputWithRegisteredRouteResults> {
+  const result = await swapExactOutputWithPythRouteResults(tx, options);
+  transferObjectsToAddress(
+    tx,
+    Array.from(result.changeCoins),
+    options.refundRecipient,
+    "BrownFi Pyth exact-output route"
+  );
+  transferObjectsToAddress(
+    tx,
+    [result.output],
+    options.recipient,
+    "BrownFi Pyth exact-output route"
+  );
+  return result;
 }
 
 export async function quoteExactInputWithPythRoute(
