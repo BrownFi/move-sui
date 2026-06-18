@@ -112,12 +112,17 @@ import {
   preflightLaunchValidationQuoteCases,
   preflightRegisteredRouteCases,
   preflightAddLiquidityWithPythRoute,
+  preflightAddLiquidityWithPythRouteAndTransfer,
   preflightRemoveLiquidityWithPythRoute,
+  preflightRemoveLiquidityWithPythRouteAndTransfer,
   preflightZapWithPythRoute,
+  preflightZapWithPythRouteAndTransfer,
   preflightFlashBorrowWithPythRoute,
   preflightSwapExactInputWithPythRoute,
+  preflightSwapExactInputWithPythRouteAndTransfer,
   preflightSwapExactOutputWithPythRoute,
   preflightSwapExactOutputWithPythRouteResults,
+  preflightSwapExactOutputWithPythRouteResultsAndTransfer,
   preflightSwapExactInputWithRegisteredRoute,
   preflightSwapExactOutputWithRegisteredRoute,
   preflightSwapExactOutputWithRegisteredRouteResults,
@@ -6322,6 +6327,308 @@ test("Pyth liquidity zap and flash preflight wrappers cover the launch route sur
       lastTarget: "0xBROWN::flash::repay_b_with_coin"
     },
     { kind: "dryRun", input: { transactionBlock: "flash-borrow-b-bytes" } }
+  ]);
+});
+
+test("Pyth transfer preflight wrappers dry-run recipient-aware route PTBs", async () => {
+  const exactInputTx = createTransactionRecorder();
+  const exactOutputResultsTx = createTransactionRecorder();
+  const addTx = createTransactionRecorder();
+  const removeTx = createTransactionRecorder();
+  const zapTx = createTransactionRecorder();
+  const calls = [];
+  const txLabels = new Map([
+    [exactInputTx, "exact-input-transfer"],
+    [exactOutputResultsTx, "exact-output-results-transfer"],
+    [addTx, "add-liquidity-transfer"],
+    [zapTx, "zap-in-a-transfer"]
+  ]);
+  const attachBuild = (tx, label) => {
+    tx.build = async (input) => {
+      const targets = tx.calls.map((call) => call.target);
+      calls.push({
+        kind: "build",
+        label,
+        input,
+        moveCallCount: tx.calls.length,
+        transferCount: tx.transfers.length,
+        firstTarget: targets[0],
+        lastTarget: targets[targets.length - 1]
+      });
+      return `${label}-bytes`;
+    };
+  };
+  attachBuild(exactInputTx, "exact-input-transfer");
+  attachBuild(exactOutputResultsTx, "exact-output-results-transfer");
+  attachBuild(addTx, "add-liquidity-transfer");
+  attachBuild(removeTx, "remove-liquidity-transfer");
+  attachBuild(zapTx, "zap-in-a-transfer");
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      calls.push({ kind: "dryRun", input });
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const pythProvider = {
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        calls.push({ kind: "fetch", feedIds: Array.from(feedIdsArg) });
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        const label = txLabels.get(txArg);
+        assert.ok(label);
+        assert.equal(txArg.calls.length, 0);
+        calls.push({
+          kind: "update",
+          label,
+          updates: Array.from(updatesArg),
+          feedIds: Array.from(feedIdsArg),
+          moveCallCount: txArg.calls.length
+        });
+        return feedIdsArg.map(
+          (feedId) => `0xPRICE_${feedId.replace(/[^a-z0-9]/gi, "").toUpperCase()}`
+        );
+      }
+    }
+  };
+  const pair = {
+    packageId: "0xBROWN",
+    typeA: "A",
+    typeB: "B",
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+
+  const exactInput = await preflightSwapExactInputWithPythRouteAndTransfer({
+    tx: exactInputTx,
+    suiClient,
+    ...pythProvider,
+    clock: "0x6",
+    path: ["A", "B"],
+    pairs: [pair],
+    input: "0xCOINA",
+    minOutputs: [9n],
+    recipient: "0xRECIPIENT"
+  });
+  const exactOutputResults =
+    await preflightSwapExactOutputWithPythRouteResultsAndTransfer({
+      tx: exactOutputResultsTx,
+      suiClient,
+      ...pythProvider,
+      clock: "0x6",
+      path: ["A", "B"],
+      pairs: [pair],
+      input: "0xCOINA",
+      amountOut: 7n,
+      refundRecipient: "0xSENDER",
+      recipient: "0xRECIPIENT"
+    });
+  const addResult = await preflightAddLiquidityWithPythRouteAndTransfer({
+    tx: addTx,
+    suiClient,
+    ...pythProvider,
+    clock: "0x6",
+    pair,
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minLpOut: 33n,
+    recipient: "0xRECIPIENT"
+  });
+  const removeResult = await preflightRemoveLiquidityWithPythRouteAndTransfer({
+    tx: removeTx,
+    suiClient,
+    pair,
+    lpIn: "0xLP",
+    minAOut: 7n,
+    minBOut: 8n,
+    recipient: "0xRECIPIENT"
+  });
+  const zapResult = await preflightZapWithPythRouteAndTransfer({
+    tx: zapTx,
+    suiClient,
+    ...pythProvider,
+    name: "pyth zap in A transfer",
+    kind: "zap-in-a",
+    clock: "0x6",
+    pair,
+    inputA: "0xCOINA",
+    minBFromSwap: 1n,
+    minLpOut: 2n,
+    recipient: "0xRECIPIENT"
+  });
+
+  assert.deepEqual(exactInput, {
+    swapResult: { kind: "result", index: 3 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "exact-input-transfer-bytes"
+    }
+  });
+  assert.deepEqual(exactInputTx.transfers, [
+    {
+      objects: [{ kind: "result", index: 3 }],
+      recipient: { kind: "address", value: "0xRECIPIENT" }
+    }
+  ]);
+  assert.deepEqual(exactOutputResults.changeCoins, [
+    { kind: "nested-result", index: 3, resultIndex: 0 }
+  ]);
+  assert.deepEqual(exactOutputResults.output, {
+    kind: "nested-result",
+    index: 3,
+    resultIndex: 1
+  });
+  assert.deepEqual(exactOutputResults.dryRunResult, {
+    effects: { status: { status: "success" } },
+    transactionBlock: "exact-output-results-transfer-bytes"
+  });
+  assert.deepEqual(exactOutputResultsTx.transfers, [
+    {
+      objects: [{ kind: "nested-result", index: 3, resultIndex: 0 }],
+      recipient: { kind: "address", value: "0xSENDER" }
+    },
+    {
+      objects: [{ kind: "nested-result", index: 3, resultIndex: 1 }],
+      recipient: { kind: "address", value: "0xRECIPIENT" }
+    }
+  ]);
+  assert.deepEqual(addResult, {
+    liquidityResult: { kind: "result", index: 3 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "add-liquidity-transfer-bytes"
+    }
+  });
+  assert.equal(
+    addTx.calls[3].target,
+    "0xBROWN::router::add_liquidity_with_bundle_and_transfer"
+  );
+  assert.deepEqual(removeResult, {
+    liquidityResult: { kind: "result", index: 0 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "remove-liquidity-transfer-bytes"
+    }
+  });
+  assert.equal(
+    removeTx.calls[0].target,
+    "0xBROWN::swap::remove_liquidity_with_coins_and_transfer"
+  );
+  assert.deepEqual(zapResult, {
+    zapResult: { kind: "result", index: 3 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "zap-in-a-transfer-bytes"
+    }
+  });
+  assert.equal(
+    zapTx.calls[3].target,
+    "0xBROWN::router::zap_in_a_with_bundle_and_transfer"
+  );
+  assert.deepEqual(calls, [
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "exact-input-transfer",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "exact-input-transfer",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      transferCount: 1,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::swap_exact_a_for_b_with_bundle"
+    },
+    {
+      kind: "dryRun",
+      input: { transactionBlock: "exact-input-transfer-bytes" }
+    },
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "exact-output-results-transfer",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "exact-output-results-transfer",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      transferCount: 2,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::swap_a_for_exact_b_with_bundle"
+    },
+    {
+      kind: "dryRun",
+      input: { transactionBlock: "exact-output-results-transfer-bytes" }
+    },
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "add-liquidity-transfer",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "add-liquidity-transfer",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      transferCount: 0,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::add_liquidity_with_bundle_and_transfer"
+    },
+    {
+      kind: "dryRun",
+      input: { transactionBlock: "add-liquidity-transfer-bytes" }
+    },
+    {
+      kind: "build",
+      label: "remove-liquidity-transfer",
+      input: { client: suiClient },
+      moveCallCount: 1,
+      transferCount: 0,
+      firstTarget: "0xBROWN::swap::remove_liquidity_with_coins_and_transfer",
+      lastTarget: "0xBROWN::swap::remove_liquidity_with_coins_and_transfer"
+    },
+    {
+      kind: "dryRun",
+      input: { transactionBlock: "remove-liquidity-transfer-bytes" }
+    },
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "zap-in-a-transfer",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "zap-in-a-transfer",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      transferCount: 0,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::zap_in_a_with_bundle_and_transfer"
+    },
+    {
+      kind: "dryRun",
+      input: { transactionBlock: "zap-in-a-transfer-bytes" }
+    }
   ]);
 });
 

@@ -1581,6 +1581,14 @@ export interface PreflightSwapExactInputWithPythRouteOptions<
   suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
 }
 
+export interface PreflightSwapExactInputWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> extends SwapExactInputWithPythRouteAndTransferOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
 export interface PreflightSwapExactOutputWithPythRouteOptions<
   TDryRunResult = unknown
 > extends SwapExactOutputWithPythRouteOptions,
@@ -1592,6 +1600,14 @@ export interface PreflightSwapExactOutputWithPythRouteOptions<
 export interface PreflightSwapExactOutputWithPythRouteResultsOptions<
   TDryRunResult = unknown
 > extends SwapExactOutputWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
+export interface PreflightSwapExactOutputWithPythRouteResultsAndTransferOptions<
+  TDryRunResult = unknown
+> extends SwapExactOutputWithPythRouteResultsAndTransferOptions,
     AssertDryRunTransactionBlockSucceededOptions {
   tx: SuiTransactionBlockBuilderLike;
   suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
@@ -1617,6 +1633,14 @@ export interface PreflightAddLiquidityWithPythRouteOptions<
   suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
 }
 
+export interface PreflightAddLiquidityWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> extends AddLiquidityWithPythRouteAndTransferOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
 export type RemoveLiquidityWithPythRouteOptions =
   RemoveLiquidityWithRegisteredRouteOptions<PythRoutePriceHopOptions>;
 
@@ -1630,6 +1654,14 @@ export interface PreflightRemoveLiquidityWithPythRouteOptions<
   tx: SuiTransactionBlockBuilderLike;
   suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
 }
+
+export type PreflightRemoveLiquidityWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = RemoveLiquidityWithPythRouteAndTransferOptions &
+  AssertDryRunTransactionBlockSucceededOptions & {
+    tx: SuiTransactionBlockBuilderLike;
+    suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+  };
 
 export interface QuoteExactInputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
@@ -1717,6 +1749,14 @@ export type PreflightZapWithPythRouteOptions<TDryRunResult = unknown> =
       tx: SuiTransactionBlockBuilderLike;
       suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
     };
+
+export type PreflightZapWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = ZapWithPythRouteAndTransferOptions &
+  AssertDryRunTransactionBlockSucceededOptions & {
+    tx: SuiTransactionBlockBuilderLike;
+    suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+  };
 
 export interface FlashBorrowWithPythRouteOptions extends PythRouteProviderOptions {
   name?: string;
@@ -7253,6 +7293,23 @@ export async function preflightSwapExactInputWithPythRoute<
   });
 }
 
+export async function preflightSwapExactInputWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactInputWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  const swapResult = await swapExactInputWithPythRouteAndTransfer(
+    options.tx,
+    options
+  );
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? "BrownFi Pyth exact-input route transfer preflight"
+  });
+  return { swapResult, dryRunResult };
+}
+
 export async function preflightSwapExactOutputWithPythRoute<
   TDryRunResult = unknown
 >(
@@ -7291,6 +7348,23 @@ export async function preflightSwapExactOutputWithPythRouteResults<
     input: options.input,
     amountOut: options.amountOut
   });
+}
+
+export async function preflightSwapExactOutputWithPythRouteResultsAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactOutputWithPythRouteResultsAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapExactOutputRouteResults<TDryRunResult>> {
+  const routeResults = await swapExactOutputWithPythRouteResultsAndTransfer(
+    options.tx,
+    options
+  );
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? "BrownFi Pyth exact-output route transfer preflight"
+  });
+  return { ...routeResults, dryRunResult };
 }
 
 export async function swapExactInputWithPythRoute(
@@ -7562,6 +7636,23 @@ export async function preflightAddLiquidityWithPythRoute<
   });
 }
 
+export async function preflightAddLiquidityWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightAddLiquidityWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightLiquidityRouteResult<TDryRunResult>> {
+  const liquidityResult = await addLiquidityWithPythRouteAndTransfer(
+    options.tx,
+    options
+  );
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? "BrownFi Pyth add-liquidity transfer preflight"
+  });
+  return { liquidityResult, dryRunResult };
+}
+
 export function removeLiquidityWithPythRoute(
   tx: TransactionLike,
   options: RemoveLiquidityWithPythRouteOptions
@@ -7583,6 +7674,23 @@ export async function preflightRemoveLiquidityWithPythRoute<
     minAOut: options.minAOut,
     minBOut: options.minBOut
   });
+}
+
+export async function preflightRemoveLiquidityWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightRemoveLiquidityWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightLiquidityRouteResult<TDryRunResult>> {
+  const liquidityResult = removeLiquidityWithPythRouteAndTransfer(
+    options.tx,
+    options
+  );
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? "BrownFi Pyth remove-liquidity transfer preflight"
+  });
+  return { liquidityResult, dryRunResult };
 }
 
 async function buildSinglePythRouteBundle(
@@ -7798,6 +7906,20 @@ export async function preflightZapWithPythRoute<TDryRunResult = unknown>(
     lpIn: options.lpIn,
     minOut: options.minOut
   });
+}
+
+export async function preflightZapWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightZapWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightZapRouteResult<TDryRunResult>> {
+  const zapRouteResult = await zapWithPythRouteAndTransfer(options.tx, options);
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? `BrownFi ${zapRouteResult.name} transfer preflight`
+  });
+  return { zapResult: zapRouteResult.zapResult, dryRunResult };
 }
 
 export async function zapWithPythRouteAndTransfer(
