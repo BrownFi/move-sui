@@ -891,6 +891,186 @@ module brownfi_amm::v3_config_test {
     }
 
     #[test]
+    fun test_granular_spread_setters_preserve_other_fields() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let risk_cap = take_from_sender<RiskCap>(&scenario);
+
+            admin::set_pool_spreads(
+                &mut pool,
+                &risk_cap,
+                20_000_000,
+                1_000_000,
+                2_000_000,
+                100_000,
+                5_000_000,
+                123_456
+            );
+
+            admin::set_pool_spread(&mut pool, &risk_cap, 30_000_000, 3_000_000, 4_000_000);
+            assert!(brownfi_amm::pool::compress(&pool) == 30_000_000, 0);
+            assert!(brownfi_amm::pool::s_sell(&pool) == 3_000_000, 0);
+            assert!(brownfi_amm::pool::s_buy(&pool) == 4_000_000, 0);
+            assert!(brownfi_amm::pool::fix_s(&pool) == 100_000, 0);
+            assert!(brownfi_amm::pool::dis_threshold(&pool) == 5_000_000, 0);
+            assert!(brownfi_amm::pool::s_bound(&pool) == 123_456, 0);
+
+            admin::set_pool_fix_spread(&mut pool, &risk_cap, 200_000);
+            assert!(brownfi_amm::pool::compress(&pool) == 30_000_000, 0);
+            assert!(brownfi_amm::pool::s_sell(&pool) == 3_000_000, 0);
+            assert!(brownfi_amm::pool::s_buy(&pool) == 4_000_000, 0);
+            assert!(brownfi_amm::pool::fix_s(&pool) == 200_000, 0);
+            assert!(brownfi_amm::pool::dis_threshold(&pool) == 5_000_000, 0);
+            assert!(brownfi_amm::pool::s_bound(&pool) == 123_456, 0);
+
+            admin::set_pool_dis_threshold(&mut pool, &risk_cap, 6_000_000);
+            assert!(brownfi_amm::pool::compress(&pool) == 30_000_000, 0);
+            assert!(brownfi_amm::pool::s_sell(&pool) == 3_000_000, 0);
+            assert!(brownfi_amm::pool::s_buy(&pool) == 4_000_000, 0);
+            assert!(brownfi_amm::pool::fix_s(&pool) == 200_000, 0);
+            assert!(brownfi_amm::pool::dis_threshold(&pool) == 6_000_000, 0);
+            assert!(brownfi_amm::pool::s_bound(&pool) == 123_456, 0);
+
+            admin::set_pool_s_bound(&mut pool, &risk_cap, 654_321);
+            assert!(brownfi_amm::pool::compress(&pool) == 30_000_000, 0);
+            assert!(brownfi_amm::pool::s_sell(&pool) == 3_000_000, 0);
+            assert!(brownfi_amm::pool::s_buy(&pool) == 4_000_000, 0);
+            assert!(brownfi_amm::pool::fix_s(&pool) == 200_000, 0);
+            assert!(brownfi_amm::pool::dis_threshold(&pool) == 6_000_000, 0);
+            assert!(brownfi_amm::pool::s_bound(&pool) == 654_321, 0);
+
+            return_to_sender<RiskCap>(&scenario, risk_cap);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = admin::ESpreadTooHigh)]
+    fun test_set_pool_spread_rechecks_constraint2_against_stored_fixed_spread() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let risk_cap = take_from_sender<RiskCap>(&scenario);
+
+            admin::set_pool_spreads(
+                &mut pool,
+                &risk_cap,
+                0,
+                0,
+                0,
+                1_000_000,
+                10_000_000,
+                0
+            );
+            admin::set_pool_spread(&mut pool, &risk_cap, 100_000_000, 0, 89_000_000);
+
+            return_to_sender<RiskCap>(&scenario, risk_cap);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = admin::ESpreadTooHigh)]
+    fun test_set_pool_fix_spread_rechecks_constraint2_against_stored_spread() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let risk_cap = take_from_sender<RiskCap>(&scenario);
+
+            admin::set_pool_spreads(
+                &mut pool,
+                &risk_cap,
+                100_000_000,
+                0,
+                89_000_000,
+                0,
+                10_000_000,
+                0
+            );
+            admin::set_pool_fix_spread(&mut pool, &risk_cap, 1_000_000);
+
+            return_to_sender<RiskCap>(&scenario, risk_cap);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = admin::ESpreadTooHigh)]
+    fun test_set_pool_dis_threshold_rechecks_constraint2_against_stored_spread() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let risk_cap = take_from_sender<RiskCap>(&scenario);
+
+            admin::set_pool_spreads(
+                &mut pool,
+                &risk_cap,
+                100_000_000,
+                0,
+                90_000_000,
+                0,
+                1,
+                0
+            );
+            admin::set_pool_dis_threshold(&mut pool, &risk_cap, 10_000_000);
+
+            return_to_sender<RiskCap>(&scenario, risk_cap);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = admin::ESpreadTooHigh)]
+    fun test_set_pool_s_bound_rejects_ten_percent_bound() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let risk_cap = take_from_sender<RiskCap>(&scenario);
+
+            admin::set_pool_spreads(
+                &mut pool,
+                &risk_cap,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0
+            );
+            admin::set_pool_s_bound(&mut pool, &risk_cap, 10_000_000);
+
+            return_to_sender<RiskCap>(&scenario, risk_cap);
+            return_shared(pool);
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     #[expected_failure(abort_code = admin::ELambdaTooHigh)]
     fun test_lambda_must_not_exceed_half_min_kappa() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);

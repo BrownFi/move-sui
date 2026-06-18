@@ -206,9 +206,7 @@ public fun set_pool_gamma<A, B>(
     );
 }
 
-public fun set_pool_spreads<A, B>(
-    pool: &mut Pool<A, B>,
-    _risk_cap: &RiskCap,
+fun assert_spreads(
     compress: u32,
     s_sell: u32,
     s_buy: u32,
@@ -230,6 +228,19 @@ public fun set_pool_spreads<A, B>(
         (fix_s as u128) + dynamic_spread + (s_buy as u128) < (PRECISION as u128),
         ESpreadTooHigh
     );
+}
+
+public fun set_pool_spreads<A, B>(
+    pool: &mut Pool<A, B>,
+    _risk_cap: &RiskCap,
+    compress: u32,
+    s_sell: u32,
+    s_buy: u32,
+    fix_s: u32,
+    dis_threshold: u32,
+    s_bound: u32
+) {
+    assert_spreads(compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
     pool::set_spreads(pool, compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
     events::emit_pool_parameters_updated(pool::id(pool), b"spreads", (fix_s as u64));
     events::emit_config_updated(
@@ -247,6 +258,86 @@ public fun set_pool_spreads<A, B>(
         b"dis_threshold",
         vector[(dis_threshold as u128)]
     );
+    events::emit_config_updated(
+        pool::id(pool),
+        b"s_bound",
+        vector[(s_bound as u128)]
+    );
+}
+
+public fun set_pool_spread<A, B>(
+    pool: &mut Pool<A, B>,
+    _risk_cap: &RiskCap,
+    compress: u32,
+    s_sell: u32,
+    s_buy: u32
+) {
+    let fix_s = pool::fix_s(pool);
+    let dis_threshold = pool::dis_threshold(pool);
+    let s_bound = pool::s_bound(pool);
+    assert_spreads(compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    pool::set_spreads(pool, compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    events::emit_pool_parameters_updated(pool::id(pool), b"spread", (compress as u64));
+    events::emit_config_updated(
+        pool::id(pool),
+        b"spread",
+        vector[(compress as u128), (s_sell as u128), (s_buy as u128)]
+    );
+}
+
+public fun set_pool_fix_spread<A, B>(
+    pool: &mut Pool<A, B>,
+    _risk_cap: &RiskCap,
+    fix_s: u32
+) {
+    let compress = pool::compress(pool);
+    let s_sell = pool::s_sell(pool);
+    let s_buy = pool::s_buy(pool);
+    let dis_threshold = pool::dis_threshold(pool);
+    let s_bound = pool::s_bound(pool);
+    assert_spreads(compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    pool::set_spreads(pool, compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    events::emit_pool_parameters_updated(pool::id(pool), b"fix_spread", (fix_s as u64));
+    events::emit_config_updated(
+        pool::id(pool),
+        b"fix_spread",
+        vector[(fix_s as u128)]
+    );
+}
+
+public fun set_pool_dis_threshold<A, B>(
+    pool: &mut Pool<A, B>,
+    _risk_cap: &RiskCap,
+    dis_threshold: u32
+) {
+    let compress = pool::compress(pool);
+    let s_sell = pool::s_sell(pool);
+    let s_buy = pool::s_buy(pool);
+    let fix_s = pool::fix_s(pool);
+    let s_bound = pool::s_bound(pool);
+    assert_spreads(compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    pool::set_spreads(pool, compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    events::emit_pool_parameters_updated(pool::id(pool), b"dis_threshold", (dis_threshold as u64));
+    events::emit_config_updated(
+        pool::id(pool),
+        b"dis_threshold",
+        vector[(dis_threshold as u128)]
+    );
+}
+
+public fun set_pool_s_bound<A, B>(
+    pool: &mut Pool<A, B>,
+    _risk_cap: &RiskCap,
+    s_bound: u32
+) {
+    let compress = pool::compress(pool);
+    let s_sell = pool::s_sell(pool);
+    let s_buy = pool::s_buy(pool);
+    let fix_s = pool::fix_s(pool);
+    let dis_threshold = pool::dis_threshold(pool);
+    assert_spreads(compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    pool::set_spreads(pool, compress, s_sell, s_buy, fix_s, dis_threshold, s_bound);
+    events::emit_pool_parameters_updated(pool::id(pool), b"s_bound", (s_bound as u64));
     events::emit_config_updated(
         pool::id(pool),
         b"s_bound",
