@@ -1568,6 +1568,30 @@ export interface SwapExactOutputWithPythRouteResultsAndTransferOptions
   recipient: string;
 }
 
+export interface PreflightSwapExactInputWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends SwapExactInputWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
+export interface PreflightSwapExactOutputWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends SwapExactOutputWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
+export interface PreflightSwapExactOutputWithPythRouteResultsOptions<
+  TDryRunResult = unknown
+> extends SwapExactOutputWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
 export interface AddLiquidityWithPythRouteOptions
   extends Omit<
       AddLiquidityWithRegisteredRouteOptions<PythRoutePriceHopOptions>,
@@ -7147,6 +7171,66 @@ function createPythOnlyRoutePriceProviderRegistry(
       pythClient: options.pythClient
     })
   ]);
+}
+
+export async function preflightSwapExactInputWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactInputWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  return preflightSwapExactInputWithRegisteredRoute({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs,
+    input: options.input,
+    minOutputs: options.minOutputs
+  });
+}
+
+export async function preflightSwapExactOutputWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactOutputWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  return preflightSwapExactOutputWithRegisteredRoute({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs,
+    input: options.input,
+    amountOut: options.amountOut
+  });
+}
+
+export async function preflightSwapExactOutputWithPythRouteResults<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactOutputWithPythRouteResultsOptions<TDryRunResult>
+): Promise<PreflightSwapExactOutputRouteResults<TDryRunResult>> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  return preflightSwapExactOutputWithRegisteredRouteResults({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    path: options.path,
+    pairs: options.pairs,
+    input: options.input,
+    amountOut: options.amountOut
+  });
 }
 
 export async function swapExactInputWithPythRoute(

@@ -106,6 +106,9 @@ import {
   preflightLaunchValidationCases,
   preflightLaunchValidationQuoteCases,
   preflightRegisteredRouteCases,
+  preflightSwapExactInputWithPythRoute,
+  preflightSwapExactOutputWithPythRoute,
+  preflightSwapExactOutputWithPythRouteResults,
   preflightSwapExactInputWithRegisteredRoute,
   preflightSwapExactOutputWithRegisteredRoute,
   preflightSwapExactOutputWithRegisteredRouteResults,
@@ -5882,6 +5885,214 @@ test("preflightSwapExactOutputWithRegisteredRouteResults preflights a quote-chai
   assert.deepEqual(calls, [
     { kind: "build", input: { client: suiClient }, moveCallCount: 5 },
     { kind: "dryRun", input: { transactionBlock: "quote-chain-bytes" } }
+  ]);
+});
+
+test("Pyth route preflight wrappers update feeds and dry-run built route PTBs", async () => {
+  const exactInputTx = createTransactionRecorder();
+  const exactOutputTx = createTransactionRecorder();
+  const exactOutputResultsTx = createTransactionRecorder();
+  const calls = [];
+  const txLabels = new Map([
+    [exactInputTx, "exact-input"],
+    [exactOutputTx, "exact-output"],
+    [exactOutputResultsTx, "exact-output-results"]
+  ]);
+  const attachBuild = (tx, label) => {
+    tx.build = async (input) => {
+      const targets = tx.calls.map((call) => call.target);
+      calls.push({
+        kind: "build",
+        label,
+        input,
+        moveCallCount: tx.calls.length,
+        firstTarget: targets[0],
+        lastTarget: targets[targets.length - 1]
+      });
+      return `${label}-bytes`;
+    };
+  };
+  attachBuild(exactInputTx, "exact-input");
+  attachBuild(exactOutputTx, "exact-output");
+  attachBuild(exactOutputResultsTx, "exact-output-results");
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      calls.push({ kind: "dryRun", input });
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const pythProvider = {
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        calls.push({ kind: "fetch", feedIds: Array.from(feedIdsArg) });
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        const label = txLabels.get(txArg);
+        assert.ok(label);
+        assert.equal(txArg.calls.length, 0);
+        calls.push({
+          kind: "update",
+          label,
+          updates: Array.from(updatesArg),
+          feedIds: Array.from(feedIdsArg),
+          moveCallCount: txArg.calls.length
+        });
+        return feedIdsArg.map(
+          (feedId) => `0xPRICE_${feedId.replace(/[^a-z0-9]/gi, "").toUpperCase()}`
+        );
+      }
+    }
+  };
+  const pairAB = {
+    packageId: "0xBROWN",
+    typeA: "A",
+    typeB: "B",
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+  const pairAC = {
+    packageId: "0xBROWN",
+    typeA: "A",
+    typeB: "C",
+    pool: "0xPOOLAC",
+    feedIds: ["feed-a", "feed-c"]
+  };
+  const pairBC = {
+    packageId: "0xBROWN",
+    typeA: "B",
+    typeB: "C",
+    pool: "0xPOOLBC",
+    feedIds: ["feed-b", "feed-c"]
+  };
+
+  const exactInput = await preflightSwapExactInputWithPythRoute({
+    tx: exactInputTx,
+    suiClient,
+    ...pythProvider,
+    clock: "0x6",
+    path: ["A", "B"],
+    pairs: [pairAB],
+    input: "0xCOINA",
+    minOutputs: [9n]
+  });
+  const exactOutput = await preflightSwapExactOutputWithPythRoute({
+    tx: exactOutputTx,
+    suiClient,
+    ...pythProvider,
+    clock: "0x6",
+    path: ["A", "B"],
+    pairs: [pairAB],
+    input: "0xCOINA",
+    amountOut: 7n
+  });
+  const exactOutputResults = await preflightSwapExactOutputWithPythRouteResults({
+    tx: exactOutputResultsTx,
+    suiClient,
+    ...pythProvider,
+    clock: "0x6",
+    path: ["A", "C", "B"],
+    pairs: [pairAC, pairBC],
+    input: "0xCOINA",
+    amountOut: 5n
+  });
+
+  assert.deepEqual(exactInput, {
+    swapResult: { kind: "result", index: 3 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "exact-input-bytes"
+    }
+  });
+  assert.deepEqual(exactOutput, {
+    swapResult: { kind: "result", index: 3 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "exact-output-bytes"
+    }
+  });
+  assert.deepEqual(exactOutputResults.quoteResults, [{ kind: "result", index: 6 }]);
+  assert.deepEqual(exactOutputResults.swapResults, [
+    { kind: "result", index: 7 },
+    { kind: "result", index: 8 }
+  ]);
+  assert.deepEqual(exactOutputResults.changeCoins, [
+    { kind: "nested-result", index: 7, resultIndex: 0 },
+    { kind: "nested-result", index: 8, resultIndex: 0 }
+  ]);
+  assert.deepEqual(exactOutputResults.output, {
+    kind: "nested-result",
+    index: 8,
+    resultIndex: 1
+  });
+  assert.deepEqual(exactOutputResults.dryRunResult, {
+    effects: { status: { status: "success" } },
+    transactionBlock: "exact-output-results-bytes"
+  });
+  assert.deepEqual(calls, [
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "exact-input",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "exact-input",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::swap_exact_a_for_b_with_bundle"
+    },
+    { kind: "dryRun", input: { transactionBlock: "exact-input-bytes" } },
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "exact-output",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "exact-output",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::swap_a_for_exact_b_with_bundle"
+    },
+    { kind: "dryRun", input: { transactionBlock: "exact-output-bytes" } },
+    { kind: "fetch", feedIds: ["feed-a", "feed-c", "feed-b"] },
+    {
+      kind: "update",
+      label: "exact-output-results",
+      updates: [
+        { update: "feed-a" },
+        { update: "feed-c" },
+        { update: "feed-b" }
+      ],
+      feedIds: ["feed-a", "feed-c", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "exact-output-results",
+      input: { client: suiClient },
+      moveCallCount: 9,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::swap_b_for_exact_a_with_bundle"
+    },
+    {
+      kind: "dryRun",
+      input: { transactionBlock: "exact-output-results-bytes" }
+    }
   ]);
 });
 
