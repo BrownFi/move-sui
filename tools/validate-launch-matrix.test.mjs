@@ -881,3 +881,32 @@ test("pyth-current testnet SUI/USDT live evidence matrix is verifier-ready", () 
     summary.routeCases.map((entry) => entry.name)
   );
 });
+
+test("pyth-current testnet fresh current-source live evidence matrix is verifier-ready", () => {
+  const config =
+    "configs/launch/pyth-current-testnet.current-source-live-evidence.matrix.json";
+  const summary = validateLaunchMatrixConfigFile({
+    config,
+    launchConfig: "configs/launch/pyth-current-testnet.json",
+    requireLiveValues: true
+  });
+  const matrix = JSON.parse(fs.readFileSync(config, "utf8"));
+
+  assert.equal(summary.routeCaseCount, 11);
+  assert.equal(summary.quoteCaseCount, 6);
+  assert.deepEqual(summary.providerIds, ["pyth"]);
+  assert.equal(
+    summary.quoteCases.some((entry) => entry.kind === "max-bound-quote"),
+    true
+  );
+  assert.deepEqual(
+    matrix.txEvidence.map((entry) => entry.name),
+    summary.routeCases.map((entry) => entry.name)
+  );
+  assert.deepEqual(Object.keys(matrix.setupEvidence), [
+    "testCoins",
+    "brownfiPackage",
+    "pool",
+    "flashEnable"
+  ]);
+});

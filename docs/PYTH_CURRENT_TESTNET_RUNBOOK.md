@@ -15,12 +15,14 @@ Optional protocol-fee launch values are separate from route-matrix values:
 - Protocol-fee pool template: `configs/launch/pyth-current-testnet.protocol-fee.pool.example.json`
 - Protocol-fee pool-only values: `configs/launch/pyth-current-testnet.protocol-fee.values.example.json`
 
-The checked live evidence file is verifier-only:
+The checked live evidence files are verifier-only:
 
-- `configs/launch/pyth-current-testnet.live-evidence.matrix.json`
+- `configs/launch/pyth-current-testnet.live-evidence.matrix.json` for the 2026-06-17 protocol-fee launch.
+- `configs/launch/pyth-current-testnet.current-source-live-evidence.matrix.json` for the 2026-06-18 fresh current-source launch.
+- `configs/launch/pyth-current-testnet.sui-usdt-live-evidence.matrix.json` for the 2026-06-18 native SUI / test USDT launch.
 
-It records historical landed transactions. Its route input coin IDs may be spent, so do not submit from it.
-It also carries live-value-clean cutoff-aware and raw/no-cutoff exact-input and exact-output quote cases, plus an exact-output round-trip quote case, for coverage validation; those quote cases do not have tx evidence because they are no-spend cases.
+They record historical landed transactions. Their route input coin IDs may be spent, so do not submit from them.
+They also carry live-value-clean quote cases for coverage validation; those quote cases do not have tx evidence because they are no-spend cases.
 
 ## Requirements
 
@@ -243,7 +245,7 @@ rtk node tools/verify-sui-cli-tx-evidence.mjs \
 
 ## Fresh Live Launch
 
-This publishes launch test coins, publishes the BrownFi current-Pyth package, creates a Pyth-backed pool, enables flash for that pool when the pool template sets `flashEnabled: true`, optionally dry-runs quote-only cases with `--preflight-quotes`, verifies setup evidence when `--verify-tx-evidence` is set, submits exact-input, exact-output, result-aware exact-output, add/remove, zap-in/zap-out, and flash-borrow route cases, writes artifacts under `OUT_DIR`, and verifies landed route evidence. The checked `pyth-current-testnet.live-evidence.matrix.json` is verifier-only for the latest landed Pyth setup, swap, liquidity, zap, flash, and result-aware exact-output transactions.
+This publishes launch test coins, publishes the BrownFi current-Pyth package, creates a Pyth-backed pool, enables flash for that pool when the pool template sets `flashEnabled: true`, optionally dry-runs quote-only cases with `--preflight-quotes`, verifies setup evidence when `--verify-tx-evidence` is set, submits exact-input, exact-output, result-aware exact-output, add/remove, zap-in/zap-out, and flash-borrow route cases, writes artifacts under `OUT_DIR`, and verifies landed route evidence. `pyth-current-testnet.current-source-live-evidence.matrix.json` is verifier-only for the 2026-06-18 fresh current-source default launch; `pyth-current-testnet.live-evidence.matrix.json` remains the 2026-06-17 protocol-fee evidence matrix.
 
 ```sh
 OUT_DIR=/private/tmp/brownfi-pyth-current-testnet-$(date +%Y%m%d-%H%M%S)
@@ -344,6 +346,45 @@ The checked evidence matrix records the 2026-06-17 protocol-fee launch:
 - Zap-out-B digest: `9gNSeQ5EMTnjbHbUCeGTHQPZ5EWjFf9jbydbjk7PBvkJ`
 - Flash-borrow-A digest: `BtNqLWGRVTrogXAN63x52JixVL5TBeV4PeJxcjDcTkTG`
 - Flash-borrow-B digest: `85kRkpDmcEXndb2bnncTS9FRzgBrnCYUfydwrkXiLJED`
+
+Additional 2026-06-18 fresh current-source current-Pyth evidence:
+
+- Test coins package: `0x03b90ff3c760df885b36ae6f55920f93ccffade73486913876968c88fe7cd43a`
+- Test coins digest: `5Sa6iJXYEyvaNN6DYMdPpVrtNmjYzhn3fSbZ97E1b6rx`
+- BrownFi package: `0x23b6db1a5ba301e6d71123a375de6fcf963a22a8a1e9c0b7bb84c826e19b57be`
+- BrownFi package digest: `GbtuJKydpVdrknqYfsnUio9wzuqXfe4iCPn3tRuXmjUJ`
+- Pool: `0xcf260008fc7ff1f0604856a8cfdbcb36cc041dc457969e1f262b22d1412d31b6`
+- Pool-create digest: `9HBaPD9LihZz5LPvxZ2mYPyosdCryfBmBxDAajVwPG96`
+- LP coin: `0xefd0cead49416b086368da8f85992d02521bcff0a6f5f30798f5747cdbb13359`
+- Flash-enable digest: `FQw7Ev987bsHgaeX3esYfbqs6K6ohRvR3wPTg6rTQ9Nu`
+- Exact-input swap digest: `9i5ncFWzQNPUa16qGCGRJrHkBgHfHfsRdmbBR8J5oAUP`
+- Exact-output swap digest: `7QqujEjLRwaZMPQGAFpKpqtwsEdvAYWuawA2fYTuDC81`
+- Result-aware exact-output digest: `2ZsQaXFtU2RkBwTreKyMcbct2URr3iQyteSbQW3shPrp`
+- Add-liquidity digest: `6grxXsCS6p2T91xaCkjszowN5zagWqmPrtiW8x7Q38tV`
+- Remove-liquidity digest: `2YQnCbByJo4QNQTeaFSj9ESQeK2hjJMy9EgTRhfx1MnX`
+- Zap-in-A digest: `CVJpLn74uhnD3yt1mXp6zx7Rsv5NVEZW6RU9Cqye1Mwb`
+- Zap-in-B digest: `3Ev5vHpUGWeFZfZ4XF7EaT61GkdaQrCE1NasyU2s6a1R`
+- Zap-out-A digest: `PJWWqd3GNozETJbxqMB12EpzgT3c9s6xFUEjAeazGqu`
+- Zap-out-B digest: `HtkmmPKfrVgmoexCZi2PtHkM3N4VzgVJrTjqQJnKUhPN`
+- Flash-borrow-A digest: `6DhVChgWvKsEu2qZngct1aFh4L4buYsTnfui2qQNWEiP`
+- Flash-borrow-B digest: `3iQVdSQ5WH1ifDasYht1qnkRum9DKqJtJzFnPnh2ospW`
+
+The checked verifier-only matrix for this fresh current-source run is `configs/launch/pyth-current-testnet.current-source-live-evidence.matrix.json`. It records setup evidence, all 11 landed route transactions, and six quote-only cases: exact-input, exact-output, exact-output round-trip, max-bound, raw exact-input, and raw exact-output.
+
+```bash
+rtk node tools/validate-launch-matrix.mjs \
+  --config configs/launch/pyth-current-testnet.current-source-live-evidence.matrix.json \
+  --launch-config configs/launch/pyth-current-testnet.json \
+  --require-live-values
+```
+
+```bash
+rtk node tools/verify-sui-cli-tx-evidence.mjs \
+  --config configs/launch/pyth-current-testnet.current-source-live-evidence.matrix.json \
+  --all \
+  --rpc-url https://fullnode.testnet.sui.io:443 \
+  --use-rtk
+```
 
 Additional 2026-06-18 native SUI / test USDT evidence:
 

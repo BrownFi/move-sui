@@ -10,6 +10,8 @@ Current Pyth launch surface: the current-Pyth template now covers exact-input sw
 
 Current Pyth launch route cases can optionally set `recipient`. When omitted, route output transfer behavior remains sender-directed for compatibility. When present, the submitter sends final swap/zap outputs, LP from add/zap-in, and remove-liquidity outputs to `recipient`, while exact-output input/intermediate change coins and add/zap-in residual token coins are refunded to the runtime sender. The preflight runner also transfers returned route coin objects before dry-run when the runtime exposes a sender, so state-changing route PTBs are simulated with all non-drop outputs consumed. Direct Pyth convenience preflight wrappers now cover the same recipient-aware transfer variants for dynamic exact-input routes, result-aware exact-output routes, add-liquidity, remove-liquidity, and zap.
 
+Additional checked 2026-06-18 fresh current-source evidence is recorded in `configs/launch/pyth-current-testnet.current-source-live-evidence.matrix.json`. It proves a newly published current-source BrownFi package `0x23b6db1a5ba301e6d71123a375de6fcf963a22a8a1e9c0b7bb84c826e19b57be` and pool `0xcf260008fc7ff1f0604856a8cfdbcb36cc041dc457969e1f262b22d1412d31b6` executed the same 11 landed Pyth route cases as the current launch template, and it includes all six current quote-only cases including max-bound quote coverage.
+
 ## Verdict
 
 Verdict: Better approach available
