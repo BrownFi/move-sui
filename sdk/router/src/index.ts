@@ -1900,6 +1900,34 @@ export interface SwapCForExactAViaBWithPythRouteAndTransferOptions
   recipient: string;
 }
 
+export interface TwoHopPythRouteQuoteOptions {
+  packageId: string;
+  typeA: string;
+  typeB: string;
+  typeC: string;
+  priceFeedConnection: PythPriceFeedUpdateFetcher;
+  pythClient: PythPriceFeedUpdater;
+  clock: ObjectInput;
+  hopAB: PythRouteHopSourceOptions;
+  hopBC: PythRouteHopSourceOptions;
+}
+
+export interface QuoteExactAForCViaBWithPythRouteOptions
+  extends TwoHopPythRouteQuoteOptions {
+  amountIn: U64Input;
+}
+
+export type QuoteExactCForAViaBWithPythRouteOptions =
+  QuoteExactAForCViaBWithPythRouteOptions;
+
+export interface QuoteAForExactCViaBWithPythRouteOptions
+  extends TwoHopPythRouteQuoteOptions {
+  amountOut: U64Input;
+}
+
+export type QuoteCForExactAViaBWithPythRouteOptions =
+  QuoteAForExactCViaBWithPythRouteOptions;
+
 export type PreflightPythTypedSwapTransferOptions<
   TOptions,
   TDryRunResult = unknown
@@ -8546,6 +8574,136 @@ export async function swapCForExactAViaBWithPythRoute(
     poolAB: options.hopAB.pool,
     poolBC: options.hopBC.pool,
     input: options.input,
+    amountOut: options.amountOut
+  })(tx);
+}
+
+function twoHopPythRouteQuoteBundleOptions(
+  options: TwoHopPythRouteQuoteOptions,
+  priceBundleAB: TransactionArgument,
+  priceBundleBC: TransactionArgument
+) {
+  return {
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    typeC: options.typeC,
+    priceBundleAB,
+    priceBundleBC,
+    clock: options.clock,
+    poolAB: options.hopAB.pool,
+    poolBC: options.hopBC.pool
+  };
+}
+
+export async function quoteExactAForCViaBWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteExactAForCViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteExactAForCViaBWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
+    amountIn: options.amountIn
+  })(tx);
+}
+
+export async function quoteExactAForCViaBWithoutCutoffWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteExactAForCViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteExactAForCViaBWithoutCutoffWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
+    amountIn: options.amountIn
+  })(tx);
+}
+
+export async function quoteExactCForAViaBWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteExactCForAViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteExactCForAViaBWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
+    amountIn: options.amountIn
+  })(tx);
+}
+
+export async function quoteExactCForAViaBWithoutCutoffWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteExactCForAViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteExactCForAViaBWithoutCutoffWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
+    amountIn: options.amountIn
+  })(tx);
+}
+
+export async function quoteAForExactCViaBWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteAForExactCViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteAForExactCViaBWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
+    amountOut: options.amountOut
+  })(tx);
+}
+
+export async function quoteAForExactCViaBWithoutCutoffWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteAForExactCViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteAForExactCViaBWithoutCutoffWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
+    amountOut: options.amountOut
+  })(tx);
+}
+
+export async function quoteCForExactAViaBWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteCForExactAViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteCForExactAViaBWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
+    amountOut: options.amountOut
+  })(tx);
+}
+
+export async function quoteCForExactAViaBWithoutCutoffWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteCForExactAViaBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const [priceBundleAB, priceBundleBC] = await buildTwoHopPythRouteBundles(
+    tx,
+    options
+  );
+  return quoteCForExactAViaBWithoutCutoffWithBundles({
+    ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
     amountOut: options.amountOut
   })(tx);
 }

@@ -9298,6 +9298,123 @@ test("swapExactAForCViaBWithPythRoute builds deduped Pyth bundles before the typ
   });
 });
 
+test("typed two-hop Pyth route quote wrappers build deduped bundles before quote calls", async () => {
+  const {
+    quoteAForExactCViaBWithPythRoute,
+    quoteAForExactCViaBWithoutCutoffWithPythRoute,
+    quoteCForExactAViaBWithPythRoute,
+    quoteCForExactAViaBWithoutCutoffWithPythRoute,
+    quoteExactAForCViaBWithPythRoute,
+    quoteExactAForCViaBWithoutCutoffWithPythRoute,
+    quoteExactCForAViaBWithPythRoute,
+    quoteExactCForAViaBWithoutCutoffWithPythRoute
+  } = await import("../dist/index.js");
+
+  const cases = [
+    {
+      fn: quoteExactAForCViaBWithPythRoute,
+      target: "0xBROWN::router::quote_exact_a_for_c_via_b_with_bundles",
+      amountField: "amountIn",
+      amount: 100n
+    },
+    {
+      fn: quoteExactAForCViaBWithoutCutoffWithPythRoute,
+      target: "0xBROWN::router::quote_exact_a_for_c_via_b_without_cutoff_with_bundles",
+      amountField: "amountIn",
+      amount: 101n
+    },
+    {
+      fn: quoteExactCForAViaBWithPythRoute,
+      target: "0xBROWN::router::quote_exact_c_for_a_via_b_with_bundles",
+      amountField: "amountIn",
+      amount: 102n
+    },
+    {
+      fn: quoteExactCForAViaBWithoutCutoffWithPythRoute,
+      target: "0xBROWN::router::quote_exact_c_for_a_via_b_without_cutoff_with_bundles",
+      amountField: "amountIn",
+      amount: 103n
+    },
+    {
+      fn: quoteAForExactCViaBWithPythRoute,
+      target: "0xBROWN::router::quote_a_for_exact_c_via_b_with_bundles",
+      amountField: "amountOut",
+      amount: 104n
+    },
+    {
+      fn: quoteAForExactCViaBWithoutCutoffWithPythRoute,
+      target: "0xBROWN::router::quote_a_for_exact_c_via_b_without_cutoff_with_bundles",
+      amountField: "amountOut",
+      amount: 105n
+    },
+    {
+      fn: quoteCForExactAViaBWithPythRoute,
+      target: "0xBROWN::router::quote_c_for_exact_a_via_b_with_bundles",
+      amountField: "amountOut",
+      amount: 106n
+    },
+    {
+      fn: quoteCForExactAViaBWithoutCutoffWithPythRoute,
+      target: "0xBROWN::router::quote_c_for_exact_a_via_b_without_cutoff_with_bundles",
+      amountField: "amountOut",
+      amount: 107n
+    }
+  ];
+
+  for (const testCase of cases) {
+    assert.equal(typeof testCase.fn, "function");
+    const tx = createTransactionRecorder();
+    const result = await testCase.fn(tx, {
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      typeC: "0x1::c::C",
+      priceFeedConnection: {
+        async getPriceFeedsUpdateData(feedIdsArg) {
+          assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c"]);
+          return feedIdsArg.map((feedId) => ({ update: feedId }));
+        }
+      },
+      pythClient: {
+        async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+          assert.equal(txArg, tx);
+          assert.deepEqual(updatesArg, [
+            { update: "feed-a" },
+            { update: "feed-b" },
+            { update: "feed-c" }
+          ]);
+          assert.deepEqual(feedIdsArg, ["feed-a", "feed-b", "feed-c"]);
+          return ["0xPRICEA", "0xPRICEB", "0xPRICEC"];
+        }
+      },
+      clock: "0x6",
+      hopAB: {
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      },
+      hopBC: {
+        pool: "0xPOOLBC",
+        feedIds: ["feed-b", "feed-c"]
+      },
+      [testCase.amountField]: testCase.amount
+    });
+
+    assert.deepEqual(result, { kind: "result", index: 6 });
+    assert.deepEqual(tx.calls[6], {
+      target: testCase.target,
+      typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+      arguments: [
+        { kind: "result", index: 2 },
+        { kind: "result", index: 5 },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" },
+        { kind: "object", id: "0xPOOLBC" },
+        { kind: "u64", value: testCase.amount.toString() }
+      ]
+    });
+  }
+});
+
 test("swapExactBForAWithPythRoute builds the Pyth bundle before the reverse single-hop swap", async () => {
   const tx = createTransactionRecorder();
   const result = await swapExactBForAWithPythRoute(tx, {
