@@ -10375,6 +10375,273 @@ test("Pyth route transfer convenience wrappers target recipient-aware entrypoint
   assert.deepEqual(twoHopExactOutputCTx.calls[6].target, "0xBROWN::router::swap_c_for_exact_a_via_b_with_bundles_and_transfer");
 });
 
+test("typed Pyth swap transfer preflight wrappers build transfer PTBs before dry-run", async () => {
+  const {
+    preflightSwapAForExactBWithPythRouteAndTransfer,
+    preflightSwapAForExactCViaBWithPythRouteAndTransfer,
+    preflightSwapBForExactAWithPythRouteAndTransfer,
+    preflightSwapCForExactAViaBWithPythRouteAndTransfer,
+    preflightSwapExactAForBWithPythRouteAndTransfer,
+    preflightSwapExactAForCViaBWithPythRouteAndTransfer,
+    preflightSwapExactBForAWithPythRouteAndTransfer,
+    preflightSwapExactCForAViaBWithPythRouteAndTransfer
+  } = await import("../dist/index.js");
+  for (const exported of [
+    preflightSwapAForExactBWithPythRouteAndTransfer,
+    preflightSwapAForExactCViaBWithPythRouteAndTransfer,
+    preflightSwapBForExactAWithPythRouteAndTransfer,
+    preflightSwapCForExactAViaBWithPythRouteAndTransfer,
+    preflightSwapExactAForBWithPythRouteAndTransfer,
+    preflightSwapExactAForCViaBWithPythRouteAndTransfer,
+    preflightSwapExactBForAWithPythRouteAndTransfer,
+    preflightSwapExactCForAViaBWithPythRouteAndTransfer
+  ]) {
+    assert.equal(typeof exported, "function");
+  }
+
+  const events = [];
+  const pythProvider = {
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        events.push({ kind: "fetch", feedIds: Array.from(feedIdsArg) });
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg.calls.length, 0);
+        events.push({
+          kind: "update",
+          updates: Array.from(updatesArg),
+          feedIds: Array.from(feedIdsArg)
+        });
+        return feedIdsArg.map((feedId) => `0xPRICE_${feedId}`);
+      }
+    }
+  };
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      events.push({ kind: "dryRun", input });
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const attachBuild = (tx, label) => {
+    tx.build = async (input) => {
+      events.push({
+        kind: "build",
+        label,
+        input,
+        moveCallCount: tx.calls.length,
+        transferCount: tx.transfers.length,
+        lastTarget: tx.calls.at(-1)?.target
+      });
+      return `${label}-bytes`;
+    };
+  };
+  const pair = {
+    packageId: "0xBROWN",
+    typeA: "0x1::a::A",
+    typeB: "0x1::b::B",
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+  const hopAB = {
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+  const hopBC = {
+    pool: "0xPOOLBC",
+    feedIds: ["feed-b", "feed-c"]
+  };
+  const cases = [
+    {
+      label: "exact-a-for-b",
+      fn: preflightSwapExactAForBWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        ...pair,
+        clock: "0x6",
+        input: "0xCOINA",
+        minOut: 77n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget: "0xBROWN::router::swap_exact_a_for_b_with_bundle_and_transfer",
+      expectedCallCount: 4,
+      expectedSwapResult: { kind: "result", index: 3 }
+    },
+    {
+      label: "exact-b-for-a",
+      fn: preflightSwapExactBForAWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        ...pair,
+        clock: "0x6",
+        input: "0xCOINB",
+        minOut: 66n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget: "0xBROWN::router::swap_exact_b_for_a_with_bundle_and_transfer",
+      expectedCallCount: 4,
+      expectedSwapResult: { kind: "result", index: 3 }
+    },
+    {
+      label: "a-for-exact-b",
+      fn: preflightSwapAForExactBWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        ...pair,
+        clock: "0x6",
+        input: "0xCOINA",
+        amountOut: 55n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget: "0xBROWN::router::swap_a_for_exact_b_with_bundle_and_transfer",
+      expectedCallCount: 4,
+      expectedSwapResult: { kind: "result", index: 3 }
+    },
+    {
+      label: "b-for-exact-a",
+      fn: preflightSwapBForExactAWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        ...pair,
+        clock: "0x6",
+        input: "0xCOINB",
+        amountOut: 44n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget: "0xBROWN::router::swap_b_for_exact_a_with_bundle_and_transfer",
+      expectedCallCount: 4,
+      expectedSwapResult: { kind: "result", index: 3 }
+    },
+    {
+      label: "exact-a-for-c",
+      fn: preflightSwapExactAForCViaBWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        typeC: "0x1::c::C",
+        clock: "0x6",
+        hopAB,
+        hopBC,
+        input: "0xCOINA",
+        minBOut: 33n,
+        minCOut: 22n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget:
+        "0xBROWN::router::swap_exact_a_for_c_via_b_with_bundles_and_transfer",
+      expectedCallCount: 7,
+      expectedSwapResult: { kind: "result", index: 6 }
+    },
+    {
+      label: "exact-c-for-a",
+      fn: preflightSwapExactCForAViaBWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        typeC: "0x1::c::C",
+        clock: "0x6",
+        hopAB,
+        hopBC,
+        input: "0xCOINC",
+        minBOut: 31n,
+        minAOut: 21n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget:
+        "0xBROWN::router::swap_exact_c_for_a_via_b_with_bundles_and_transfer",
+      expectedCallCount: 7,
+      expectedSwapResult: { kind: "result", index: 6 }
+    },
+    {
+      label: "a-for-exact-c",
+      fn: preflightSwapAForExactCViaBWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        typeC: "0x1::c::C",
+        clock: "0x6",
+        hopAB,
+        hopBC,
+        input: "0xCOINA",
+        amountOut: 20n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget:
+        "0xBROWN::router::swap_a_for_exact_c_via_b_with_bundles_and_transfer",
+      expectedCallCount: 7,
+      expectedSwapResult: { kind: "result", index: 6 }
+    },
+    {
+      label: "c-for-exact-a",
+      fn: preflightSwapCForExactAViaBWithPythRouteAndTransfer,
+      options: {
+        ...pythProvider,
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        typeC: "0x1::c::C",
+        clock: "0x6",
+        hopAB,
+        hopBC,
+        input: "0xCOINC",
+        amountOut: 19n,
+        recipient: "0xRECIPIENT"
+      },
+      expectedTarget:
+        "0xBROWN::router::swap_c_for_exact_a_via_b_with_bundles_and_transfer",
+      expectedCallCount: 7,
+      expectedSwapResult: { kind: "result", index: 6 }
+    }
+  ];
+
+  for (const routeCase of cases) {
+    const tx = createTransactionRecorder();
+    attachBuild(tx, routeCase.label);
+    const result = await routeCase.fn({
+      tx,
+      suiClient,
+      ...routeCase.options
+    });
+    assert.deepEqual(result, {
+      swapResult: routeCase.expectedSwapResult,
+      dryRunResult: {
+        effects: { status: { status: "success" } },
+        transactionBlock: `${routeCase.label}-bytes`
+      }
+    });
+    assert.equal(tx.calls.length, routeCase.expectedCallCount);
+    assert.equal(tx.calls.at(-1).target, routeCase.expectedTarget);
+    assert.deepEqual(tx.transfers, []);
+    assert.ok(
+      events.some(
+        (event) =>
+          event.kind === "build" &&
+          event.label === routeCase.label &&
+          event.lastTarget === routeCase.expectedTarget &&
+          event.transferCount === 0
+      )
+    );
+    assert.ok(
+      events.some(
+        (event) =>
+          event.kind === "dryRun" &&
+          event.input.transactionBlock === `${routeCase.label}-bytes`
+      )
+    );
+  }
+});
+
 test("swapExactInputWithPythRoute plans a reverse two-hop PTB route from token path", async () => {
   const tx = createTransactionRecorder();
   const result = await swapExactInputWithPythRoute(tx, {

@@ -1900,6 +1900,71 @@ export interface SwapCForExactAViaBWithPythRouteAndTransferOptions
   recipient: string;
 }
 
+export type PreflightPythTypedSwapTransferOptions<
+  TOptions,
+  TDryRunResult = unknown
+> = TOptions &
+  AssertDryRunTransactionBlockSucceededOptions & {
+    tx: SuiTransactionBlockBuilderLike;
+    suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+  };
+
+export type PreflightSwapExactAForBWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapExactAForBWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
+export type PreflightSwapExactBForAWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapExactBForAWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
+export type PreflightSwapAForExactBWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapAForExactBWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
+export type PreflightSwapBForExactAWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapBForExactAWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
+export type PreflightSwapExactAForCViaBWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapExactAForCViaBWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
+export type PreflightSwapExactCForAViaBWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapExactCForAViaBWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
+export type PreflightSwapAForExactCViaBWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapAForExactCViaBWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
+export type PreflightSwapCForExactAViaBWithPythRouteAndTransferOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedSwapTransferOptions<
+  SwapCForExactAViaBWithPythRouteAndTransferOptions,
+  TDryRunResult
+>;
+
 export interface DirectOraclePairOptions extends PairTypesOptions {
   oracle: ObjectInput;
   priceInfoObjectA: ObjectInput;
@@ -8569,6 +8634,119 @@ export async function swapCForExactAViaBWithPythRouteAndTransfer(
     amountOut: options.amountOut,
     recipient: options.recipient
   })(tx);
+}
+
+async function preflightPythTypedSwapTransfer<TOptions, TDryRunResult = unknown>(
+  options: PreflightPythTypedSwapTransferOptions<TOptions, TDryRunResult>,
+  buildSwap: (
+    tx: TransactionLike,
+    options: TOptions
+  ) => Promise<TransactionArgument>,
+  defaultContext: string
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  const swapResult = await buildSwap(options.tx, options);
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? defaultContext
+  });
+  return { swapResult, dryRunResult };
+}
+
+export async function preflightSwapExactAForBWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactAForBWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapExactAForBWithPythRouteAndTransfer,
+    "BrownFi Pyth exact A for B transfer preflight"
+  );
+}
+
+export async function preflightSwapExactBForAWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactBForAWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapExactBForAWithPythRouteAndTransfer,
+    "BrownFi Pyth exact B for A transfer preflight"
+  );
+}
+
+export async function preflightSwapAForExactBWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapAForExactBWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapAForExactBWithPythRouteAndTransfer,
+    "BrownFi Pyth A for exact B transfer preflight"
+  );
+}
+
+export async function preflightSwapBForExactAWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapBForExactAWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapBForExactAWithPythRouteAndTransfer,
+    "BrownFi Pyth B for exact A transfer preflight"
+  );
+}
+
+export async function preflightSwapExactAForCViaBWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactAForCViaBWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapExactAForCViaBWithPythRouteAndTransfer,
+    "BrownFi Pyth exact A for C via B transfer preflight"
+  );
+}
+
+export async function preflightSwapExactCForAViaBWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapExactCForAViaBWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapExactCForAViaBWithPythRouteAndTransfer,
+    "BrownFi Pyth exact C for A via B transfer preflight"
+  );
+}
+
+export async function preflightSwapAForExactCViaBWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapAForExactCViaBWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapAForExactCViaBWithPythRouteAndTransfer,
+    "BrownFi Pyth A for exact C via B transfer preflight"
+  );
+}
+
+export async function preflightSwapCForExactAViaBWithPythRouteAndTransfer<
+  TDryRunResult = unknown
+>(
+  options: PreflightSwapCForExactAViaBWithPythRouteAndTransferOptions<TDryRunResult>
+): Promise<PreflightSwapRouteResult<TDryRunResult>> {
+  return preflightPythTypedSwapTransfer(
+    options,
+    swapCForExactAViaBWithPythRouteAndTransfer,
+    "BrownFi Pyth C for exact A via B transfer preflight"
+  );
 }
 
 export function swapExactAForB(options: SingleHopDirectExactInputOptions): TransactionThunk {
