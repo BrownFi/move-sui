@@ -720,3 +720,83 @@ test("pyth-current testnet live evidence matrix is verifier-ready", () => {
     summary.routeCases.map((entry) => entry.name)
   );
 });
+
+test("pyth-current testnet SUI/USDT live evidence matrix is verifier-ready", () => {
+  const config =
+    "configs/launch/pyth-current-testnet.sui-usdt-live-evidence.matrix.json";
+  const summary = validateLaunchMatrixConfigFile({
+    config,
+    launchConfig: "configs/launch/pyth-current-testnet.json",
+    requireLiveValues: true
+  });
+  const matrix = JSON.parse(fs.readFileSync(config, "utf8"));
+
+  assert.deepEqual(summary, {
+    routeCaseCount: 11,
+    quoteCaseCount: 0,
+    totalCaseCount: 11,
+    providerIds: ["pyth"],
+    routeCases: [
+      {
+        name: "live SUI/USDT exact input SUI to USDT",
+        kind: "exact-input",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT add liquidity",
+        kind: "add-liquidity",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT remove liquidity",
+        kind: "remove-liquidity",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT exact output SUI to USDT",
+        kind: "exact-output",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT exact output results SUI to USDT",
+        kind: "exact-output-results",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT zap in A",
+        kind: "zap-in-a",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT zap in B",
+        kind: "zap-in-b",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT zap out A",
+        kind: "zap-out-a",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT zap out B",
+        kind: "zap-out-b",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT flash borrow A",
+        kind: "flash-borrow-a",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT flash borrow B",
+        kind: "flash-borrow-b",
+        providerId: "pyth"
+      }
+    ],
+    quoteCases: []
+  });
+  assert.deepEqual(
+    matrix.txEvidence.map((entry) => entry.name),
+    summary.routeCases.map((entry) => entry.name)
+  );
+});

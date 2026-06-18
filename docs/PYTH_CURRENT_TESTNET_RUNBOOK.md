@@ -364,4 +364,14 @@ Additional 2026-06-18 native SUI / test USDT evidence:
 - Flash-borrow-A digest: `7cUPxu8v1kAjong6iBbYsDvFNAjy8PLxcWv9c511Qqq`
 - Flash-borrow-B digest: `HxfcRu6CapUjHTF1UNEWLiFdPJZTcWouSDCjH8CvMvbw`
 
+The checked verifier-only matrix for this native SUI / test USDT run is `configs/launch/pyth-current-testnet.sui-usdt-live-evidence.matrix.json`. It records historical input coin IDs, so use it to verify landed tx evidence rather than to resubmit routes.
+
+```bash
+rtk node tools/verify-sui-cli-tx-evidence.mjs \
+  --config configs/launch/pyth-current-testnet.sui-usdt-live-evidence.matrix.json \
+  --all \
+  --rpc-url https://fullnode.testnet.sui.io:443 \
+  --use-rtk
+```
+
 The SUI/USDT remaining-route matrix used configured input and flash-fee coin splits during preflight, then route submission kept one submit-time split per configured amount. The final route preflight passed 8/8 before the exact-output, zap, and flash transactions above were submitted and verified.
