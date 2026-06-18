@@ -1604,11 +1604,27 @@ export interface AddLiquidityWithPythRouteAndTransferOptions
   recipient: string;
 }
 
+export interface PreflightAddLiquidityWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends AddLiquidityWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
 export type RemoveLiquidityWithPythRouteOptions =
   RemoveLiquidityWithRegisteredRouteOptions<PythRoutePriceHopOptions>;
 
 export type RemoveLiquidityWithPythRouteAndTransferOptions =
   RemoveLiquidityWithPythRouteOptions & { recipient: string };
+
+export interface PreflightRemoveLiquidityWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends RemoveLiquidityWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
 
 export interface QuoteExactInputWithPythRouteOptions extends PythRouteProviderOptions {
   clock: ObjectInput;
@@ -1666,6 +1682,13 @@ export type ZapWithPythRouteAndTransferOptions =
   | (ZapInBWithPythRouteOptions & { recipient: string })
   | (ZapOutWithPythRouteOptions & { recipient: string });
 
+export type PreflightZapWithPythRouteOptions<TDryRunResult = unknown> =
+  ZapWithPythRouteOptions &
+    AssertDryRunTransactionBlockSucceededOptions & {
+      tx: SuiTransactionBlockBuilderLike;
+      suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+    };
+
 export interface FlashBorrowWithPythRouteOptions extends PythRouteProviderOptions {
   name?: string;
   kind: "flash-borrow-a" | "flash-borrow-b";
@@ -1673,6 +1696,14 @@ export interface FlashBorrowWithPythRouteOptions extends PythRouteProviderOption
   pair: PythRoutePriceHopOptions;
   amount: U64Input;
   feeCoin: ObjectInput;
+}
+
+export interface PreflightFlashBorrowWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends FlashBorrowWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
 }
 
 export interface SwapExactAForBWithPythRouteOptions
@@ -7402,11 +7433,49 @@ export async function addLiquidityWithPythRoute(
   });
 }
 
+export async function preflightAddLiquidityWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightAddLiquidityWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightLiquidityRouteResult<TDryRunResult>> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  return preflightAddLiquidityWithRegisteredRoute({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    pair: options.pair,
+    inputA: options.inputA,
+    inputB: options.inputB,
+    minADeposit: options.minADeposit,
+    minBDeposit: options.minBDeposit,
+    minLpOut: options.minLpOut
+  });
+}
+
 export function removeLiquidityWithPythRoute(
   tx: TransactionLike,
   options: RemoveLiquidityWithPythRouteOptions
 ): TransactionArgument {
   return removeLiquidityWithRegisteredRoute(tx, options);
+}
+
+export async function preflightRemoveLiquidityWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightRemoveLiquidityWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightLiquidityRouteResult<TDryRunResult>> {
+  return preflightRemoveLiquidityWithRegisteredRoute({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context,
+    pair: options.pair,
+    lpIn: options.lpIn,
+    minAOut: options.minAOut,
+    minBOut: options.minBOut
+  });
 }
 
 async function buildSinglePythRouteBundle(
@@ -7584,6 +7653,46 @@ export async function zapWithPythRoute(
   });
 }
 
+export async function preflightZapWithPythRoute<TDryRunResult = unknown>(
+  options: PreflightZapWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightZapRouteResult<TDryRunResult>> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  const commonOptions = {
+    name: options.name ?? `pyth ${options.kind} route`,
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    pair: options.pair
+  };
+  if (options.kind === "zap-in-a") {
+    return preflightZapWithRegisteredRoute({
+      ...commonOptions,
+      kind: options.kind,
+      inputA: options.inputA,
+      minBFromSwap: options.minBFromSwap,
+      minLpOut: options.minLpOut
+    });
+  }
+  if (options.kind === "zap-in-b") {
+    return preflightZapWithRegisteredRoute({
+      ...commonOptions,
+      kind: options.kind,
+      inputB: options.inputB,
+      minAFromSwap: options.minAFromSwap,
+      minLpOut: options.minLpOut
+    });
+  }
+  return preflightZapWithRegisteredRoute({
+    ...commonOptions,
+    kind: options.kind,
+    lpIn: options.lpIn,
+    minOut: options.minOut
+  });
+}
+
 export async function zapWithPythRouteAndTransfer(
   tx: TransactionLike,
   options: ZapWithPythRouteAndTransferOptions
@@ -7642,6 +7751,27 @@ export async function flashBorrowWithPythRoute(
     name: options.name ?? `pyth ${options.kind} route`,
     kind: options.kind,
     tx,
+    providerRegistry,
+    providerId: "pyth",
+    clock: options.clock,
+    pair: options.pair,
+    amount: options.amount,
+    feeCoin: options.feeCoin
+  });
+}
+
+export async function preflightFlashBorrowWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightFlashBorrowWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightFlashBorrowRouteResult<TDryRunResult>> {
+  const providerRegistry = createPythOnlyRoutePriceProviderRegistry(options);
+  return preflightFlashBorrowWithRegisteredRoute({
+    name: options.name ?? `pyth ${options.kind} route`,
+    kind: options.kind,
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context,
     providerRegistry,
     providerId: "pyth",
     clock: options.clock,

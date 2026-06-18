@@ -106,6 +106,10 @@ import {
   preflightLaunchValidationCases,
   preflightLaunchValidationQuoteCases,
   preflightRegisteredRouteCases,
+  preflightAddLiquidityWithPythRoute,
+  preflightRemoveLiquidityWithPythRoute,
+  preflightZapWithPythRoute,
+  preflightFlashBorrowWithPythRoute,
   preflightSwapExactInputWithPythRoute,
   preflightSwapExactOutputWithPythRoute,
   preflightSwapExactOutputWithPythRouteResults,
@@ -6093,6 +6097,226 @@ test("Pyth route preflight wrappers update feeds and dry-run built route PTBs", 
       kind: "dryRun",
       input: { transactionBlock: "exact-output-results-bytes" }
     }
+  ]);
+});
+
+test("Pyth liquidity zap and flash preflight wrappers cover the launch route surface", async () => {
+  const addTx = createTransactionRecorder();
+  const removeTx = createTransactionRecorder();
+  const zapTx = createTransactionRecorder();
+  const flashTx = createTransactionRecorder();
+  const calls = [];
+  const txLabels = new Map([
+    [addTx, "add-liquidity"],
+    [zapTx, "zap-out-a"],
+    [flashTx, "flash-borrow-b"]
+  ]);
+  const attachBuild = (tx, label) => {
+    tx.build = async (input) => {
+      const targets = tx.calls.map((call) => call.target);
+      calls.push({
+        kind: "build",
+        label,
+        input,
+        moveCallCount: tx.calls.length,
+        firstTarget: targets[0],
+        lastTarget: targets[targets.length - 1]
+      });
+      return `${label}-bytes`;
+    };
+  };
+  attachBuild(addTx, "add-liquidity");
+  attachBuild(removeTx, "remove-liquidity");
+  attachBuild(zapTx, "zap-out-a");
+  attachBuild(flashTx, "flash-borrow-b");
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      calls.push({ kind: "dryRun", input });
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const pythProvider = {
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        calls.push({ kind: "fetch", feedIds: Array.from(feedIdsArg) });
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        const label = txLabels.get(txArg);
+        assert.ok(label);
+        assert.equal(txArg.calls.length, 0);
+        calls.push({
+          kind: "update",
+          label,
+          updates: Array.from(updatesArg),
+          feedIds: Array.from(feedIdsArg),
+          moveCallCount: txArg.calls.length
+        });
+        return feedIdsArg.map(
+          (feedId) => `0xPRICE_${feedId.replace(/[^a-z0-9]/gi, "").toUpperCase()}`
+        );
+      }
+    }
+  };
+  const pair = {
+    packageId: "0xBROWN",
+    typeA: "A",
+    typeB: "B",
+    pool: "0xPOOLAB",
+    feedIds: ["feed-a", "feed-b"]
+  };
+
+  const addResult = await preflightAddLiquidityWithPythRoute({
+    tx: addTx,
+    suiClient,
+    ...pythProvider,
+    clock: "0x6",
+    pair,
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minADeposit: 11n,
+    minBDeposit: 22n,
+    minLpOut: 33n
+  });
+  const removeResult = await preflightRemoveLiquidityWithPythRoute({
+    tx: removeTx,
+    suiClient,
+    pair,
+    lpIn: "0xLP",
+    minAOut: 7n,
+    minBOut: 8n
+  });
+  const zapResult = await preflightZapWithPythRoute({
+    tx: zapTx,
+    suiClient,
+    ...pythProvider,
+    name: "pyth zap out A",
+    kind: "zap-out-a",
+    clock: "0x6",
+    pair,
+    lpIn: "0xLPZ",
+    minOut: 44n
+  });
+  const flashResult = await preflightFlashBorrowWithPythRoute({
+    tx: flashTx,
+    suiClient,
+    ...pythProvider,
+    name: "pyth flash borrow B",
+    kind: "flash-borrow-b",
+    clock: "0x6",
+    pair,
+    amount: 55n,
+    feeCoin: "0xFEE"
+  });
+
+  assert.deepEqual(addResult, {
+    liquidityResult: { kind: "result", index: 3 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "add-liquidity-bytes"
+    }
+  });
+  assert.deepEqual(removeResult, {
+    liquidityResult: { kind: "result", index: 0 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "remove-liquidity-bytes"
+    }
+  });
+  assert.deepEqual(zapResult, {
+    zapResult: { kind: "result", index: 3 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "zap-out-a-bytes"
+    }
+  });
+  assert.deepEqual(flashResult, {
+    name: "pyth flash borrow B",
+    kind: "flash-borrow-b",
+    providerId: "pyth",
+    flashResult: {
+      result: { kind: "result", index: 3 },
+      borrowed: { kind: "nested-result", index: 3, resultIndex: 0 },
+      receipt: { kind: "nested-result", index: 3, resultIndex: 1 }
+    },
+    repayResult: { kind: "result", index: 4 },
+    dryRunResult: {
+      effects: { status: { status: "success" } },
+      transactionBlock: "flash-borrow-b-bytes"
+    }
+  });
+  assert.deepEqual(flashTx.merges, [
+    {
+      coin: { kind: "nested-result", index: 3, resultIndex: 0 },
+      sources: [{ kind: "object", id: "0xFEE" }]
+    }
+  ]);
+  assert.deepEqual(calls, [
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "add-liquidity",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "add-liquidity",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::add_liquidity_with_bundle_with_min_deposits"
+    },
+    { kind: "dryRun", input: { transactionBlock: "add-liquidity-bytes" } },
+    {
+      kind: "build",
+      label: "remove-liquidity",
+      input: { client: suiClient },
+      moveCallCount: 1,
+      firstTarget: "0xBROWN::router::remove_liquidity_with_coins",
+      lastTarget: "0xBROWN::router::remove_liquidity_with_coins"
+    },
+    { kind: "dryRun", input: { transactionBlock: "remove-liquidity-bytes" } },
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "zap-out-a",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "zap-out-a",
+      input: { client: suiClient },
+      moveCallCount: 4,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::router::zap_out_a_with_bundle"
+    },
+    { kind: "dryRun", input: { transactionBlock: "zap-out-a-bytes" } },
+    { kind: "fetch", feedIds: ["feed-a", "feed-b"] },
+    {
+      kind: "update",
+      label: "flash-borrow-b",
+      updates: [{ update: "feed-a" }, { update: "feed-b" }],
+      feedIds: ["feed-a", "feed-b"],
+      moveCallCount: 0
+    },
+    {
+      kind: "build",
+      label: "flash-borrow-b",
+      input: { client: suiClient },
+      moveCallCount: 5,
+      firstTarget: "0xBROWN::pyth_source::read_price_a",
+      lastTarget: "0xBROWN::flash::repay_b_with_coin"
+    },
+    { kind: "dryRun", input: { transactionBlock: "flash-borrow-b-bytes" } }
   ]);
 });
 
