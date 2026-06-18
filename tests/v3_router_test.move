@@ -3084,16 +3084,52 @@ module brownfi_amm::v3_router_test {
 
     #[test]
     fun test_router_pyth_bundle_mixed_decimal_route_quotes_remain_monotonic_after_state_sequence() {
+        assert_pyth_mixed_decimal_route_state_sequence(6, 9, 12);
+    }
+
+    #[test]
+    fun test_router_pyth_bundle_mixed_decimal_route_state_sequence_6_12_9() {
+        assert_pyth_mixed_decimal_route_state_sequence(6, 12, 9);
+    }
+
+    #[test]
+    fun test_router_pyth_bundle_mixed_decimal_route_state_sequence_9_6_12() {
+        assert_pyth_mixed_decimal_route_state_sequence(9, 6, 12);
+    }
+
+    #[test]
+    fun test_router_pyth_bundle_mixed_decimal_route_state_sequence_9_12_6() {
+        assert_pyth_mixed_decimal_route_state_sequence(9, 12, 6);
+    }
+
+    #[test]
+    fun test_router_pyth_bundle_mixed_decimal_route_state_sequence_12_6_9() {
+        assert_pyth_mixed_decimal_route_state_sequence(12, 6, 9);
+    }
+
+    #[test]
+    fun test_router_pyth_bundle_mixed_decimal_route_state_sequence_12_9_6() {
+        assert_pyth_mixed_decimal_route_state_sequence(12, 9, 6);
+    }
+
+    fun assert_pyth_mixed_decimal_route_state_sequence(
+        decimals_a: u8,
+        decimals_b: u8,
+        decimals_c: u8
+    ) {
+        let unit_a = pyth_mixed_decimal_tenth_unit(decimals_a);
+        let unit_b = pyth_mixed_decimal_tenth_unit(decimals_b);
+        let unit_c = pyth_mixed_decimal_tenth_unit(decimals_c);
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_route_with_balances_and_decimals(
             &mut scenario,
-            10_000_000,
-            10_000_000_000,
-            10_000_000_000,
-            10_000_000_000_000,
-            6,
-            9,
-            12
+            100 * unit_a,
+            100 * unit_b,
+            100 * unit_b,
+            100 * unit_c,
+            decimals_a,
+            decimals_b,
+            decimals_c
         );
 
         next_tx(&mut scenario, ADDR2);
@@ -3122,8 +3158,8 @@ module brownfi_amm::v3_router_test {
             );
             let bundle_ab = pyth_bundle_for_pool(&pio_a, &pio_b, &clock, &pool_ab);
             let bundle_bc = pyth_bundle_for_pool(&pio_b, &pio_c, &clock, &pool_bc);
-            let input_a = coin::from_balance(balance::create_for_testing<A>(500_000), ctx(&mut scenario));
-            let input_c = coin::from_balance(balance::create_for_testing<C>(300_000_000_000), ctx(&mut scenario));
+            let input_a = coin::from_balance(balance::create_for_testing<A>(5 * unit_a), ctx(&mut scenario));
+            let input_c = coin::from_balance(balance::create_for_testing<C>(3 * unit_c), ctx(&mut scenario));
 
             let c_out = router::swap_exact_a_for_c_via_b_with_bundles(
                 &bundle_ab,
@@ -3157,7 +3193,7 @@ module brownfi_amm::v3_router_test {
                 &clock,
                 &pool_ab,
                 &pool_bc,
-                100_000
+                unit_a
             );
             let (_, large_b, large_c) = router::quote_exact_a_for_c_via_b_with_bundles(
                 &bundle_ab,
@@ -3165,7 +3201,7 @@ module brownfi_amm::v3_router_test {
                 &clock,
                 &pool_ab,
                 &pool_bc,
-                200_000
+                2 * unit_a
             );
             let (_, small_rev_b, small_a) = router::quote_exact_c_for_a_via_b_with_bundles(
                 &bundle_ab,
@@ -3173,7 +3209,7 @@ module brownfi_amm::v3_router_test {
                 &clock,
                 &pool_ab,
                 &pool_bc,
-                100_000_000_000
+                unit_c
             );
             let (_, large_rev_b, large_a) = router::quote_exact_c_for_a_via_b_with_bundles(
                 &bundle_ab,
@@ -3181,7 +3217,7 @@ module brownfi_amm::v3_router_test {
                 &clock,
                 &pool_ab,
                 &pool_bc,
-                200_000_000_000
+                2 * unit_c
             );
 
             let (small_req_a, small_req_b, small_effective_c) =
@@ -3191,7 +3227,7 @@ module brownfi_amm::v3_router_test {
                     &clock,
                     &pool_ab,
                     &pool_bc,
-                    100_000_000_000
+                    unit_c
                 );
             let (large_req_a, large_req_b, large_effective_c) =
                 router::quote_a_for_exact_c_via_b_with_bundles(
@@ -3200,7 +3236,7 @@ module brownfi_amm::v3_router_test {
                     &clock,
                     &pool_ab,
                     &pool_bc,
-                    200_000_000_000
+                    2 * unit_c
                 );
             let (small_req_c, small_req_rev_b, small_effective_a) =
                 router::quote_c_for_exact_a_via_b_with_bundles(
@@ -3209,7 +3245,7 @@ module brownfi_amm::v3_router_test {
                     &clock,
                     &pool_ab,
                     &pool_bc,
-                    100_000
+                    unit_a
                 );
             let (large_req_c, large_req_rev_b, large_effective_a) =
                 router::quote_c_for_exact_a_via_b_with_bundles(
@@ -3218,19 +3254,19 @@ module brownfi_amm::v3_router_test {
                     &clock,
                     &pool_ab,
                     &pool_bc,
-                    200_000
+                    2 * unit_a
                 );
 
             assert!(large_b >= small_b, 0);
             assert!(large_c >= small_c, 1);
             assert!(large_rev_b >= small_rev_b, 2);
             assert!(large_a >= small_a, 3);
-            assert!(small_effective_c == 100_000_000_000, 4);
-            assert!(large_effective_c == 200_000_000_000, 5);
+            assert!(small_effective_c == unit_c, 4);
+            assert!(large_effective_c == 2 * unit_c, 5);
             assert!(large_req_a >= small_req_a, 6);
             assert!(large_req_b >= small_req_b, 7);
-            assert!(small_effective_a == 100_000, 8);
-            assert!(large_effective_a == 200_000, 9);
+            assert!(small_effective_a == unit_a, 8);
+            assert!(large_effective_a == 2 * unit_a, 9);
             assert!(large_req_c >= small_req_c, 10);
             assert!(large_req_rev_b >= small_req_rev_b, 11);
 
@@ -3246,6 +3282,17 @@ module brownfi_amm::v3_router_test {
         };
 
         test_scenario::end(scenario);
+    }
+
+    fun pyth_mixed_decimal_tenth_unit(decimals: u8): u64 {
+        if (decimals == 6) {
+            100_000
+        } else if (decimals == 9) {
+            100_000_000
+        } else {
+            assert!(decimals == 12, 255);
+            100_000_000_000
+        }
     }
 
     #[test]

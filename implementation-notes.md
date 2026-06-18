@@ -2022,3 +2022,7 @@
   - Finding: architecture tracked mixed-decimal route monotonicity and state-sequence monotonicity separately, but not their intersection after both pools mutate in a mixed-decimal route.
   - Decision: add a 6/9/12-decimal typed route test that executes forward A -> B -> C and reverse C -> B -> A Pyth bundle swaps, then checks exact-input and exact-output quote monotonicity against the mutated pools. This is coverage-only; no production code changed.
   - Verification: `rtk sui move test test_router_pyth_bundle_mixed_decimal_route_quotes_remain_monotonic_after_state_sequence --allow-dirty --build-env testnet --warnings-are-errors` passed 1/1 immediately after adding the test.
+- 2026-06-18 Pyth mixed-decimal route permutation coverage slice:
+  - Finding: after the 6/9/12 state-sequence route test, the other five decimal orderings across A/B/C were still unpinned.
+  - Decision: refactor the state-sequence route monotonicity check into a decimal-parameterized helper and add the remaining 6/12/9, 9/6/12, 9/12/6, 12/6/9, and 12/9/6 cases. This is coverage-only; no production code changed.
+  - Verification: `rtk sui move test mixed_decimal_route --allow-dirty --build-env testnet --warnings-are-errors` passed 6/6.
