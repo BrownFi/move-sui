@@ -76,6 +76,11 @@ import {
   quoteExactOutputWithoutCutoffWithPythRoute,
   quoteExactOutputWithoutCutoffWithRegisteredRoute,
   quoteExactOutputWithRegisteredRoute,
+  preflightQuoteExactInputWithPythRoute,
+  preflightQuoteExactInputWithoutCutoffWithPythRoute,
+  preflightQuoteExactOutputWithPythRoute,
+  preflightQuoteExactOutputWithoutCutoffWithPythRoute,
+  preflightQuoteMaxBoundWithPythRoute,
   quoteAForBWithBundle,
   quoteAForB,
   quoteAForExactBWithoutCutoffWithBundle,
@@ -10779,6 +10784,188 @@ test("quoteExactOutputWithoutCutoffWithPythRoute chains raw required inputs back
       { kind: "nested-result", index: 6, resultIndex: 0 }
     ]
   });
+});
+
+test("Pyth route quote preflight wrappers build quote PTBs and dry-run them", async () => {
+  const calls = [];
+  const makeOptions = (label, tx) => ({
+    tx,
+    suiClient: {
+      async dryRunTransactionBlock(input) {
+        calls.push({ kind: "dryRun", label, input });
+        return {
+          effects: { status: { status: "success" } },
+          transactionBlock: input.transactionBlock
+        };
+      }
+    },
+    priceFeedConnection: {
+      async getPriceFeedsUpdateData(feedIdsArg) {
+        calls.push({ kind: "fetch", label, feedIds: feedIdsArg });
+        return feedIdsArg.map((feedId) => ({ update: feedId }));
+      }
+    },
+    pythClient: {
+      async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+        assert.equal(txArg, tx);
+        assert.equal(txArg.calls.length, 0);
+        calls.push({ kind: "update", label, updates: updatesArg, feedIds: feedIdsArg });
+        return ["0xPRICEA", "0xPRICEB"];
+      }
+    },
+    context: label,
+    clock: "0x6",
+    path: ["0x1::a::A", "0x1::b::B"],
+    pairs: [
+      {
+        packageId: "0xBROWN",
+        typeA: "0x1::a::A",
+        typeB: "0x1::b::B",
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      }
+    ]
+  });
+  const runCase = async ({ label, invoke, expectedTarget, expectedAmounts }) => {
+    const tx = createTransactionRecorder();
+    tx.build = async (input) => {
+      calls.push({
+        kind: "build",
+        label,
+        input,
+        moveCallTargets: tx.calls.map((call) => call.target)
+      });
+      return `${label}-bytes`;
+    };
+
+    const result = await invoke(makeOptions(label, tx));
+
+    assert.deepEqual(result.quoteResults, [{ kind: "result", index: 3 }]);
+    assert.deepEqual(result.amounts, expectedAmounts);
+    assert.deepEqual(result.dryRunResult, {
+      effects: { status: { status: "success" } },
+      transactionBlock: `${label}-bytes`
+    });
+    assert.deepEqual(
+      tx.calls.map((call) => call.target),
+      [
+        "0xBROWN::pyth_source::read_price_a",
+        "0xBROWN::pyth_source::read_price_b",
+        "0xBROWN::oracle_gateway::get_swap_price_bundle_from_readings",
+        expectedTarget
+      ]
+    );
+  };
+
+  await runCase({
+    label: "exact input quote",
+    invoke: (options) =>
+      preflightQuoteExactInputWithPythRoute({
+        ...options,
+        amountIn: 777n
+      }),
+    expectedTarget: "0xBROWN::swap::quote_a_for_b_with_bundle",
+    expectedAmounts: [
+      { kind: "u64", value: "777" },
+      { kind: "nested-result", index: 3, resultIndex: 0 }
+    ]
+  });
+  await runCase({
+    label: "raw exact input quote",
+    invoke: (options) =>
+      preflightQuoteExactInputWithoutCutoffWithPythRoute({
+        ...options,
+        amountIn: 777n
+      }),
+    expectedTarget: "0xBROWN::swap::quote_a_for_b_with_bundle",
+    expectedAmounts: [
+      { kind: "u64", value: "777" },
+      { kind: "nested-result", index: 3, resultIndex: 1 }
+    ]
+  });
+  await runCase({
+    label: "exact output quote",
+    invoke: (options) =>
+      preflightQuoteExactOutputWithPythRoute({
+        ...options,
+        amountOut: 44n
+      }),
+    expectedTarget: "0xBROWN::swap::quote_a_for_exact_b_with_bundle",
+    expectedAmounts: [
+      { kind: "nested-result", index: 3, resultIndex: 0 },
+      { kind: "nested-result", index: 3, resultIndex: 1 }
+    ]
+  });
+  await runCase({
+    label: "raw exact output quote",
+    invoke: (options) =>
+      preflightQuoteExactOutputWithoutCutoffWithPythRoute({
+        ...options,
+        amountOut: 44n
+      }),
+    expectedTarget: "0xBROWN::swap::quote_a_for_exact_b_without_cutoff_with_bundle",
+    expectedAmounts: [
+      { kind: "nested-result", index: 3, resultIndex: 0 },
+      { kind: "u64", value: "44" }
+    ]
+  });
+  await runCase({
+    label: "max-bound quote",
+    invoke: (options) => preflightQuoteMaxBoundWithPythRoute(options),
+    expectedTarget: "0xBROWN::swap::quote_max_a_for_b_with_bundle",
+    expectedAmounts: [
+      { kind: "nested-result", index: 3, resultIndex: 0 },
+      { kind: "nested-result", index: 3, resultIndex: 1 }
+    ]
+  });
+
+  const labels = [
+    "exact input quote",
+    "raw exact input quote",
+    "exact output quote",
+    "raw exact output quote",
+    "max-bound quote"
+  ];
+  assert.deepEqual(
+    calls.map((call) => [call.kind, call.label]),
+    labels.flatMap((label) => [
+      ["fetch", label],
+      ["update", label],
+      ["build", label],
+      ["dryRun", label]
+    ])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "fetch" || call.kind === "update")
+      .map((call) => ({
+        kind: call.kind,
+        label: call.label,
+        feedIds: call.feedIds,
+        updates: call.updates
+      })),
+    labels.flatMap((label) => [
+      { kind: "fetch", label, feedIds: ["feed-a", "feed-b"], updates: undefined },
+      {
+        kind: "update",
+        label,
+        feedIds: ["feed-a", "feed-b"],
+        updates: [{ update: "feed-a" }, { update: "feed-b" }]
+      }
+    ])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "build")
+      .map((call) => [call.label, Boolean(call.input.client)]),
+    labels.map((label) => [label, true])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "dryRun")
+      .map((call) => [call.label, call.input.transactionBlock]),
+    labels.map((label) => [label, `${label}-bytes`])
+  );
 });
 
 test("swapExactOutputWithPythRoute plans a reverse two-hop exact-output PTB route", async () => {

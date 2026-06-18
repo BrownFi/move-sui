@@ -965,6 +965,11 @@ export interface PreflightSwapExactOutputRouteResults<TDryRunResult = unknown>
   dryRunResult: TDryRunResult;
 }
 
+export interface PreflightRouteQuoteResults<TDryRunResult = unknown>
+  extends RouteQuoteResults {
+  dryRunResult: TDryRunResult;
+}
+
 export interface PreflightSwapExactInputWithRegisteredRouteOptions<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions,
   TDryRunResult = unknown
@@ -1644,6 +1649,30 @@ export interface QuoteMaxBoundWithPythRouteOptions extends PythRouteProviderOpti
   clock: ObjectInput;
   path: readonly string[];
   pairs: readonly PythRoutePriceHopOptions[];
+}
+
+export interface PreflightQuoteExactInputWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends QuoteExactInputWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
+export interface PreflightQuoteExactOutputWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends QuoteExactOutputWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+}
+
+export interface PreflightQuoteMaxBoundWithPythRouteOptions<
+  TDryRunResult = unknown
+> extends QuoteMaxBoundWithPythRouteOptions,
+    AssertDryRunTransactionBlockSucceededOptions {
+  tx: SuiTransactionBlockBuilderLike;
+  suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
 }
 
 export interface ZapWithPythRouteBaseOptions extends PythRouteProviderOptions {
@@ -7413,6 +7442,84 @@ export async function quoteExactOutputWithoutCutoffWithPythRoute(
     pairs: options.pairs,
     amountOut: options.amountOut
   });
+}
+
+export async function preflightQuoteExactInputWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactInputWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightRouteQuoteResults<TDryRunResult>> {
+  const quoteResults = await quoteExactInputWithPythRoute(options.tx, options);
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? "BrownFi Pyth exact-input route quote preflight"
+  });
+  return { ...quoteResults, dryRunResult };
+}
+
+export async function preflightQuoteExactInputWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactInputWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightRouteQuoteResults<TDryRunResult>> {
+  const quoteResults = await quoteExactInputWithoutCutoffWithPythRoute(
+    options.tx,
+    options
+  );
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context:
+      options.context ?? "BrownFi Pyth raw exact-input route quote preflight"
+  });
+  return { ...quoteResults, dryRunResult };
+}
+
+export async function preflightQuoteMaxBoundWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteMaxBoundWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightRouteQuoteResults<TDryRunResult>> {
+  const quoteResults = await quoteMaxBoundWithPythRoute(options.tx, options);
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? "BrownFi Pyth max-bound route quote preflight"
+  });
+  return { ...quoteResults, dryRunResult };
+}
+
+export async function preflightQuoteExactOutputWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactOutputWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightRouteQuoteResults<TDryRunResult>> {
+  const quoteResults = await quoteExactOutputWithPythRoute(options.tx, options);
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? "BrownFi Pyth exact-output route quote preflight"
+  });
+  return { ...quoteResults, dryRunResult };
+}
+
+export async function preflightQuoteExactOutputWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactOutputWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightRouteQuoteResults<TDryRunResult>> {
+  const quoteResults = await quoteExactOutputWithoutCutoffWithPythRoute(
+    options.tx,
+    options
+  );
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context:
+      options.context ?? "BrownFi Pyth raw exact-output route quote preflight"
+  });
+  return { ...quoteResults, dryRunResult };
 }
 
 export async function addLiquidityWithPythRoute(
