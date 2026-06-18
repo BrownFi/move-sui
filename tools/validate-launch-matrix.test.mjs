@@ -733,8 +733,8 @@ test("pyth-current testnet SUI/USDT live evidence matrix is verifier-ready", () 
 
   assert.deepEqual(summary, {
     routeCaseCount: 11,
-    quoteCaseCount: 0,
-    totalCaseCount: 11,
+    quoteCaseCount: 5,
+    totalCaseCount: 16,
     providerIds: ["pyth"],
     routeCases: [
       {
@@ -793,7 +793,33 @@ test("pyth-current testnet SUI/USDT live evidence matrix is verifier-ready", () 
         providerId: "pyth"
       }
     ],
-    quoteCases: []
+    quoteCases: [
+      {
+        name: "live SUI/USDT exact input quote",
+        kind: "exact-input-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT exact output quote",
+        kind: "exact-output-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT exact output round-trip quote",
+        kind: "exact-output-round-trip-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT exact input raw quote",
+        kind: "exact-input-without-cutoff-quote",
+        providerId: "pyth"
+      },
+      {
+        name: "live SUI/USDT exact output raw quote",
+        kind: "exact-output-without-cutoff-quote",
+        providerId: "pyth"
+      }
+    ]
   });
   assert.deepEqual(
     matrix.txEvidence.map((entry) => entry.name),

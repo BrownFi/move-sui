@@ -364,7 +364,7 @@ Additional 2026-06-18 native SUI / test USDT evidence:
 - Flash-borrow-A digest: `7cUPxu8v1kAjong6iBbYsDvFNAjy8PLxcWv9c511Qqq`
 - Flash-borrow-B digest: `HxfcRu6CapUjHTF1UNEWLiFdPJZTcWouSDCjH8CvMvbw`
 
-The checked verifier-only matrix for this native SUI / test USDT run is `configs/launch/pyth-current-testnet.sui-usdt-live-evidence.matrix.json`. It records historical input coin IDs, so use it to verify landed tx evidence rather than to resubmit routes.
+The checked verifier-only matrix for this native SUI / test USDT run is `configs/launch/pyth-current-testnet.sui-usdt-live-evidence.matrix.json`. It records historical input coin IDs, so use it to verify landed tx evidence rather than to resubmit routes. The same matrix includes quote-only cases for exact-input, exact-output, exact-output round-trip, raw exact-input, and raw exact-output preflight against the live SUI/USDT pool; it intentionally omits the newer max-bound quote case because package `0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4` does not expose `quote_max_*` helpers.
 
 ```bash
 rtk node tools/verify-sui-cli-tx-evidence.mjs \
@@ -372,6 +372,16 @@ rtk node tools/verify-sui-cli-tx-evidence.mjs \
   --all \
   --rpc-url https://fullnode.testnet.sui.io:443 \
   --use-rtk
+```
+
+```bash
+rtk env BROWNFI_SUI_SENDER=0x3eb3bafd39074ef149c53fc5c6aa0b9f7c08552df956011f85dd41026fe88c04 \
+  /Applications/Codex.app/Contents/Resources/node tools/run-launch-matrix-preflight.mjs \
+  --config configs/launch/pyth-current-testnet.sui-usdt-live-evidence.matrix.json \
+  --launch-config configs/launch/pyth-current-testnet.json \
+  --runtime tools/pyth-launch-runtime.mjs \
+  --runtime-config configs/launch/pyth-current-testnet.runtime.example.json \
+  --quote-only
 ```
 
 The SUI/USDT remaining-route matrix used configured input and flash-fee coin splits during preflight, then route submission kept one submit-time split per configured amount. The final route preflight passed 8/8 before the exact-output, zap, and flash transactions above were submitted and verified.
