@@ -1366,6 +1366,7 @@ export interface RegisteredRouteCaseSwapTransactionResult {
   kind: "exact-input" | "exact-output";
   providerId: string;
   swapResult: TransactionArgument;
+  exactOutputResultArity?: 2 | 3;
 }
 
 export interface RegisteredRouteCaseLiquidityTransactionResult {
@@ -6520,6 +6521,7 @@ export async function buildRegisteredRouteCaseTransaction<
   }
 
   if (routeCase.kind === "exact-output") {
+    const route = resolveRoute(routeCase.path, routeCase.pairs);
     const swapResult = await swapExactOutputWithRegisteredRoute(routeCase.tx, {
       providerRegistry: routeCase.providerRegistry,
       providerId: routeCase.providerId,
@@ -6533,7 +6535,8 @@ export async function buildRegisteredRouteCaseTransaction<
       name: routeCase.name,
       kind: routeCase.kind,
       providerId: routeCase.providerId,
-      swapResult
+      swapResult,
+      exactOutputResultArity: route.length === 1 ? 2 : 3
     };
   }
 
@@ -7019,8 +7022,7 @@ function registeredRouteCaseResultOutputs(
     return [];
   }
   if (routeResult.kind === "exact-output") {
-    const swapResult = routeResult.swapResult as Partial<Record<number, TransactionArgument>>;
-    if (swapResult[2] !== undefined) {
+    if (routeResult.exactOutputResultArity === 3) {
       return [
         transactionArgumentResultAt(routeResult.swapResult, 0, "exact-output input change coin"),
         transactionArgumentResultAt(
@@ -7031,13 +7033,13 @@ function registeredRouteCaseResultOutputs(
         transactionArgumentResultAt(routeResult.swapResult, 2, "exact-output output coin")
       ];
     }
-    if (swapResult[0] !== undefined && swapResult[1] !== undefined) {
+    if (routeResult.exactOutputResultArity === 2) {
       return [
         transactionArgumentResultAt(routeResult.swapResult, 0, "exact-output change coin"),
         transactionArgumentResultAt(routeResult.swapResult, 1, "exact-output output coin")
       ];
     }
-    return [routeResult.swapResult];
+    throw new Error("BrownFi exact-output route result arity is unknown");
   }
   throw new Error(
     `Unsupported BrownFi registered route case kind: ${String(
@@ -7114,8 +7116,7 @@ function registeredRouteCaseResultTransferGroups(
     return [];
   }
   if (routeResult.kind === "exact-output") {
-    const swapResult = routeResult.swapResult as Partial<Record<number, TransactionArgument>>;
-    if (swapResult[2] !== undefined) {
+    if (routeResult.exactOutputResultArity === 3) {
       return [
         {
           recipient: senderAddress,
@@ -7140,7 +7141,7 @@ function registeredRouteCaseResultTransferGroups(
         }
       ];
     }
-    if (swapResult[0] !== undefined && swapResult[1] !== undefined) {
+    if (routeResult.exactOutputResultArity === 2) {
       return [
         {
           recipient: senderAddress,
@@ -7156,7 +7157,7 @@ function registeredRouteCaseResultTransferGroups(
         }
       ];
     }
-    return [{ recipient: defaultRecipient, outputs: [routeResult.swapResult] }];
+    throw new Error("BrownFi exact-output route result arity is unknown");
   }
   throw new Error(
     `Unsupported BrownFi registered route case kind: ${String(

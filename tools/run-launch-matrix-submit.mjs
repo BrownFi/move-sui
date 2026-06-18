@@ -427,20 +427,20 @@ function routeResultOutputs(routeResult) {
     return [];
   }
   const swapResult = routeResult.swapResult;
-  if (swapResult?.[2] !== undefined) {
+  if (routeResult.exactOutputResultArity === 3) {
     return [
       transactionResultAt(swapResult, 0, "exact-output input change coin"),
       transactionResultAt(swapResult, 1, "exact-output intermediate change coin"),
       transactionResultAt(swapResult, 2, "exact-output output coin")
     ];
   }
-  if (swapResult?.[0] !== undefined && swapResult?.[1] !== undefined) {
+  if (routeResult.exactOutputResultArity === 2) {
     return [
       transactionResultAt(swapResult, 0, "exact-output change coin"),
       transactionResultAt(swapResult, 1, "exact-output output coin")
     ];
   }
-  return [swapResult];
+  throw new Error("Launch matrix exact-output route result arity is unknown");
 }
 
 function runtimeSender(runtime, tx) {
@@ -514,7 +514,7 @@ function routeResultTransferGroups(routeResult, senderAddress, recipientAddress)
     return [];
   }
   const swapResult = routeResult.swapResult;
-  if (swapResult?.[2] !== undefined) {
+  if (routeResult.exactOutputResultArity === 3) {
     return [
       {
         recipient: senderAddress,
@@ -529,7 +529,7 @@ function routeResultTransferGroups(routeResult, senderAddress, recipientAddress)
       }
     ];
   }
-  if (swapResult?.[0] !== undefined && swapResult?.[1] !== undefined) {
+  if (routeResult.exactOutputResultArity === 2) {
     return [
       {
         recipient: senderAddress,
@@ -541,7 +541,7 @@ function routeResultTransferGroups(routeResult, senderAddress, recipientAddress)
       }
     ];
   }
-  return [{ recipient: defaultRecipient, outputs: [swapResult] }];
+  throw new Error("Launch matrix exact-output route result arity is unknown");
 }
 
 function transferRouteResultOutputs(tx, runtime, routeResult, routeCaseConfig) {

@@ -319,6 +319,19 @@ function createTransactionRecorder(options = {}) {
         };
       }
       Object.defineProperties(result, descriptors);
+      if (options.alwaysIndexableResults) {
+        return new Proxy(result, {
+          get(target, prop, receiver) {
+            if (typeof prop === "string" && /^[0-9]+$/.test(prop)) {
+              if (Object.hasOwn(target, prop)) {
+                return Reflect.get(target, prop, receiver);
+              }
+              return nested(Number(prop));
+            }
+            return Reflect.get(target, prop, receiver);
+          }
+        });
+      }
       return result;
     },
     splitCoins(coin, amounts) {
@@ -6729,6 +6742,7 @@ test("preflightRegisteredRouteCases runs exact-input and exact-output cases in o
       kind: "exact-output",
       providerId: "custom",
       swapResult: { kind: "result", index: 0 },
+      exactOutputResultArity: 2,
       dryRunResult: {
         effects: { status: { status: "success" } },
         transactionBlock: "exact-output-bytes"
@@ -7859,6 +7873,65 @@ test("preflightRegisteredRouteCases can transfer route outputs before dry-run", 
       transfers: tx.transfers
     },
     { kind: "dryRun", input: { transactionBlock: "matrix-exact-output-bytes" } }
+  ]);
+});
+
+test("preflightRegisteredRouteCases keeps one-hop exact-output transfer arity explicit", async () => {
+  const tx = createTransactionRecorder({ alwaysIndexableResults: true });
+  tx.build = async () => "matrix-one-hop-exact-output-bytes";
+  const suiClient = {
+    async dryRunTransactionBlock(input) {
+      return {
+        effects: { status: { status: "success" } },
+        transactionBlock: input.transactionBlock
+      };
+    }
+  };
+  const registry = createRoutePriceProviderRegistry([
+    {
+      id: "custom",
+      async buildPriceBundles() {
+        return [{ kind: "bundle", id: "ab" }];
+      }
+    }
+  ]);
+
+  await preflightRegisteredRouteCases({
+    suiClient,
+    transferRecipient: "0xSENDER",
+    cases: [
+      {
+        name: "custom exact-output A/B",
+        kind: "exact-output",
+        tx,
+        providerRegistry: registry,
+        providerId: "custom",
+        path: ["A", "B"],
+        clock: "0x6",
+        pairs: [
+          {
+            packageId: "0xBROWN",
+            typeA: "A",
+            typeB: "B",
+            pool: "0xPOOLAB"
+          }
+        ],
+        input: "0xCOINA",
+        amountOut: 55n,
+        recipient: "0xRECIPIENT"
+      }
+    ]
+  });
+
+  assert.deepEqual(tx.transfers, [
+    {
+      objects: [{ kind: "nested-result", index: 0, resultIndex: 0 }],
+      recipient: { kind: "address", value: "0xSENDER" }
+    },
+    {
+      objects: [{ kind: "nested-result", index: 0, resultIndex: 1 }],
+      recipient: { kind: "address", value: "0xRECIPIENT" }
+    }
   ]);
 });
 
