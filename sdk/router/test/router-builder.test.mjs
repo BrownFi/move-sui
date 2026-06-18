@@ -5,6 +5,7 @@ import {
   addLiquidityWithCoins,
   addLiquidityWithCoinsWithMinDeposits,
   addLiquidityWithCoinsAndTransfer,
+  addLiquidityWithCoinsAndTransferWithMinDeposits,
   addLiquidityWithRegisteredRoute,
   addLiquidityWithBundleAndTransferWithMinDeposits,
   addLiquidityWithBundleAndTransfer,
@@ -11766,6 +11767,33 @@ test("direct coin transfer builders target recipient-aware swap entrypoints", ()
       { kind: "object", id: "0xPOOLAB" },
       { kind: "object", id: "0xCOINA" },
       { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "333" },
+      { kind: "address", value: "0xRECIPIENT" }
+    ]
+  });
+
+  const checkedAddTx = createTransactionRecorder();
+  addLiquidityWithCoinsAndTransferWithMinDeposits({
+    ...base,
+    inputA: "0xCOINA",
+    inputB: "0xCOINB",
+    minADeposit: 111n,
+    minBDeposit: 222n,
+    minLpOut: 333n
+  })(checkedAddTx);
+  assert.deepEqual(checkedAddTx.calls[0], {
+    target: "0xBROWN::router::add_liquidity_with_coins_and_transfer_with_min_deposits",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xORACLE" },
+      { kind: "object", id: "0xPRICEA" },
+      { kind: "object", id: "0xPRICEB" },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xCOINA" },
+      { kind: "object", id: "0xCOINB" },
+      { kind: "u64", value: "111" },
+      { kind: "u64", value: "222" },
       { kind: "u64", value: "333" },
       { kind: "address", value: "0xRECIPIENT" }
     ]

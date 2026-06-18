@@ -1957,6 +1957,11 @@ export interface AddLiquidityWithCoinsTransferOptions extends AddLiquidityWithCo
   recipient: string;
 }
 
+export interface AddLiquidityWithCoinsTransferWithMinDepositsOptions
+  extends AddLiquidityWithCoinsWithMinDepositsOptions {
+  recipient: string;
+}
+
 export interface ZapInAOptions extends DirectOraclePairOptions {
   inputA: ObjectInput;
   minBFromSwap: U64Input;
@@ -8767,6 +8772,28 @@ export function addLiquidityWithCoinsAndTransfer(
         ...directOraclePairArgs(tx, options),
         objectArg(tx, options.inputA),
         objectArg(tx, options.inputB),
+        tx.pure.u64(options.minLpOut),
+        pureAddress(tx, options.recipient)
+      ]
+    });
+}
+
+export function addLiquidityWithCoinsAndTransferWithMinDeposits(
+  options: AddLiquidityWithCoinsTransferWithMinDepositsOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: routerTarget(
+        options.packageId,
+        "add_liquidity_with_coins_and_transfer_with_min_deposits"
+      ),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        ...directOraclePairArgs(tx, options),
+        objectArg(tx, options.inputA),
+        objectArg(tx, options.inputB),
+        tx.pure.u64(options.minADeposit),
+        tx.pure.u64(options.minBDeposit),
         tx.pure.u64(options.minLpOut),
         pureAddress(tx, options.recipient)
       ]

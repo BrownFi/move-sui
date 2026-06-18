@@ -4570,6 +4570,60 @@ module brownfi_amm::v3_router_test {
     }
 
     #[test]
+    fun test_router_add_liquidity_with_coins_transfer_with_min_deposits_sends_lp_to_recipient() {
+        let mut scenario = test_helpers::init_test_scenario(ADDR1);
+        test_helpers::create_test_pool(&mut scenario, 1_000_000, 1_000_000);
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let oracle = take_shared<OracleAdapter>(&scenario);
+            let clock = take_shared<Clock>(&scenario);
+            let pio_a = take_shared<PriceInfoObject>(&scenario);
+            let pio_b = take_shared<PriceInfoObject>(&scenario);
+            let mut pool = take_shared<Pool<A, B>>(&scenario);
+            let input_a = coin::from_balance(balance::create_for_testing<A>(200_000), ctx(&mut scenario));
+            let input_b = coin::from_balance(balance::create_for_testing<B>(100_000), ctx(&mut scenario));
+
+            router::add_liquidity_with_coins_and_transfer_with_min_deposits(
+                &oracle,
+                &pio_a,
+                &pio_b,
+                &clock,
+                &mut pool,
+                input_a,
+                input_b,
+                100_000,
+                100_000,
+                1,
+                ADDR2,
+                ctx(&mut scenario)
+            );
+
+            return_shared(oracle);
+            return_shared(clock);
+            return_shared(pio_a);
+            return_shared(pio_b);
+            return_shared(pool);
+        };
+
+        next_tx(&mut scenario, ADDR2);
+        {
+            let lp = take_from_sender<Coin<LP<A, B>>>(&scenario);
+            assert!(coin::value(&lp) > 0, 0);
+            balance::destroy_for_testing(coin::into_balance(lp));
+        };
+
+        next_tx(&mut scenario, ADDR1);
+        {
+            let remaining_a = take_from_sender<Coin<A>>(&scenario);
+            assert!(coin::value(&remaining_a) == 100_000, 1);
+            balance::destroy_for_testing(coin::into_balance(remaining_a));
+        };
+
+        test_scenario::end(scenario);
+    }
+
+    #[test]
     fun test_router_add_then_remove_liquidity_with_bundle_returns_inputs() {
         let mut scenario = test_helpers::init_test_scenario(ADDR1);
         create_pyth_test_pool(&mut scenario);

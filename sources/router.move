@@ -195,6 +195,41 @@ public fun add_liquidity_with_coins_with_min_deposits<A, B>(
     (remaining_a, remaining_b, lp)
 }
 
+#[allow(lint(self_transfer))]
+public fun add_liquidity_with_coins_and_transfer_with_min_deposits<A, B>(
+    oracle: &OracleAdapter,
+    price_info_object_a: &PriceInfoObject,
+    price_info_object_b: &PriceInfoObject,
+    clock: &Clock,
+    pool: &mut Pool<A, B>,
+    input_a: Coin<A>,
+    input_b: Coin<B>,
+    min_a_deposit: u64,
+    min_b_deposit: u64,
+    min_lp_out: u64,
+    lp_recipient: address,
+    ctx: &mut TxContext
+) {
+    let refund_recipient = sender(ctx);
+    let (remaining_a, remaining_b, lp) = add_liquidity_with_coins_with_min_deposits(
+        oracle,
+        price_info_object_a,
+        price_info_object_b,
+        clock,
+        pool,
+        input_a,
+        input_b,
+        min_a_deposit,
+        min_b_deposit,
+        min_lp_out,
+        ctx
+    );
+
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_a), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(remaining_b), refund_recipient, ctx);
+    library::destroy_zero_or_transfer(coin::into_balance(lp), lp_recipient, ctx);
+}
+
 public fun zap_in_a<A, B>(
     oracle: &OracleAdapter,
     price_info_object_a: &PriceInfoObject,

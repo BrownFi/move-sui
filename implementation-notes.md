@@ -2100,3 +2100,7 @@
   - Finding: `ARCHITECTURE_v3_SUI.md` still described the Pyth-upgraded launch matrix as narrower after the upgraded template had already been expanded to match the current-Pyth single-hop surface.
   - Decision: add a doc-consistency test that derives current/upgraded route and quote coverage from the actual matrix validator, then requires the architecture to state the shared `11` route / `6` quote case surface.
   - RED/GREEN: `rtk node --test tools/architecture-doc.test.mjs` first failed on the stale architecture wording, then passed after updating the launch-matrix paragraph.
+- 2026-06-18 direct Pyth add-liquidity token-min recipient parity:
+  - Finding: the bundle/provider add-liquidity path already combined Solidity-style token-side minimums with recipient-directed LP delivery, but the direct `OracleAdapter` compatibility path exposed token-side minimums and recipient transfer separately.
+  - Decision: add `router::add_liquidity_with_coins_and_transfer_with_min_deposits` as a thin wrapper over the existing checked direct add-liquidity helper, refund residual token coins to `tx_context::sender`, and send LP to the requested recipient. Add the matching SDK PTB builder.
+  - RED/GREEN: focused SDK first failed because `addLiquidityWithCoinsAndTransferWithMinDeposits` was not exported, and focused Move first failed because the router function was unbound. After wiring Move and SDK, `rtk npm test --prefix sdk/router -- --test-name-pattern "direct coin transfer builders"` passed 222/222 and the focused Move test passed 1/1.
