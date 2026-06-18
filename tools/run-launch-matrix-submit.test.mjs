@@ -242,6 +242,13 @@ export async function createLaunchMatrixRuntime(options = {}) {
       if (${JSON.stringify(options.requireSplits ?? false)} && _tx.splits.length === 0) {
         throw new Error("expected route inputs to be split");
       }
+      const expectedSplitCounts = ${JSON.stringify(options.expectedSplitCounts ?? null)};
+      const expectedSplitCount = expectedSplitCounts?.[context.index];
+      if (expectedSplitCount !== undefined && _tx.splits.length !== expectedSplitCount) {
+        throw new Error(
+          "expected route split count " + expectedSplitCount + ", got " + _tx.splits.length
+        );
+      }
       const digest = "digest-" + context.index;
       return {
         digest,
@@ -730,7 +737,7 @@ test("submitLaunchMatrixRoutesConfigFile can split configured route input amount
       }
     ]
   });
-  const runtime = writeRuntime(root, { requireSplits: true });
+  const runtime = writeRuntime(root, { requireSplits: true, expectedSplitCounts: [1] });
 
   const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
 
@@ -754,7 +761,7 @@ test("submitLaunchMatrixRoutesConfigFile can split configured flash fee coin amo
       }
     ]
   });
-  const runtime = writeRuntime(root, { requireSplits: true });
+  const runtime = writeRuntime(root, { requireSplits: true, expectedSplitCounts: [1] });
 
   const report = await submitLaunchMatrixRoutesConfigFile({ config, runtime });
 

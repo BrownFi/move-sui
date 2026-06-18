@@ -1044,6 +1044,7 @@ export interface RegisteredRoutePreflightInputCaseConfig<
   THop extends RoutePriceHopOptions = RoutePriceHopOptions
 > extends RegisteredRoutePreflightBaseCaseConfig<THop> {
   input: ObjectInput;
+  inputAmount?: U64Input;
 }
 
 export interface RegisteredRoutePreflightExactInputCaseConfig<
@@ -1067,6 +1068,8 @@ export interface RegisteredRoutePreflightAddLiquidityCaseConfig<
 > extends RegisteredRoutePreflightInputCaseConfig<THop> {
   kind: "add-liquidity";
   inputB: ObjectInput;
+  inputAAmount?: U64Input;
+  inputBAmount?: U64Input;
   minADeposit?: U64Input;
   minBDeposit?: U64Input;
   minLpOut: U64Input;
@@ -1143,6 +1146,7 @@ export interface RegisteredRoutePreflightFlashBorrowCaseConfig<
   kind: "flash-borrow-a" | "flash-borrow-b";
   amount: U64Input;
   feeCoin: ObjectInput;
+  feeCoinAmount?: U64Input;
   amountOut?: never;
   input?: never;
   inputB?: never;
@@ -1178,6 +1182,7 @@ export interface BuildRegisteredRoutePreflightCasesOptions<
   txFactory: RegisteredRoutePreflightTransactionFactory<THop>;
   cases: readonly RegisteredRoutePreflightCaseConfig<THop>[];
   routeLimits?: LaunchValidationRouteLimits;
+  applyInputSplits?: boolean;
 }
 
 export interface PreflightRegisteredExactInputRouteCase<
@@ -1473,6 +1478,7 @@ export interface BuildLaunchValidationMatrixOptions<
   routeCases?: readonly RegisteredRoutePreflightCaseConfig<THop>[];
   quoteCases?: readonly LaunchValidationQuoteCaseConfig<THop>[];
   routeLimits?: LaunchValidationRouteLimits;
+  applyInputSplits?: boolean;
 }
 
 export interface LaunchValidationMatrix<
@@ -3896,7 +3902,8 @@ export function buildLaunchValidationMatrix<
       providerRegistry: options.providerRegistry,
       txFactory: routeTransactionFactory,
       cases: routeCases,
-      routeLimits: options.routeLimits
+      routeLimits: options.routeLimits,
+      applyInputSplits: options.applyInputSplits
     });
   }
 
@@ -4073,6 +4080,7 @@ export function validateLaunchValidationMatrixConfig<
     routeCases,
     quoteCases: options.quoteCases,
     routeLimits: options.routeLimits,
+    applyInputSplits: false,
     ...(routeCases.length === 0
       ? {}
       : {
@@ -6565,6 +6573,22 @@ export function buildRegisteredRoutePreflightCases<
   options: BuildRegisteredRoutePreflightCasesOptions<THop>
 ): PreflightRegisteredRouteCase<THop>[] {
   return options.cases.map((routeCase, index) => {
+    const splitInputIfConfigured = (
+      tx: TransactionLike,
+      coin: ObjectInput,
+      amount: U64Input | undefined,
+      label: string
+    ): ObjectInput => {
+      if (amount === undefined || options.applyInputSplits === false) return coin;
+      if (tx.splitCoins === undefined) {
+        throw new Error(`${label} requires a transaction builder with splitCoins`);
+      }
+      const [split] = tx.splitCoins(objectArg(tx, coin), [amountArg(tx, amount)]);
+      if (split === undefined) {
+        throw new Error(`${label} did not return a split coin`);
+      }
+      return split;
+    };
     const buildCommonOptions = () => {
       const tx = options.txFactory(routeCase, index);
       return {
@@ -6597,10 +6621,16 @@ export function buildRegisteredRoutePreflightCases<
         throw new Error("BrownFi exact-input preflight config must not set amountOut");
       }
       validateCommonOptions();
+      const commonOptions = buildCommonOptions();
       return {
-        ...buildCommonOptions(),
+        ...commonOptions,
         kind: "exact-input",
-        input: routeCase.input,
+        input: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAmount,
+          `BrownFi ${routeCase.name} exact-input preflight inputAmount`
+        ),
         minOutputs: routeCase.minOutputs
       };
     }
@@ -6613,10 +6643,16 @@ export function buildRegisteredRoutePreflightCases<
         throw new Error("BrownFi exact-output preflight config must not set minOutputs");
       }
       validateCommonOptions();
+      const commonOptions = buildCommonOptions();
       return {
-        ...buildCommonOptions(),
+        ...commonOptions,
         kind: "exact-output",
-        input: routeCase.input,
+        input: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAmount,
+          `BrownFi ${routeCase.name} exact-output preflight inputAmount`
+        ),
         amountOut: routeCase.amountOut
       };
     }
@@ -6629,10 +6665,16 @@ export function buildRegisteredRoutePreflightCases<
         throw new Error("BrownFi exact-output preflight config must not set minOutputs");
       }
       validateCommonOptions();
+      const commonOptions = buildCommonOptions();
       return {
-        ...buildCommonOptions(),
+        ...commonOptions,
         kind: "exact-output-results",
-        input: routeCase.input,
+        input: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAmount,
+          `BrownFi ${routeCase.name} exact-output preflight inputAmount`
+        ),
         amountOut: routeCase.amountOut
       };
     }
@@ -6675,8 +6717,18 @@ export function buildRegisteredRoutePreflightCases<
         providerId: commonOptions.providerId,
         clock: commonOptions.clock,
         pair: route[0].pair,
-        inputA: routeCase.input,
-        inputB: routeCase.inputB,
+        inputA: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAAmount,
+          `BrownFi ${routeCase.name} add-liquidity preflight inputAAmount`
+        ),
+        inputB: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.inputB,
+          routeCase.inputBAmount,
+          `BrownFi ${routeCase.name} add-liquidity preflight inputBAmount`
+        ),
         minADeposit: routeCase.minADeposit,
         minBDeposit: routeCase.minBDeposit,
         minLpOut: routeCase.minLpOut,
@@ -6721,7 +6773,12 @@ export function buildRegisteredRoutePreflightCases<
         tx: commonOptions.tx,
         providerId: commonOptions.providerId,
         pair: route[0].pair,
-        lpIn: routeCase.input,
+        lpIn: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAmount,
+          `BrownFi ${routeCase.name} remove-liquidity preflight inputAmount`
+        ),
         minAOut: routeCase.minAOut,
         minBOut: routeCase.minBOut,
         recipient: commonOptions.recipient,
@@ -6780,7 +6837,12 @@ export function buildRegisteredRoutePreflightCases<
         providerId: commonOptions.providerId,
         clock: commonOptions.clock,
         pair: route[0].pair,
-        inputA: routeCase.input,
+        inputA: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAmount,
+          `BrownFi ${routeCase.name} zap-in preflight inputAmount`
+        ),
         minBFromSwap: routeCase.minBFromSwap,
         minLpOut: routeCase.minLpOut,
         recipient: commonOptions.recipient,
@@ -6839,7 +6901,12 @@ export function buildRegisteredRoutePreflightCases<
         providerId: commonOptions.providerId,
         clock: commonOptions.clock,
         pair: route[0].pair,
-        inputB: routeCase.input,
+        inputB: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAmount,
+          `BrownFi ${routeCase.name} zap-in preflight inputAmount`
+        ),
         minAFromSwap: routeCase.minAFromSwap,
         minLpOut: routeCase.minLpOut,
         recipient: commonOptions.recipient,
@@ -6898,7 +6965,12 @@ export function buildRegisteredRoutePreflightCases<
         providerId: commonOptions.providerId,
         clock: commonOptions.clock,
         pair: route[0].pair,
-        lpIn: routeCase.input,
+        lpIn: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.input,
+          routeCase.inputAmount,
+          `BrownFi ${routeCase.name} zap-out preflight inputAmount`
+        ),
         minOut: routeCase.minOut,
         recipient: commonOptions.recipient,
         context: commonOptions.context
@@ -6951,7 +7023,12 @@ export function buildRegisteredRoutePreflightCases<
         clock: commonOptions.clock,
         pair: route[0].pair,
         amount: routeCase.amount,
-        feeCoin: routeCase.feeCoin,
+        feeCoin: splitInputIfConfigured(
+          commonOptions.tx,
+          routeCase.feeCoin,
+          routeCase.feeCoinAmount,
+          `BrownFi ${routeCase.name} flash preflight feeCoinAmount`
+        ),
         recipient: commonOptions.recipient,
         context: commonOptions.context
       };

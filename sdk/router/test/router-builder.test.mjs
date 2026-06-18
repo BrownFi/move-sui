@@ -1512,6 +1512,7 @@ test("buildLaunchValidationMatrix hydrates route and quote launch sections", () 
           }
         ],
         input: "0xCOINA",
+        inputAmount: 123n,
         minOutputs: [9n]
       }
     ],
@@ -1653,6 +1654,7 @@ test("validateLaunchValidationMatrixConfig hydrates launch coverage without prov
           }
         ],
         input: "0xCOINA",
+        inputAmount: 123n,
         minOutputs: [9n]
       }
     ],
@@ -6937,6 +6939,7 @@ test("preflightRegisteredRouteCases supports provider-backed zap cases", async (
         path: ["A", "B"],
         pairs: [pair],
         input: "0xCOINB",
+        inputAmount: 1_000n,
         minAFromSwap: 21n,
         minLpOut: 456n
       },
@@ -7038,7 +7041,7 @@ test("preflightRegisteredRouteCases supports provider-backed zap cases", async (
           { kind: "bundle", txIndex: 1 },
           { kind: "object", id: "0xCLOCK" },
           { kind: "object", id: "0xPOOLAB" },
-          { kind: "object", id: "0xCOINB" },
+          { kind: "split", splitIndex: 0, resultIndex: 0 },
           { kind: "u64", value: "21" },
           { kind: "u64", value: "456" }
         ]
@@ -7067,6 +7070,12 @@ test("preflightRegisteredRouteCases supports provider-backed zap cases", async (
       }
     ]
   );
+  assert.deepEqual(txs[1].splits, [
+    {
+      coin: { kind: "object", id: "0xCOINB" },
+      amounts: [{ kind: "u64", value: "1000" }]
+    }
+  ]);
   assert.deepEqual(calls, [
     { kind: "factory", index: 0, caseKind: "zap-in-a" },
     { kind: "factory", index: 1, caseKind: "zap-in-b" },
@@ -8269,6 +8278,7 @@ test("buildRegisteredRoutePreflightCases hydrates flash borrow configs for prefl
         ],
         amount: 1_000n,
         feeCoin: "0xFEEA",
+        feeCoinAmount: 1n,
         context: "BrownFi launch flash borrow A"
       }
     ]
@@ -8278,7 +8288,7 @@ test("buildRegisteredRoutePreflightCases hydrates flash borrow configs for prefl
   assert.equal(cases[0].providerRegistry, providerRegistry);
   assert.equal(cases[0].kind, "flash-borrow-a");
   assert.equal(cases[0].amount, 1_000n);
-  assert.equal(cases[0].feeCoin, "0xFEEA");
+  assert.deepEqual(cases[0].feeCoin, { kind: "split", splitIndex: 0, resultIndex: 0 });
 
   const results = await preflightRegisteredRouteCases({ suiClient, cases });
 
@@ -8319,7 +8329,13 @@ test("buildRegisteredRoutePreflightCases hydrates flash borrow configs for prefl
   assert.deepEqual(txs[0].merges, [
     {
       coin: { kind: "nested-result", index: 0, resultIndex: 0 },
-      sources: [{ kind: "object", id: "0xFEEA" }]
+      sources: [{ kind: "split", splitIndex: 0, resultIndex: 0 }]
+    }
+  ]);
+  assert.deepEqual(txs[0].splits, [
+    {
+      coin: { kind: "object", id: "0xFEEA" },
+      amounts: [{ kind: "u64", value: "1" }]
     }
   ]);
 });

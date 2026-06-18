@@ -358,6 +358,7 @@ function createTransaction(label) {
   return {
     calls: [],
     transfers: [],
+    splits: [],
     object(id) {
       return { kind: "object", id };
     },
@@ -374,6 +375,10 @@ function createTransaction(label) {
     },
     transferObjects(objects, recipient) {
       this.transfers.push({ objects, recipient });
+    },
+    splitCoins(coin, amounts) {
+      this.splits.push({ coin, amounts });
+      return amounts.map((_amount, index) => ({ kind: "split", index }));
     },
     moveCall(call) {
       const result = { kind: "result", label, index: this.calls.length };

@@ -794,7 +794,8 @@ export async function submitLaunchMatrixRoutesConfigFile({
     providerRegistry: launchRuntime.providerRegistry,
     txFactory: launchRuntime.routeTransactionFactory,
     cases: routeCaseConfigs,
-    routeLimits: matrixConfig.routeLimits
+    routeLimits: matrixConfig.routeLimits,
+    applyInputSplits: false
   });
 
   const submittedRouteCases = [];
