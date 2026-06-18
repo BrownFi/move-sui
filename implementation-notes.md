@@ -2080,3 +2080,7 @@
   - Finding: Solidity V3 exposes granular `setSpread`, `setFixSpread`, `setDisThreshold`, and `setSbound` surfaces, while Sui only had combined `set_pool_spreads`. The docs require Constraint 2 rechecks whenever spread, fixed spread, or discrepancy threshold changes, and the Sbound setter must retain the strict Solidity `[0, 10_000_000)` bound.
   - Decision: add `set_pool_spread`, `set_pool_fix_spread`, `set_pool_dis_threshold`, and `set_pool_s_bound` under the existing `RiskCap`. Each setter preserves untouched spread fields, uses the same validation helper as `set_pool_spreads`, and emits only the corresponding parameter-group event.
   - RED/GREEN: `rtk sui move test granular_spread --allow-dirty --build-env testnet --warnings-are-errors` first failed on missing admin functions, then passed after the granular setters landed.
+- 2026-06-18 granular spread SDK parity:
+  - Finding: Move core exposed the granular spread setters, but `sdk/router` still only had the combined `setPoolSpreads` admin builder.
+  - Decision: add `setPoolSpread`, `setPoolFixSpread`, `setPoolDisThreshold`, and `setPoolSBound` as thin PTB builders over the matching `admin` functions. TypeScript does not duplicate spread validation; `admin.move` remains authoritative under `RiskCap`.
+  - RED/GREEN: `rtk npm test --prefix sdk/router -- --test-name-pattern "Core admin builders"` first failed because the granular builders were not exported, then passed 222/222 after adding the SDK builders and argument-order coverage.

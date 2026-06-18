@@ -161,11 +161,13 @@ import {
   setPoolFee,
   setPoolFeeSplit,
   setPoolFeeTo,
+  setPoolFixSpread,
   setPoolGamma,
   setPoolK,
   setPoolKB,
   setPoolKQ,
   setPoolLambda,
+  setPoolDisThreshold,
   setPoolOracleAggregationPolicy,
   setPoolOracleMaxPriceAge,
   setPoolOracleQuorum,
@@ -174,6 +176,8 @@ import {
   setPoolFlashEnabled,
   setPoolPythWeight,
   setPoolRouterEnabled,
+  setPoolSBound,
+  setPoolSpread,
   setPoolSpreads,
   setPoolSwapsPaused,
   splitSuiFromGas,
@@ -13364,6 +13368,61 @@ test("pool risk and gate admin builders target admin functions with Move argumen
       { kind: "u32", value: "400" },
       { kind: "u32", value: "500" },
       { kind: "u32", value: "600" }
+    ]
+  });
+
+  const spreadTx = createTransactionRecorder();
+  setPoolSpread({
+    ...riskBase,
+    compress: 101,
+    sSell: 201,
+    sBuy: 301
+  })(spreadTx);
+  assert.deepEqual(spreadTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_spread",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "101" },
+      { kind: "u32", value: "201" },
+      { kind: "u32", value: "301" }
+    ]
+  });
+
+  const fixSpreadTx = createTransactionRecorder();
+  setPoolFixSpread({ ...riskBase, fixS: 401 })(fixSpreadTx);
+  assert.deepEqual(fixSpreadTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_fix_spread",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "401" }
+    ]
+  });
+
+  const disThresholdTx = createTransactionRecorder();
+  setPoolDisThreshold({ ...riskBase, disThreshold: 501 })(disThresholdTx);
+  assert.deepEqual(disThresholdTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_dis_threshold",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "501" }
+    ]
+  });
+
+  const sBoundTx = createTransactionRecorder();
+  setPoolSBound({ ...riskBase, sBound: 601 })(sBoundTx);
+  assert.deepEqual(sBoundTx.calls[0], {
+    target: "0xBROWN::admin::set_pool_s_bound",
+    typeArguments: ["0x1::a::A", "0x1::b::B"],
+    arguments: [
+      { kind: "object", id: "0xPOOLAB" },
+      { kind: "object", id: "0xRISK" },
+      { kind: "u32", value: "601" }
     ]
   });
 

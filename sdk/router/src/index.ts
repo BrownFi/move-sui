@@ -2273,6 +2273,24 @@ export interface SetPoolSpreadsOptions extends PoolRiskAdminOptions {
   sBound: U32Input;
 }
 
+export interface SetPoolSpreadOptions extends PoolRiskAdminOptions {
+  compress: U32Input;
+  sSell: U32Input;
+  sBuy: U32Input;
+}
+
+export interface SetPoolFixSpreadOptions extends PoolRiskAdminOptions {
+  fixS: U32Input;
+}
+
+export interface SetPoolDisThresholdOptions extends PoolRiskAdminOptions {
+  disThreshold: U32Input;
+}
+
+export interface SetPoolSBoundOptions extends PoolRiskAdminOptions {
+  sBound: U32Input;
+}
+
 export interface PoolFeeAdminOptions extends PairTypesOptions {
   pool: ObjectInput;
   feeCap: ObjectInput;
@@ -9546,6 +9564,62 @@ export function setPoolSpreads(options: SetPoolSpreadsOptions): TransactionThunk
         pureU32(tx, options.sBuy),
         pureU32(tx, options.fixS),
         pureU32(tx, options.disThreshold),
+        pureU32(tx, options.sBound)
+      ]
+    });
+}
+
+export function setPoolSpread(options: SetPoolSpreadOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_spread"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.compress),
+        pureU32(tx, options.sSell),
+        pureU32(tx, options.sBuy)
+      ]
+    });
+}
+
+export function setPoolFixSpread(options: SetPoolFixSpreadOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_fix_spread"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.fixS)
+      ]
+    });
+}
+
+export function setPoolDisThreshold(
+  options: SetPoolDisThresholdOptions
+): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_dis_threshold"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
+        pureU32(tx, options.disThreshold)
+      ]
+    });
+}
+
+export function setPoolSBound(options: SetPoolSBoundOptions): TransactionThunk {
+  return (tx) =>
+    tx.moveCall({
+      target: moduleTarget(options.packageId, "admin", "set_pool_s_bound"),
+      typeArguments: pairTypeArguments(options),
+      arguments: [
+        objectArg(tx, options.pool),
+        objectArg(tx, options.riskCap),
         pureU32(tx, options.sBound)
       ]
     });
