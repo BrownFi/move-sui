@@ -1,0 +1,17 @@
+[package]
+name = "brownfi_oracle"
+version = "1.0.0"
+edition = "2024.beta"
+
+[dependencies.Pyth]
+local = "../pyth-crosschain/target_chains/sui/contracts"
+
+# NOTE: For testnet publishing, uncomment this override:
+# [dependencies.Sui]
+# git = "https://github.com/MystenLabs/sui.git"
+# subdir = "crates/sui-framework/packages/sui-framework"
+# rev = "041c5f2bae2fe52079e44b70514333532d69f4e6"
+# override = true
+
+[addresses]
+brownfi_oracle = "0x0"

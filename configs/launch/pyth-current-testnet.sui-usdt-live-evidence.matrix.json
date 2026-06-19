@@ -1,0 +1,605 @@
+{
+  "name": "brownfi-v3-pyth-current-testnet-sui-usdt-live-evidence",
+  "description": "Verifier-only live evidence matrix for landed native SUI / BrownFi test USDT current-Pyth testnet routes. The route input coin IDs are historical and may be spent; use this file for tx-evidence verification, not resubmission.",
+  "network": "testnet",
+  "providerIds": [
+    "pyth"
+  ],
+  "ammProviderIds": [],
+  "routeLimits": {
+    "maxHops": 1,
+    "maxOracleSourcesPerHop": 1,
+    "maxAmmSourcesPerHop": 0,
+    "maxUpdatePayloadBytes": 250000
+  },
+  "routeCases": [
+    {
+      "name": "live SUI/USDT exact input SUI to USDT",
+      "kind": "exact-input",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0x46e18fb7517bb3f2291b7e4b65357806c3d941ac39000469716007b5bab0e782",
+      "inputAmount": "10000000",
+      "minOutputs": [
+        "1"
+      ]
+    },
+    {
+      "name": "live SUI/USDT add liquidity",
+      "kind": "add-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0x46e18fb7517bb3f2291b7e4b65357806c3d941ac39000469716007b5bab0e782",
+      "inputB": "0xc0174798d3ea28941625c1be5358ea550089016d71534529aef0083626f5c028",
+      "inputAAmount": "10000000",
+      "inputBAmount": "20000000",
+      "minLpOut": "1"
+    },
+    {
+      "name": "live SUI/USDT remove liquidity",
+      "kind": "remove-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xdead3fdc0bfd0c3127be1f2c50c7317f6cf400fcbb9ed18179e0c4dfb9858015",
+      "inputAmount": "1000000",
+      "minAOut": "1",
+      "minBOut": "1"
+    },
+    {
+      "name": "live SUI/USDT exact output SUI to USDT",
+      "kind": "exact-output",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xa744e5e550ca983a75f0b05d72371e872b5b12e099f87946f4d51c219eb30be3",
+      "inputAmount": "50000000",
+      "amountOut": "1000000"
+    },
+    {
+      "name": "live SUI/USDT exact output results SUI to USDT",
+      "kind": "exact-output-results",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xa744e5e550ca983a75f0b05d72371e872b5b12e099f87946f4d51c219eb30be3",
+      "inputAmount": "50000000",
+      "amountOut": "1000000"
+    },
+    {
+      "name": "live SUI/USDT zap in A",
+      "kind": "zap-in-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xa744e5e550ca983a75f0b05d72371e872b5b12e099f87946f4d51c219eb30be3",
+      "inputAmount": "20000000",
+      "minBFromSwap": "1",
+      "minLpOut": "1"
+    },
+    {
+      "name": "live SUI/USDT zap in B",
+      "kind": "zap-in-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xc0174798d3ea28941625c1be5358ea550089016d71534529aef0083626f5c028",
+      "inputAmount": "1000000000",
+      "minAFromSwap": "1",
+      "minLpOut": "1"
+    },
+    {
+      "name": "live SUI/USDT zap out A",
+      "kind": "zap-out-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xdead3fdc0bfd0c3127be1f2c50c7317f6cf400fcbb9ed18179e0c4dfb9858015",
+      "inputAmount": "1000000",
+      "minOut": "1"
+    },
+    {
+      "name": "live SUI/USDT zap out B",
+      "kind": "zap-out-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xdead3fdc0bfd0c3127be1f2c50c7317f6cf400fcbb9ed18179e0c4dfb9858015",
+      "inputAmount": "1000000",
+      "minOut": "1"
+    },
+    {
+      "name": "live SUI/USDT flash borrow A",
+      "kind": "flash-borrow-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amount": "1000",
+      "feeCoin": "0xc92a413426adae06bad9360f2c6e3fb7a858f2e27a0a1bce88e0764de1b17883",
+      "feeCoinAmount": "1"
+    },
+    {
+      "name": "live SUI/USDT flash borrow B",
+      "kind": "flash-borrow-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amount": "1000",
+      "feeCoin": "0xc0174798d3ea28941625c1be5358ea550089016d71534529aef0083626f5c028",
+      "feeCoinAmount": "1"
+    }
+  ],
+  "quoteCases": [
+    {
+      "name": "live SUI/USDT exact input quote",
+      "kind": "exact-input-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "live SUI/USDT exact output quote",
+      "kind": "exact-output-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    },
+    {
+      "name": "live SUI/USDT exact output round-trip quote",
+      "kind": "exact-output-round-trip-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    },
+    {
+      "name": "live SUI/USDT exact input raw quote",
+      "kind": "exact-input-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "live SUI/USDT exact output raw quote",
+      "kind": "exact-output-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4",
+          "typeA": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "typeB": "0x429630f969bec64e7e583df35090d4b764bb2ed8abeabbe697dd2a599b598c9f::usdt::USDT",
+          "pool": "0x04a273289ecabd5731f9fab769fbcdae1df130cba13b0ba0f9687a7b766dd183",
+          "feedIds": [
+            "0x50c67b3fd225db8912a424dd4baed60ffdde625ed2feaaf283724f9608fea266",
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    }
+  ],
+  "txEvidence": [
+    {
+      "name": "live SUI/USDT exact input SUI to USDT",
+      "digest": "4rz84gvfC7tccf4oHUXLDwfXLWS9VbMddm47H3SswJnf",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::swap_exact_a_for_b_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::PriceBundleUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::SwapExecuted",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Swap"
+      ]
+    },
+    {
+      "name": "live SUI/USDT add liquidity",
+      "digest": "7N93fdPcCqQD2MFCgxxUxVX3Xxg1Qcxgx7P4oSoeggQS",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::add_liquidity_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::AddLiquidity"
+      ]
+    },
+    {
+      "name": "live SUI/USDT remove liquidity",
+      "digest": "RHq79ynHyCqVZBLY1YgY94fWxj1NkDmW6j4x3dHWhB9",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::remove_liquidity_with_coins"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::RemoveLiquidity"
+      ]
+    },
+    {
+      "name": "live SUI/USDT exact output SUI to USDT",
+      "digest": "Cvur9khNv9DZbzf78u2QgpAzPv1LXFdGJtGc674be761",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::swap_a_for_exact_b_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::PriceBundleUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::SwapExecuted",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Swap"
+      ]
+    },
+    {
+      "name": "live SUI/USDT exact output results SUI to USDT",
+      "digest": "GpsXRtpqMeEpcNpUXX7AN8Ra2izsFLcTT4rYovuNS2gG",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::swap_a_for_exact_b_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::PriceBundleUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::SwapExecuted",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Swap"
+      ]
+    },
+    {
+      "name": "live SUI/USDT zap in A",
+      "digest": "XoPQp2RESM9gSR3Byw7f2io8WnhhJRDXWbuUAcke1X8",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::zap_in_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::PriceBundleUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::SwapExecuted",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Swap",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::AddLiquidity"
+      ]
+    },
+    {
+      "name": "live SUI/USDT zap in B",
+      "digest": "HrcYrQo6Y4zKf6H3E3dG9G8aR58nNBF3fLqQUL2tiwtY",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::zap_in_b_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::PriceBundleUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::SwapExecuted",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Swap",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::AddLiquidity"
+      ]
+    },
+    {
+      "name": "live SUI/USDT zap out A",
+      "digest": "8YbvXsqToZTSvhoftLWUtEZ9YhQmTYHuw9SZ55snxFPs",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::zap_out_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::RemoveLiquidity",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::PriceBundleUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::SwapExecuted",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Swap"
+      ]
+    },
+    {
+      "name": "live SUI/USDT zap out B",
+      "digest": "D8xh4UTNrPfVPcbYPmjYeEpCZHR1fgfbUDTSmy1RZNJB",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::router::zap_out_b_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::RemoveLiquidity",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Sync",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::PriceBundleUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::SwapExecuted",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::Swap"
+      ]
+    },
+    {
+      "name": "live SUI/USDT flash borrow A",
+      "digest": "7cUPxu8v1kAjong6iBbYsDvFNAjy8PLxcWv9c511Qqq",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::flash::borrow_a_with_coin",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::flash::repay_a_with_coin"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::FlashBorrowed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::FlashRepaid"
+      ]
+    },
+    {
+      "name": "live SUI/USDT flash borrow B",
+      "digest": "HxfcRu6CapUjHTF1UNEWLiFdPJZTcWouSDCjH8CvMvbw",
+      "expectedMoveCalls": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::flash::borrow_b_with_coin",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::flash::repay_b_with_coin"
+      ],
+      "expectedEventTypes": [
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::OracleQuorumUsed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::FlashBorrowed",
+        "0x7d082a9b04ef6cee7793da2553cbf59def37e740fa0e63cf839f55a5cb46e8c4::events::FlashRepaid"
+      ]
+    }
+  ]
+}

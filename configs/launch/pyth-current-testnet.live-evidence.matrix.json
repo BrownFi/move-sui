@@ -1,0 +1,657 @@
+{
+  "name": "brownfi-v3-pyth-current-testnet-live-evidence",
+  "description": "Verifier-only live evidence matrix for the landed current-Pyth testnet protocol-fee launch. The route input coin IDs are historical and may be spent; use this file for tx-evidence verification, not resubmission.",
+  "network": "testnet",
+  "providerIds": [
+    "pyth"
+  ],
+  "ammProviderIds": [],
+  "routeLimits": {
+    "maxHops": 2,
+    "maxOracleSourcesPerHop": 1,
+    "maxAmmSourcesPerHop": 0,
+    "maxUpdatePayloadBytes": 250000
+  },
+  "routeCases": [
+    {
+      "name": "pyth current testnet exact input route",
+      "kind": "exact-input",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xea7066e9e6274f0a4176771d175e2a9a247e1f1fe7c4a2e0465efbfe03a9f537",
+      "inputAmount": "1000000",
+      "minOutputs": [
+        "1"
+      ]
+    },
+    {
+      "name": "pyth current testnet exact output route",
+      "kind": "exact-output",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xea7066e9e6274f0a4176771d175e2a9a247e1f1fe7c4a2e0465efbfe03a9f537",
+      "inputAmount": "1000000",
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet exact output results route",
+      "kind": "exact-output-results",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xea7066e9e6274f0a4176771d175e2a9a247e1f1fe7c4a2e0465efbfe03a9f537",
+      "inputAmount": "1000000",
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet add liquidity",
+      "kind": "add-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xd4b8cd4460c74bdcbe19e7e6905c287892c6c589a664a440d408a86bbfe55e28",
+      "inputB": "0xea7066e9e6274f0a4176771d175e2a9a247e1f1fe7c4a2e0465efbfe03a9f537",
+      "inputAAmount": "1000000",
+      "inputBAmount": "1000000",
+      "minLpOut": "1"
+    },
+    {
+      "name": "pyth current testnet remove liquidity",
+      "kind": "remove-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0x0417af08ac65eeca14c4b3c3eb785232469305dc1b41b5110d3f387d5ea33032",
+      "inputAmount": "1000000",
+      "minAOut": "1",
+      "minBOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap in A",
+      "kind": "zap-in-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xd4b8cd4460c74bdcbe19e7e6905c287892c6c589a664a440d408a86bbfe55e28",
+      "inputAmount": "1000000",
+      "minBFromSwap": "1",
+      "minLpOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap in B",
+      "kind": "zap-in-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xea7066e9e6274f0a4176771d175e2a9a247e1f1fe7c4a2e0465efbfe03a9f537",
+      "inputAmount": "1000000",
+      "minAFromSwap": "1",
+      "minLpOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap out A",
+      "kind": "zap-out-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0x0417af08ac65eeca14c4b3c3eb785232469305dc1b41b5110d3f387d5ea33032",
+      "inputAmount": "1000000",
+      "minOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap out B",
+      "kind": "zap-out-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0x0417af08ac65eeca14c4b3c3eb785232469305dc1b41b5110d3f387d5ea33032",
+      "inputAmount": "1000000",
+      "minOut": "1"
+    },
+    {
+      "name": "pyth current testnet flash borrow A",
+      "kind": "flash-borrow-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amount": "1000",
+      "feeCoin": "0xd4b8cd4460c74bdcbe19e7e6905c287892c6c589a664a440d408a86bbfe55e28",
+      "feeCoinAmount": "1"
+    },
+    {
+      "name": "pyth current testnet flash borrow B",
+      "kind": "flash-borrow-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amount": "1000",
+      "feeCoin": "0xea7066e9e6274f0a4176771d175e2a9a247e1f1fe7c4a2e0465efbfe03a9f537",
+      "feeCoinAmount": "1"
+    }
+  ],
+  "quoteCases": [
+    {
+      "name": "pyth current testnet exact input quote",
+      "kind": "exact-input-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "pyth current testnet exact output quote",
+      "kind": "exact-output-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet exact output round-trip quote",
+      "kind": "exact-output-round-trip-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet exact input raw quote",
+      "kind": "exact-input-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "pyth current testnet exact output raw quote",
+      "kind": "exact-output-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+        "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+          "typeA": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_a::COIN_A",
+          "typeB": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef::coin_b::COIN_B",
+          "pool": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+          "feedIds": [
+            "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+            "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    }
+  ],
+  "setupEvidence": {
+    "testCoins": {
+      "packageId": "0x7f05d737f545fdca57539f9c85b44f50e66860832e161b80c58a5e0cbd7856ef",
+      "digest": "6cFqREnD264yWR14fToWiwwfuNkXutHcpsHXfjkHqifh"
+    },
+    "brownfiPackage": {
+      "packageId": "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9",
+      "digest": "13Sny17FWN4czLC2GybBRv5TPNMTBaRY4vPXkW5W9Tot"
+    },
+    "pool": {
+      "objectId": "0x7bebba8475103e2779c2a951b00a003f588003602bf58656ad1fa74c4f222887",
+      "digest": "4ynf6oiMHk7wZUXFpqELwoCVwGnvmKPmoAG3L2BotrMu",
+      "lpCoin": "0x0417af08ac65eeca14c4b3c3eb785232469305dc1b41b5110d3f387d5ea33032",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::swap::create_pool_with_coins_and_transfer_lp_to_sender"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PoolCreated",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync"
+      ]
+    },
+    "protocolFeeSetup": {
+      "digest": "HaxcXDwFRjxfn3D15hJDnZxrzibex75o5XqcM8x4pge",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::admin::set_pool_fee_to",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::admin::set_pool_protocol_fee"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::FeeToUpdated",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PoolParametersUpdated",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::ConfigUpdated"
+      ]
+    },
+    "flashEnable": {
+      "digest": "9ozBVd3vD646e5GjYW9s8yUp3ZX5eS7FyRCHyq7R5W9",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::admin::set_pool_flash_enabled"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PoolGateStateChanged"
+      ]
+    },
+    "protocolLpClaim": {
+      "digest": "AfcMRm9SQyNZ2zy8thJddAW3XftGMuVQikmuzK1zc4wH",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::admin::claim_protocol_lp"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::ProtocolLpClaimed"
+      ]
+    }
+  },
+  "txEvidence": [
+    {
+      "name": "pyth current testnet exact input route",
+      "digest": "HwRwdNGzGGpTWbX6ygoWbQR29JLVGQdMiwVbv5P51Af1",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::swap_exact_b_for_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PriceBundleUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::SwapExecuted",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Swap"
+      ]
+    },
+    {
+      "name": "pyth current testnet exact output route",
+      "digest": "5LE3UMidsg8awmHUzSoHvXr24huRzYJUKT6AAZYGV9pM",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::swap_b_for_exact_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PriceBundleUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::SwapExecuted",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Swap"
+      ]
+    },
+    {
+      "name": "pyth current testnet exact output results route",
+      "digest": "87w8zKy94PfVWcYTzBKZHUFL74k2cpJyWsp4SSumTaVR",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::swap_b_for_exact_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PriceBundleUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::SwapExecuted",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Swap"
+      ]
+    },
+    {
+      "name": "pyth current testnet add liquidity",
+      "digest": "4vMiuTdNHmqqmQVyHJxLLQB87HGNyqHhLpZYhCMdjVvh",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::add_liquidity_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::AddLiquidity"
+      ]
+    },
+    {
+      "name": "pyth current testnet remove liquidity",
+      "digest": "A4RyrfATPS7HPWhQZAcemHqcuanoWfw6cz4ztQftKGc9",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::remove_liquidity_with_coins"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::RemoveLiquidity"
+      ]
+    },
+    {
+      "name": "pyth current testnet zap in A",
+      "digest": "7VRTg2M9Uzoy1kc1NTZg6vjkhxnoVd9Xdo2UGhV6nEgx",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::zap_in_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PriceBundleUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::SwapExecuted",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Swap",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::AddLiquidity"
+      ]
+    },
+    {
+      "name": "pyth current testnet zap in B",
+      "digest": "G2rBTNqdkwwysCiRRfF2sKHXZ5T2VFtYHBUBAtvtM1R8",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::zap_in_b_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PriceBundleUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::SwapExecuted",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Swap",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::AddLiquidity"
+      ]
+    },
+    {
+      "name": "pyth current testnet zap out A",
+      "digest": "CBPqUWXwV8o6qiywcfxfbDBQYk68rD9BQMzfkhyRkSfm",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::zap_out_a_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::RemoveLiquidity",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PriceBundleUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::SwapExecuted",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Swap"
+      ]
+    },
+    {
+      "name": "pyth current testnet zap out B",
+      "digest": "9gNSeQ5EMTnjbHbUCeGTHQPZ5EWjFf9jbydbjk7PBvkJ",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::router::zap_out_b_with_bundle"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::RemoveLiquidity",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Sync",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::PriceBundleUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::SwapExecuted",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::Swap"
+      ]
+    },
+    {
+      "name": "pyth current testnet flash borrow A",
+      "digest": "BtNqLWGRVTrogXAN63x52JixVL5TBeV4PeJxcjDcTkTG",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::flash::borrow_a_with_coin",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::flash::repay_a_with_coin"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::FlashBorrowed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::FlashRepaid"
+      ]
+    },
+    {
+      "name": "pyth current testnet flash borrow B",
+      "digest": "85kRkpDmcEXndb2bnncTS9FRzgBrnCYUfydwrkXiLJED",
+      "expectedMoveCalls": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::flash::borrow_b_with_coin",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::flash::repay_b_with_coin"
+      ],
+      "expectedEventTypes": [
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::OracleQuorumUsed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::FlashBorrowed",
+        "0x80503414708cfc44705615b9b10c31676af8b37ba6c83bbd86fefc3e069ecad9::events::FlashRepaid"
+      ]
+    }
+  ]
+}

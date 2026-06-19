@@ -1,0 +1,7 @@
+[package]
+name = "brownfi_usdt_test_coin"
+edition = "2024.beta"
+version = "0.0.0"
+
+[addresses]
+brownfi_usdt_test_coin = "0x0"

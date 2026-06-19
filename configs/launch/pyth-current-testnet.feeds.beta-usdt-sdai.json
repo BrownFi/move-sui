@@ -1,0 +1,13 @@
+{
+  "name": "brownfi-v3-pyth-current-testnet-feeds-beta-usdt-sdai",
+  "description": "Concrete Pyth Hermes Beta feed values for a USDT/USD base over SDAI/USD quote testnet launch run.",
+  "source": {
+    "checkedAt": "2026-06-14",
+    "hermesEndpoint": "https://hermes-beta.pyth.network/v2/price_feeds",
+    "notes": "Hermes Beta updates for these feeds embed Wormhole guardian set index 0 with one signature, matching the current Sui testnet Wormhole state quorum."
+  },
+  "replacements": {
+    "BASE_FEED_ID": "0x1fc18861232290221461220bd4e2acd1dcdfbc89c84092c93c18bdc7756c1588",
+    "QUOTE_FEED_ID": "0x55b9594b0b975ca8be6b00399c47956e04269f1e565ffa33e2f8756e7e840efb"
+  }
+}

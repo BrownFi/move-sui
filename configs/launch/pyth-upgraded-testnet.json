@@ -1,0 +1,52 @@
+{
+  "name": "brownfi-v3-launch-pyth-upgraded-testnet",
+  "description": "Testnet launch package profile for live Pyth-upgraded route validation. This excludes optional non-Pyth adapters so dependency verification is scoped to the selected source set.",
+  "providerIds": [
+    "pyth"
+  ],
+  "ammProviderIds": [],
+  "sources": [
+    "admin",
+    "events",
+    "factory",
+    "flash",
+    "library",
+    "math",
+    "oracle_gateway",
+    "pool",
+    "pyth_source",
+    "router",
+    "swap"
+  ],
+  "copyPaths": [
+    "packages/oracle",
+    "packages/pyth-crosschain/target_chains/sui/contracts",
+    "packages/pyth-crosschain/target_chains/sui/vendor/wormhole_simple_majority/wormhole"
+  ],
+  "removeDependencies": [
+    "Pyth",
+    "SupraOracle",
+    "Switchboard",
+    "flowx_clmm",
+    "stork"
+  ],
+  "removeAddresses": [
+    "supra_validator"
+  ],
+  "manifestOverrides": [
+    {
+      "path": "packages/pyth-crosschain/target_chains/sui/contracts",
+      "manifest": "Move.pro_compatible.sui_testnet.toml",
+      "removeAddresses": [
+        "wormhole"
+      ]
+    },
+    {
+      "path": "packages/pyth-crosschain/target_chains/sui/vendor/wormhole_simple_majority/wormhole",
+      "manifest": "Move.sui_testnet.toml"
+    }
+  ],
+  "localDependencies": {
+    "pyth": "./packages/pyth-crosschain/target_chains/sui/contracts"
+  }
+}

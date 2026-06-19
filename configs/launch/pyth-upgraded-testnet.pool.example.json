@@ -1,0 +1,24 @@
+{
+  "name": "brownfi-v3-pyth-upgraded-testnet-pool-example",
+  "description": "Offline pool-creation template for the Pyth-upgraded testnet package profile. Replace package, setup object, feed, and initial coin values before live submission.",
+  "network": "testnet",
+  "packageId": "0xBROWNFI_PACKAGE",
+  "typeA": "TYPE_A",
+  "typeB": "TYPE_B",
+  "factory": "0xFACTORY",
+  "poolCreatorCap": "0xPOOL_CREATOR_CAP",
+  "pauseCap": "0xPAUSE_CAP",
+  "oracle": "0xORACLE_ADAPTER",
+  "feedIds": [
+    "0xBASE_FEED_ID",
+    "0xQUOTE_FEED_ID"
+  ],
+  "clock": "0x6",
+  "initA": "0xINIT_COIN_A",
+  "initB": "0xINIT_COIN_B",
+  "initAAmount": "10000000000",
+  "initBAmount": "10000000000",
+  "tokenADecimals": 9,
+  "tokenBDecimals": 9,
+  "flashEnabled": true
+}

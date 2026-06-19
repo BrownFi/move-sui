@@ -1,0 +1,130 @@
+{
+  "name": "brownfi-v3-devnet-smoke-launch-matrix",
+  "description": "Live-value-clean devnet smoke matrix for the launch-shaped package published in tx Bz12WPCeGHtVqjoTuJ3eEnT3WdKdVzKyU9pNCJ1acPMA. This uses the temporary devnet_smoke source wrapper and proves smoke-route dry-run hygiene; it is not Pyth/Stork/Switchboard live-provider evidence.",
+  "network": "devnet",
+  "evidence": {
+    "publishTx": "Bz12WPCeGHtVqjoTuJ3eEnT3WdKdVzKyU9pNCJ1acPMA",
+    "createPoolTx": "8JyZwJPmqvKoB3M6ZEMdr23UEybCiqzuomqJfrF2D6gQ",
+    "addLiquidityTx": "8WHyQ1qo2vdNJvy33CczXg9uzXhErVyoEXnraSszZMaR",
+    "swapTx": "5otmGQH838V8yNucRv7CPNPczDkTvJtW9MzdrNFXHyQx",
+    "removeLiquidityTx": "9ogGTqGLsM461dZozHsG6Ep5BrYKAH2ReCV2tyd2SzwJ",
+    "swapDryRunStatus": "success",
+    "swapDryRunDigest": "ANsCMsZv1ytu1yBoVD8TiJygtUVtRmaLYT2zDMZ9dryE",
+    "swapDryRunInputCoin": "0xd2ca4564a797ca09b78e373e9eb0976a8a3df9e4cc32c856ba2641d4d8196237"
+  },
+  "txEvidence": [
+    {
+      "name": "add-liquidity",
+      "digest": "8WHyQ1qo2vdNJvy33CczXg9uzXhErVyoEXnraSszZMaR",
+      "expectedMoveCalls": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::devnet_smoke::add_liquidity_with_sui"
+      ],
+      "expectedEventTypes": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::OracleQuorumUsed",
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::Sync",
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::AddLiquidity"
+      ]
+    },
+    {
+      "name": "swap",
+      "digest": "5otmGQH838V8yNucRv7CPNPczDkTvJtW9MzdrNFXHyQx",
+      "expectedMoveCalls": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::devnet_smoke::swap_smoke_for_sui"
+      ],
+      "expectedEventTypes": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::OracleQuorumUsed",
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::Sync",
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::PriceBundleUsed",
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::SwapExecuted",
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::Swap"
+      ]
+    },
+    {
+      "name": "remove-liquidity",
+      "digest": "9ogGTqGLsM461dZozHsG6Ep5BrYKAH2ReCV2tyd2SzwJ",
+      "expectedMoveCalls": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::devnet_smoke::remove_liquidity_with_sui"
+      ],
+      "expectedEventTypes": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::Sync",
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::RemoveLiquidity"
+      ]
+    }
+  ],
+  "providerIds": [
+    "devnet-smoke"
+  ],
+  "routeLimits": {
+    "maxHops": 1,
+    "maxOracleSourcesPerHop": 1,
+    "maxAmmSourcesPerHop": 0,
+    "maxUpdatePayloadBytes": 0
+  },
+  "routeCases": [
+    {
+      "name": "devnet smoke exact input swap dry-run",
+      "kind": "exact-input",
+      "providerId": "devnet-smoke",
+      "clock": "0x6",
+      "path": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::devnet_smoke::DEVNET_SMOKE",
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc",
+          "typeA": "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::devnet_smoke::DEVNET_SMOKE",
+          "typeB": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "pool": "0xd2b5a249f7667f8c16cf22f1378658d4d16d3bc5d62a4220a07890ac3e490874",
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xd2ca4564a797ca09b78e373e9eb0976a8a3df9e4cc32c856ba2641d4d8196237",
+      "minOutputs": [
+        "0"
+      ],
+      "suiCliDryRun": {
+        "package": "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc",
+        "module": "devnet_smoke",
+        "function": "swap_smoke_for_sui",
+        "args": [
+          "0xd2b5a249f7667f8c16cf22f1378658d4d16d3bc5d62a4220a07890ac3e490874",
+          "0xd2ca4564a797ca09b78e373e9eb0976a8a3df9e4cc32c856ba2641d4d8196237",
+          "0",
+          "0x6"
+        ],
+        "gasBudget": "100000000",
+        "expectedEventTypes": [
+          "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::OracleQuorumUsed",
+          "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::PriceBundleUsed",
+          "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::SwapExecuted",
+          "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::events::Swap"
+        ]
+      }
+    }
+  ],
+  "quoteCases": [
+    {
+      "name": "devnet smoke exact input quote",
+      "kind": "exact-input-quote",
+      "providerId": "devnet-smoke",
+      "clock": "0x6",
+      "path": [
+        "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::devnet_smoke::DEVNET_SMOKE",
+        "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI"
+      ],
+      "pairs": [
+        {
+          "packageId": "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc",
+          "typeA": "0x716ac5fc2184abba66c7bc5bf242130b7a03dd07c7d04185ccfc10dad646acfc::devnet_smoke::DEVNET_SMOKE",
+          "typeB": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+          "pool": "0xd2b5a249f7667f8c16cf22f1378658d4d16d3bc5d62a4220a07890ac3e490874",
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "100000000"
+    }
+  ]
+}

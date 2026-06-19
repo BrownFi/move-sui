@@ -1,0 +1,472 @@
+{
+  "name": "brownfi-v3-pyth-current-testnet-launch-matrix-example",
+  "description": "Offline launch-matrix template for the Pyth-current testnet package profile. Replace placeholder package, pool, coin, and feed values before live dry-run.",
+  "network": "testnet",
+  "providerIds": [
+    "pyth"
+  ],
+  "ammProviderIds": [],
+  "routeLimits": {
+    "maxHops": 2,
+    "maxOracleSourcesPerHop": 1,
+    "maxAmmSourcesPerHop": 0,
+    "maxUpdatePayloadBytes": 250000
+  },
+  "routeCases": [
+    {
+      "name": "pyth current testnet exact input route",
+      "kind": "exact-input",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_B",
+        "TYPE_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_B",
+      "inputAmount": "1000000",
+      "minOutputs": [
+        "1"
+      ]
+    },
+    {
+      "name": "pyth current testnet exact output route",
+      "kind": "exact-output",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_B",
+        "TYPE_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_B",
+      "inputAmount": "1000000",
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet exact output results route",
+      "kind": "exact-output-results",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_B",
+        "TYPE_A"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_B",
+      "inputAmount": "1000000",
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet add liquidity",
+      "kind": "add-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_A",
+      "inputB": "0xINPUT_COIN_B",
+      "inputAAmount": "1000000",
+      "inputBAmount": "1000000",
+      "minLpOut": "1"
+    },
+    {
+      "name": "pyth current testnet remove liquidity",
+      "kind": "remove-liquidity",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xLP_COIN",
+      "inputAmount": "1000000",
+      "minAOut": "1",
+      "minBOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap in A",
+      "kind": "zap-in-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_A",
+      "inputAmount": "1000000",
+      "minBFromSwap": "1",
+      "minLpOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap in B",
+      "kind": "zap-in-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xINPUT_COIN_B",
+      "inputAmount": "1000000",
+      "minAFromSwap": "1",
+      "minLpOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap out A",
+      "kind": "zap-out-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xLP_COIN",
+      "inputAmount": "1000000",
+      "minOut": "1"
+    },
+    {
+      "name": "pyth current testnet zap out B",
+      "kind": "zap-out-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "input": "0xLP_COIN",
+      "inputAmount": "1000000",
+      "minOut": "1"
+    },
+    {
+      "name": "pyth current testnet flash borrow A",
+      "kind": "flash-borrow-a",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amount": "1000",
+      "feeCoin": "0xINPUT_COIN_A",
+      "feeCoinAmount": "1"
+    },
+    {
+      "name": "pyth current testnet flash borrow B",
+      "kind": "flash-borrow-b",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amount": "1000",
+      "feeCoin": "0xINPUT_COIN_B",
+      "feeCoinAmount": "1"
+    }
+  ],
+  "quoteCases": [
+    {
+      "name": "pyth current testnet exact input quote",
+      "kind": "exact-input-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "pyth current testnet exact output quote",
+      "kind": "exact-output-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet exact output round-trip quote",
+      "kind": "exact-output-round-trip-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    },
+    {
+      "name": "pyth current testnet max-bound quote",
+      "kind": "max-bound-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ]
+    },
+    {
+      "name": "pyth current testnet exact input raw quote",
+      "kind": "exact-input-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountIn": "1000000"
+    },
+    {
+      "name": "pyth current testnet exact output raw quote",
+      "kind": "exact-output-without-cutoff-quote",
+      "providerId": "pyth",
+      "clock": "0x6",
+      "path": [
+        "TYPE_A",
+        "TYPE_B"
+      ],
+      "pairs": [
+        {
+          "packageId": "0xBROWNFI_PACKAGE",
+          "typeA": "TYPE_A",
+          "typeB": "TYPE_B",
+          "pool": "0xPOOL",
+          "feedIds": [
+            "0xBASE_FEED_ID",
+            "0xQUOTE_FEED_ID"
+          ],
+          "oracleSourceCount": 1,
+          "updatePayloadByteLength": 0
+        }
+      ],
+      "amountOut": "1"
+    }
+  ]
+}

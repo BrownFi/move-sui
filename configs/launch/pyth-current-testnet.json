@@ -1,0 +1,57 @@
+{
+  "name": "brownfi-v3-launch-pyth-current-testnet",
+  "description": "Testnet launch package profile for live Pyth-current route validation. This excludes optional non-Pyth adapters so dependency verification is scoped to the selected source set.",
+  "providerIds": [
+    "pyth"
+  ],
+  "ammProviderIds": [],
+  "sources": [
+    "admin",
+    "events",
+    "factory",
+    "flash",
+    "library",
+    "math",
+    "oracle_gateway",
+    "pool",
+    "pyth_source",
+    "router",
+    "swap"
+  ],
+  "copyPaths": [
+    "packages/oracle",
+    "packages/pyth-crosschain/target_chains/sui/contracts",
+    "packages/wormhole-sui-current",
+    {
+      "source": "configs/launch/sources/wormhole_link.move",
+      "target": "sources/wormhole_link.move"
+    }
+  ],
+  "removeDependencies": [
+    "Pyth",
+    "SupraOracle",
+    "Switchboard",
+    "flowx_clmm",
+    "stork"
+  ],
+  "removeAddresses": [
+    "supra_validator"
+  ],
+  "manifestOverrides": [
+    {
+      "path": "packages/pyth-crosschain/target_chains/sui/contracts",
+      "manifest": "Move.testnet.pinned.toml",
+      "localDependencies": {
+        "Wormhole": "../../../../wormhole-sui-current"
+      }
+    },
+    {
+      "path": "packages/wormhole-sui-current",
+      "manifest": "Move.testnet.toml"
+    }
+  ],
+  "localDependencies": {
+    "pyth": "./packages/pyth-crosschain/target_chains/sui/contracts",
+    "Wormhole": "./packages/wormhole-sui-current"
+  }
+}

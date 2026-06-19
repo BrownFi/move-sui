@@ -3,10 +3,39 @@ name = "brownfi_amm"
 edition = "2024.beta" # edition = "legacy" to use legacy (pre-2024) Move
 version = "2.0.0"
 
-[dependencies.Sui]
-git = "https://github.com/MystenLabs/sui.git"
-subdir = "crates/sui-framework/packages/sui-framework"
-rev = "framework/testnet"
+[dependencies]
+brownfi_oracle = { local = "./packages/oracle" }
+
+[dependencies.Pyth]
+local = "./packages/pyth-crosschain/target_chains/sui/contracts"
+
+[dependencies.flowx_clmm]
+git = "https://github.com/FlowX-Finance/clmm-contracts.git"
+rev = "95441b22ca9d5d7420a6e527afcfc1a2639fcc39"
+
+[dependencies.Switchboard]
+git = "https://github.com/switchboard-xyz/sui.git"
+subdir = "on_demand/"
+rev = "mainnet"
+
+[dependencies.stork]
+local = "./packages/stork-sui"
+
+[dependencies.SupraOracle]
+local = "./packages/supra-sui"
+
+# NOTE: For testnet publishing, uncomment these overrides to match Pyth/Wormhole's Sui framework:
+# [dependencies.Sui]
+# git = "https://github.com/MystenLabs/sui.git"
+# subdir = "crates/sui-framework/packages/sui-framework"
+# rev = "041c5f2bae2fe52079e44b70514333532d69f4e6"
+# override = true
+#
+# [dependencies.MoveStdlib]
+# git = "https://github.com/MystenLabs/sui.git"
+# subdir = "crates/sui-framework/packages/move-stdlib"
+# rev = "041c5f2bae2fe52079e44b70514333532d69f4e6"
+# override = true
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
@@ -21,6 +50,7 @@ rev = "framework/testnet"
 
 [addresses]
 brownfi_amm = "0x0"
+supra_validator = "0x3a75968d0951fc99e7b336b26088d0f6888efd691b9cf2ac61c3958cfaa6d41b"
 
 [dev-dependencies]
 # The dev-dependencies section allows overriding dependencies for `--test` and

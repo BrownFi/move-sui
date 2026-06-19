@@ -1,0 +1,39 @@
+{
+  "name": "brownfi-v3-launch-no-supra",
+  "description": "Launch package profile for the current verifier-clean Sui source set. Supra adapters stay in the development package until the live ABI/package verifies cleanly.",
+  "providerIds": [
+    "pyth",
+    "stork-rest",
+    "switchboard"
+  ],
+  "ammProviderIds": [
+    "flowx"
+  ],
+  "sources": [
+    "admin",
+    "amm_flowx",
+    "events",
+    "factory",
+    "flash",
+    "library",
+    "math",
+    "oracle_gateway",
+    "pool",
+    "pyth_source",
+    "router",
+    "stork_source",
+    "swap",
+    "switchboard_source"
+  ],
+  "copyPaths": [
+    "packages/oracle",
+    "packages/pyth-crosschain/target_chains/sui/contracts",
+    "packages/stork-sui"
+  ],
+  "removeDependencies": [
+    "SupraOracle"
+  ],
+  "removeAddresses": [
+    "supra_validator"
+  ]
+}
