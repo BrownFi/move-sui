@@ -1969,6 +1969,48 @@ export type PreflightPythTypedQuoteOptions<
     suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
   };
 
+export type PreflightQuoteAForBWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteAForBWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteBForAWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteBForAWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteAForExactBWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteAForExactBWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteBForExactAWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteBForExactAWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteMaxAForBWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteMaxAForBWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteMaxBForAWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteMaxBForAWithPythRouteOptions,
+  TDryRunResult
+>;
+
 export type PreflightQuoteExactAForCViaBWithPythRouteOptions<
   TDryRunResult = unknown
 > = PreflightPythTypedQuoteOptions<
@@ -8892,6 +8934,102 @@ async function preflightPythTypedQuote<TOptions, TDryRunResult = unknown>(
     context: options.context ?? defaultContext
   });
   return { quoteResult, dryRunResult };
+}
+
+export async function preflightQuoteAForBWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteAForBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteAForBWithPythRoute,
+    "BrownFi typed Pyth A-for-B route quote preflight"
+  );
+}
+
+export async function preflightQuoteBForAWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteBForAWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteBForAWithPythRoute,
+    "BrownFi typed Pyth B-for-A route quote preflight"
+  );
+}
+
+export async function preflightQuoteAForExactBWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteAForExactBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteAForExactBWithPythRoute,
+    "BrownFi typed Pyth A-for-exact-B route quote preflight"
+  );
+}
+
+export async function preflightQuoteAForExactBWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteAForExactBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteAForExactBWithoutCutoffWithPythRoute,
+    "BrownFi typed Pyth raw A-for-exact-B route quote preflight"
+  );
+}
+
+export async function preflightQuoteBForExactAWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteBForExactAWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteBForExactAWithPythRoute,
+    "BrownFi typed Pyth B-for-exact-A route quote preflight"
+  );
+}
+
+export async function preflightQuoteBForExactAWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteBForExactAWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteBForExactAWithoutCutoffWithPythRoute,
+    "BrownFi typed Pyth raw B-for-exact-A route quote preflight"
+  );
+}
+
+export async function preflightQuoteMaxAForBWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteMaxAForBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteMaxAForBWithPythRoute,
+    "BrownFi typed Pyth max A-for-B route quote preflight"
+  );
+}
+
+export async function preflightQuoteMaxBForAWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteMaxBForAWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteMaxBForAWithPythRoute,
+    "BrownFi typed Pyth max B-for-A route quote preflight"
+  );
 }
 
 export async function preflightQuoteExactAForCViaBWithPythRoute<

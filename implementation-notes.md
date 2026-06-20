@@ -2125,3 +2125,7 @@
   - Finding: single-hop bundle quote builders and typed single-hop Pyth swap wrappers existed, but callers still had no first-class typed single-hop Pyth quote wrappers.
   - Decision: add eight thin typed single-hop Pyth quote wrappers for A/B exact-input, exact-output, raw/no-cutoff exact-output, and max-bound quote directions. Each wrapper fetches/updates Pyth, builds the BrownFi price bundle, then delegates to the matching prebuilt-bundle quote thunk without changing Move behavior.
   - RED/GREEN: `rtk npm test --prefix sdk/router -- --test-name-pattern "typed single-hop Pyth route quote wrappers"` first failed because the new quote exports were `undefined`, then passed 226/226 after wiring the wrappers.
+- 2026-06-20 typed single-hop Pyth quote preflight SDK parity:
+  - Finding: typed single-hop Pyth quote wrappers existed, but direct callers still had to manually build and dry-run those quote-only PTBs.
+  - Decision: add eight typed single-hop Pyth quote preflight wrappers over the shared typed quote preflight helper. They return `{ quoteResult, dryRunResult }`, matching the single quote move-call handle returned by the typed quote wrappers.
+  - RED/GREEN: `rtk npm test --prefix sdk/router -- --test-name-pattern "typed single-hop Pyth route quote preflight wrappers"` first failed because the new preflight exports were `undefined`, then passed 227/227 after wiring the wrappers.

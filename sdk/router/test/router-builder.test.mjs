@@ -9406,6 +9406,196 @@ test("typed single-hop Pyth route quote wrappers build the Pyth bundle before qu
   }
 });
 
+test("typed single-hop Pyth route quote preflight wrappers build quote PTBs before dry-run", async () => {
+  const {
+    preflightQuoteAForBWithPythRoute,
+    preflightQuoteAForExactBWithPythRoute,
+    preflightQuoteAForExactBWithoutCutoffWithPythRoute,
+    preflightQuoteBForAWithPythRoute,
+    preflightQuoteBForExactAWithPythRoute,
+    preflightQuoteBForExactAWithoutCutoffWithPythRoute,
+    preflightQuoteMaxAForBWithPythRoute,
+    preflightQuoteMaxBForAWithPythRoute
+  } = await import("../dist/index.js");
+
+  const calls = [];
+  const cases = [
+    {
+      fn: preflightQuoteAForBWithPythRoute,
+      label: "a for b",
+      target: "0xBROWN::swap::quote_a_for_b_with_bundle",
+      amountField: "amountIn",
+      amount: 400n
+    },
+    {
+      fn: preflightQuoteBForAWithPythRoute,
+      label: "b for a",
+      target: "0xBROWN::swap::quote_b_for_a_with_bundle",
+      amountField: "amountIn",
+      amount: 401n
+    },
+    {
+      fn: preflightQuoteAForExactBWithPythRoute,
+      label: "a for exact b",
+      target: "0xBROWN::swap::quote_a_for_exact_b_with_bundle",
+      amountField: "amountOut",
+      amount: 402n
+    },
+    {
+      fn: preflightQuoteAForExactBWithoutCutoffWithPythRoute,
+      label: "raw a for exact b",
+      target: "0xBROWN::swap::quote_a_for_exact_b_without_cutoff_with_bundle",
+      amountField: "amountOut",
+      amount: 403n
+    },
+    {
+      fn: preflightQuoteBForExactAWithPythRoute,
+      label: "b for exact a",
+      target: "0xBROWN::swap::quote_b_for_exact_a_with_bundle",
+      amountField: "amountOut",
+      amount: 404n
+    },
+    {
+      fn: preflightQuoteBForExactAWithoutCutoffWithPythRoute,
+      label: "raw b for exact a",
+      target: "0xBROWN::swap::quote_b_for_exact_a_without_cutoff_with_bundle",
+      amountField: "amountOut",
+      amount: 405n
+    },
+    {
+      fn: preflightQuoteMaxAForBWithPythRoute,
+      label: "max a for b",
+      target: "0xBROWN::swap::quote_max_a_for_b_with_bundle"
+    },
+    {
+      fn: preflightQuoteMaxBForAWithPythRoute,
+      label: "max b for a",
+      target: "0xBROWN::swap::quote_max_b_for_a_with_bundle"
+    }
+  ];
+
+  for (const testCase of cases) {
+    assert.equal(typeof testCase.fn, "function");
+    const tx = createTransactionRecorder();
+    tx.build = async (input) => {
+      calls.push({
+        kind: "build",
+        label: testCase.label,
+        input,
+        moveCallTargets: tx.calls.map((call) => call.target)
+      });
+      return `${testCase.label}-bytes`;
+    };
+
+    const result = await testCase.fn({
+      tx,
+      suiClient: {
+        async dryRunTransactionBlock(input) {
+          calls.push({ kind: "dryRun", label: testCase.label, input });
+          return {
+            effects: { status: { status: "success" } },
+            transactionBlock: input.transactionBlock
+          };
+        }
+      },
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      priceFeedConnection: {
+        async getPriceFeedsUpdateData(feedIdsArg) {
+          calls.push({ kind: "fetch", label: testCase.label, feedIds: feedIdsArg });
+          return feedIdsArg.map((feedId) => ({ update: feedId }));
+        }
+      },
+      pythClient: {
+        async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+          assert.equal(txArg, tx);
+          assert.equal(txArg.calls.length, 0);
+          calls.push({
+            kind: "update",
+            label: testCase.label,
+            updates: updatesArg,
+            feedIds: feedIdsArg
+          });
+          return ["0xPRICEA", "0xPRICEB"];
+        }
+      },
+      context: testCase.label,
+      clock: "0x6",
+      pool: "0xPOOLAB",
+      feedIds: ["feed-a", "feed-b"],
+      ...(testCase.amountField === undefined
+        ? {}
+        : { [testCase.amountField]: testCase.amount })
+    });
+
+    assert.deepEqual(result.quoteResult, { kind: "result", index: 3 });
+    assert.deepEqual(result.dryRunResult, {
+      effects: { status: { status: "success" } },
+      transactionBlock: `${testCase.label}-bytes`
+    });
+    const expectedArguments = [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" }
+    ];
+    if (testCase.amount !== undefined) {
+      expectedArguments.push({ kind: "u64", value: testCase.amount.toString() });
+    }
+    assert.deepEqual(tx.calls[3], {
+      target: testCase.target,
+      typeArguments: ["0x1::a::A", "0x1::b::B"],
+      arguments: expectedArguments
+    });
+  }
+
+  assert.deepEqual(
+    calls.map((call) => [call.kind, call.label]),
+    cases.flatMap((testCase) => [
+      ["fetch", testCase.label],
+      ["update", testCase.label],
+      ["build", testCase.label],
+      ["dryRun", testCase.label]
+    ])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "fetch" || call.kind === "update")
+      .map((call) => ({
+        kind: call.kind,
+        label: call.label,
+        feedIds: call.feedIds,
+        updates: call.updates
+      })),
+    cases.flatMap((testCase) => [
+      {
+        kind: "fetch",
+        label: testCase.label,
+        feedIds: ["feed-a", "feed-b"],
+        updates: undefined
+      },
+      {
+        kind: "update",
+        label: testCase.label,
+        feedIds: ["feed-a", "feed-b"],
+        updates: [{ update: "feed-a" }, { update: "feed-b" }]
+      }
+    ])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "build")
+      .map((call) => [call.label, Boolean(call.input.client)]),
+    cases.map((testCase) => [testCase.label, true])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "dryRun")
+      .map((call) => [call.label, call.input.transactionBlock]),
+    cases.map((testCase) => [testCase.label, `${testCase.label}-bytes`])
+  );
+});
+
 test("typed two-hop Pyth route quote wrappers build deduped bundles before quote calls", async () => {
   const {
     quoteAForExactCViaBWithPythRoute,
