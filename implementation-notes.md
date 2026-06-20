@@ -2117,3 +2117,7 @@
   - Finding: typed two-hop bundle quote builders existed for exact-input, raw/no-cutoff exact-input, exact-output, and raw/no-cutoff exact-output in both `A -> B -> C` and `C -> B -> A` directions, and typed two-hop Pyth swap convenience wrappers existed, but callers still had no first-class typed two-hop Pyth quote wrappers.
   - Decision: add eight thin typed two-hop Pyth quote wrappers. Each wrapper deduplicates/fetches Pyth updates across the two hops, builds the two BrownFi price bundles, then delegates to the matching prebuilt-bundle quote thunk without changing Move behavior.
   - RED/GREEN: `rtk npm test --prefix sdk/router -- --test-name-pattern "typed two-hop Pyth route quote wrappers"` first failed because the new quote exports were `undefined`, then passed 224/224 after wiring the wrappers.
+- 2026-06-18 typed two-hop Pyth quote preflight SDK parity:
+  - Finding: typed two-hop Pyth quote wrappers existed, but direct callers still had to manually build and dry-run those quote-only PTBs.
+  - Decision: add eight typed two-hop Pyth quote preflight wrappers. Each wrapper builds the matching typed quote PTB, runs the existing fail-closed Sui dry-run gate, and returns `{ quoteResult, dryRunResult }` because the typed quote surface returns one quote move-call handle rather than a dynamic route amount-chain.
+  - RED/GREEN: `rtk npm test --prefix sdk/router -- --test-name-pattern "typed two-hop Pyth route quote preflight wrappers"` first failed because the new preflight exports were `undefined`, then passed 225/225 after wiring the wrappers.

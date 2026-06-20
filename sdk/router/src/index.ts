@@ -1928,6 +1928,48 @@ export interface QuoteAForExactCViaBWithPythRouteOptions
 export type QuoteCForExactAViaBWithPythRouteOptions =
   QuoteAForExactCViaBWithPythRouteOptions;
 
+export interface PreflightPythTypedQuoteResult<TDryRunResult = unknown> {
+  quoteResult: TransactionArgument;
+  dryRunResult: TDryRunResult;
+}
+
+export type PreflightPythTypedQuoteOptions<
+  TOptions,
+  TDryRunResult = unknown
+> = TOptions &
+  AssertDryRunTransactionBlockSucceededOptions & {
+    tx: SuiTransactionBlockBuilderLike;
+    suiClient: SuiDryRunTransactionBlockClient<TDryRunResult>;
+  };
+
+export type PreflightQuoteExactAForCViaBWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteExactAForCViaBWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteExactCForAViaBWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteExactCForAViaBWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteAForExactCViaBWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteAForExactCViaBWithPythRouteOptions,
+  TDryRunResult
+>;
+
+export type PreflightQuoteCForExactAViaBWithPythRouteOptions<
+  TDryRunResult = unknown
+> = PreflightPythTypedQuoteOptions<
+  QuoteCForExactAViaBWithPythRouteOptions,
+  TDryRunResult
+>;
+
 export type PreflightPythTypedSwapTransferOptions<
   TOptions,
   TDryRunResult = unknown
@@ -8706,6 +8748,119 @@ export async function quoteCForExactAViaBWithoutCutoffWithPythRoute(
     ...twoHopPythRouteQuoteBundleOptions(options, priceBundleAB, priceBundleBC),
     amountOut: options.amountOut
   })(tx);
+}
+
+async function preflightPythTypedQuote<TOptions, TDryRunResult = unknown>(
+  options: PreflightPythTypedQuoteOptions<TOptions, TDryRunResult>,
+  buildQuote: (
+    tx: TransactionLike,
+    options: TOptions
+  ) => Promise<TransactionArgument>,
+  defaultContext: string
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  const quoteResult = await buildQuote(options.tx, options);
+  const dryRunResult = await buildAndPreflightTransactionBlock({
+    tx: options.tx,
+    suiClient: options.suiClient,
+    context: options.context ?? defaultContext
+  });
+  return { quoteResult, dryRunResult };
+}
+
+export async function preflightQuoteExactAForCViaBWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactAForCViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteExactAForCViaBWithPythRoute,
+    "BrownFi typed Pyth exact A-for-C route quote preflight"
+  );
+}
+
+export async function preflightQuoteExactAForCViaBWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactAForCViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteExactAForCViaBWithoutCutoffWithPythRoute,
+    "BrownFi typed Pyth raw exact A-for-C route quote preflight"
+  );
+}
+
+export async function preflightQuoteExactCForAViaBWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactCForAViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteExactCForAViaBWithPythRoute,
+    "BrownFi typed Pyth exact C-for-A route quote preflight"
+  );
+}
+
+export async function preflightQuoteExactCForAViaBWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteExactCForAViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteExactCForAViaBWithoutCutoffWithPythRoute,
+    "BrownFi typed Pyth raw exact C-for-A route quote preflight"
+  );
+}
+
+export async function preflightQuoteAForExactCViaBWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteAForExactCViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteAForExactCViaBWithPythRoute,
+    "BrownFi typed Pyth A-for-exact-C route quote preflight"
+  );
+}
+
+export async function preflightQuoteAForExactCViaBWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteAForExactCViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteAForExactCViaBWithoutCutoffWithPythRoute,
+    "BrownFi typed Pyth raw A-for-exact-C route quote preflight"
+  );
+}
+
+export async function preflightQuoteCForExactAViaBWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteCForExactAViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteCForExactAViaBWithPythRoute,
+    "BrownFi typed Pyth C-for-exact-A route quote preflight"
+  );
+}
+
+export async function preflightQuoteCForExactAViaBWithoutCutoffWithPythRoute<
+  TDryRunResult = unknown
+>(
+  options: PreflightQuoteCForExactAViaBWithPythRouteOptions<TDryRunResult>
+): Promise<PreflightPythTypedQuoteResult<TDryRunResult>> {
+  return preflightPythTypedQuote(
+    options,
+    quoteCForExactAViaBWithoutCutoffWithPythRoute,
+    "BrownFi typed Pyth raw C-for-exact-A route quote preflight"
+  );
 }
 
 export async function swapExactAForCViaBWithPythRouteAndTransfer(

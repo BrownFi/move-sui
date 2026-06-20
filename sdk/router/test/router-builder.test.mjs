@@ -9415,6 +9415,208 @@ test("typed two-hop Pyth route quote wrappers build deduped bundles before quote
   }
 });
 
+test("typed two-hop Pyth route quote preflight wrappers build quote PTBs before dry-run", async () => {
+  const {
+    preflightQuoteAForExactCViaBWithPythRoute,
+    preflightQuoteAForExactCViaBWithoutCutoffWithPythRoute,
+    preflightQuoteCForExactAViaBWithPythRoute,
+    preflightQuoteCForExactAViaBWithoutCutoffWithPythRoute,
+    preflightQuoteExactAForCViaBWithPythRoute,
+    preflightQuoteExactAForCViaBWithoutCutoffWithPythRoute,
+    preflightQuoteExactCForAViaBWithPythRoute,
+    preflightQuoteExactCForAViaBWithoutCutoffWithPythRoute
+  } = await import("../dist/index.js");
+
+  const calls = [];
+  const cases = [
+    {
+      fn: preflightQuoteExactAForCViaBWithPythRoute,
+      label: "exact a for c",
+      target: "0xBROWN::router::quote_exact_a_for_c_via_b_with_bundles",
+      amountField: "amountIn",
+      amount: 200n
+    },
+    {
+      fn: preflightQuoteExactAForCViaBWithoutCutoffWithPythRoute,
+      label: "raw exact a for c",
+      target: "0xBROWN::router::quote_exact_a_for_c_via_b_without_cutoff_with_bundles",
+      amountField: "amountIn",
+      amount: 201n
+    },
+    {
+      fn: preflightQuoteExactCForAViaBWithPythRoute,
+      label: "exact c for a",
+      target: "0xBROWN::router::quote_exact_c_for_a_via_b_with_bundles",
+      amountField: "amountIn",
+      amount: 202n
+    },
+    {
+      fn: preflightQuoteExactCForAViaBWithoutCutoffWithPythRoute,
+      label: "raw exact c for a",
+      target: "0xBROWN::router::quote_exact_c_for_a_via_b_without_cutoff_with_bundles",
+      amountField: "amountIn",
+      amount: 203n
+    },
+    {
+      fn: preflightQuoteAForExactCViaBWithPythRoute,
+      label: "a for exact c",
+      target: "0xBROWN::router::quote_a_for_exact_c_via_b_with_bundles",
+      amountField: "amountOut",
+      amount: 204n
+    },
+    {
+      fn: preflightQuoteAForExactCViaBWithoutCutoffWithPythRoute,
+      label: "raw a for exact c",
+      target: "0xBROWN::router::quote_a_for_exact_c_via_b_without_cutoff_with_bundles",
+      amountField: "amountOut",
+      amount: 205n
+    },
+    {
+      fn: preflightQuoteCForExactAViaBWithPythRoute,
+      label: "c for exact a",
+      target: "0xBROWN::router::quote_c_for_exact_a_via_b_with_bundles",
+      amountField: "amountOut",
+      amount: 206n
+    },
+    {
+      fn: preflightQuoteCForExactAViaBWithoutCutoffWithPythRoute,
+      label: "raw c for exact a",
+      target: "0xBROWN::router::quote_c_for_exact_a_via_b_without_cutoff_with_bundles",
+      amountField: "amountOut",
+      amount: 207n
+    }
+  ];
+
+  for (const testCase of cases) {
+    assert.equal(typeof testCase.fn, "function");
+    const tx = createTransactionRecorder();
+    tx.build = async (input) => {
+      calls.push({
+        kind: "build",
+        label: testCase.label,
+        input,
+        moveCallTargets: tx.calls.map((call) => call.target)
+      });
+      return `${testCase.label}-bytes`;
+    };
+
+    const result = await testCase.fn({
+      tx,
+      suiClient: {
+        async dryRunTransactionBlock(input) {
+          calls.push({ kind: "dryRun", label: testCase.label, input });
+          return {
+            effects: { status: { status: "success" } },
+            transactionBlock: input.transactionBlock
+          };
+        }
+      },
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      typeC: "0x1::c::C",
+      priceFeedConnection: {
+        async getPriceFeedsUpdateData(feedIdsArg) {
+          calls.push({ kind: "fetch", label: testCase.label, feedIds: feedIdsArg });
+          return feedIdsArg.map((feedId) => ({ update: feedId }));
+        }
+      },
+      pythClient: {
+        async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+          assert.equal(txArg, tx);
+          assert.equal(txArg.calls.length, 0);
+          calls.push({
+            kind: "update",
+            label: testCase.label,
+            updates: updatesArg,
+            feedIds: feedIdsArg
+          });
+          return ["0xPRICEA", "0xPRICEB", "0xPRICEC"];
+        }
+      },
+      context: testCase.label,
+      clock: "0x6",
+      hopAB: {
+        pool: "0xPOOLAB",
+        feedIds: ["feed-a", "feed-b"]
+      },
+      hopBC: {
+        pool: "0xPOOLBC",
+        feedIds: ["feed-b", "feed-c"]
+      },
+      [testCase.amountField]: testCase.amount
+    });
+
+    assert.deepEqual(result.quoteResult, { kind: "result", index: 6 });
+    assert.deepEqual(result.dryRunResult, {
+      effects: { status: { status: "success" } },
+      transactionBlock: `${testCase.label}-bytes`
+    });
+    assert.deepEqual(tx.calls[6], {
+      target: testCase.target,
+      typeArguments: ["0x1::a::A", "0x1::b::B", "0x1::c::C"],
+      arguments: [
+        { kind: "result", index: 2 },
+        { kind: "result", index: 5 },
+        { kind: "object", id: "0x6" },
+        { kind: "object", id: "0xPOOLAB" },
+        { kind: "object", id: "0xPOOLBC" },
+        { kind: "u64", value: testCase.amount.toString() }
+      ]
+    });
+  }
+
+  assert.deepEqual(
+    calls.map((call) => [call.kind, call.label]),
+    cases.flatMap((testCase) => [
+      ["fetch", testCase.label],
+      ["update", testCase.label],
+      ["build", testCase.label],
+      ["dryRun", testCase.label]
+    ])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "fetch" || call.kind === "update")
+      .map((call) => ({
+        kind: call.kind,
+        label: call.label,
+        feedIds: call.feedIds,
+        updates: call.updates
+      })),
+    cases.flatMap((testCase) => [
+      {
+        kind: "fetch",
+        label: testCase.label,
+        feedIds: ["feed-a", "feed-b", "feed-c"],
+        updates: undefined
+      },
+      {
+        kind: "update",
+        label: testCase.label,
+        feedIds: ["feed-a", "feed-b", "feed-c"],
+        updates: [
+          { update: "feed-a" },
+          { update: "feed-b" },
+          { update: "feed-c" }
+        ]
+      }
+    ])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "build")
+      .map((call) => [call.label, Boolean(call.input.client)]),
+    cases.map((testCase) => [testCase.label, true])
+  );
+  assert.deepEqual(
+    calls
+      .filter((call) => call.kind === "dryRun")
+      .map((call) => [call.label, call.input.transactionBlock]),
+    cases.map((testCase) => [testCase.label, `${testCase.label}-bytes`])
+  );
+});
+
 test("swapExactBForAWithPythRoute builds the Pyth bundle before the reverse single-hop swap", async () => {
   const tx = createTransactionRecorder();
   const result = await swapExactBForAWithPythRoute(tx, {
