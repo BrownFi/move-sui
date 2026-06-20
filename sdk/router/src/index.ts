@@ -1900,6 +1900,33 @@ export interface SwapCForExactAViaBWithPythRouteAndTransferOptions
   recipient: string;
 }
 
+export interface SingleHopPythRouteQuoteOptions
+  extends PairTypesOptions,
+    PythRouteHopSourceOptions {
+  priceFeedConnection: PythPriceFeedUpdateFetcher;
+  pythClient: PythPriceFeedUpdater;
+  clock: ObjectInput;
+}
+
+export interface QuoteAForBWithPythRouteOptions
+  extends SingleHopPythRouteQuoteOptions {
+  amountIn: U64Input;
+}
+
+export type QuoteBForAWithPythRouteOptions = QuoteAForBWithPythRouteOptions;
+
+export interface QuoteAForExactBWithPythRouteOptions
+  extends SingleHopPythRouteQuoteOptions {
+  amountOut: U64Input;
+}
+
+export type QuoteBForExactAWithPythRouteOptions =
+  QuoteAForExactBWithPythRouteOptions;
+
+export type QuoteMaxAForBWithPythRouteOptions = SingleHopPythRouteQuoteOptions;
+
+export type QuoteMaxBForAWithPythRouteOptions = SingleHopPythRouteQuoteOptions;
+
 export interface TwoHopPythRouteQuoteOptions {
   packageId: string;
   typeA: string;
@@ -8618,6 +8645,106 @@ export async function swapCForExactAViaBWithPythRoute(
     input: options.input,
     amountOut: options.amountOut
   })(tx);
+}
+
+function singleHopPythRouteQuoteBundleOptions(
+  options: SingleHopPythRouteQuoteOptions,
+  priceBundle: TransactionArgument
+) {
+  return {
+    packageId: options.packageId,
+    typeA: options.typeA,
+    typeB: options.typeB,
+    priceBundle,
+    clock: options.clock,
+    pool: options.pool
+  };
+}
+
+export async function quoteAForBWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteAForBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteAForBWithBundle({
+    ...singleHopPythRouteQuoteBundleOptions(options, priceBundle),
+    amountIn: options.amountIn
+  })(tx);
+}
+
+export async function quoteBForAWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteBForAWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteBForAWithBundle({
+    ...singleHopPythRouteQuoteBundleOptions(options, priceBundle),
+    amountIn: options.amountIn
+  })(tx);
+}
+
+export async function quoteAForExactBWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteAForExactBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteAForExactBWithBundle({
+    ...singleHopPythRouteQuoteBundleOptions(options, priceBundle),
+    amountOut: options.amountOut
+  })(tx);
+}
+
+export async function quoteAForExactBWithoutCutoffWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteAForExactBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteAForExactBWithoutCutoffWithBundle({
+    ...singleHopPythRouteQuoteBundleOptions(options, priceBundle),
+    amountOut: options.amountOut
+  })(tx);
+}
+
+export async function quoteBForExactAWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteBForExactAWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteBForExactAWithBundle({
+    ...singleHopPythRouteQuoteBundleOptions(options, priceBundle),
+    amountOut: options.amountOut
+  })(tx);
+}
+
+export async function quoteBForExactAWithoutCutoffWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteBForExactAWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteBForExactAWithoutCutoffWithBundle({
+    ...singleHopPythRouteQuoteBundleOptions(options, priceBundle),
+    amountOut: options.amountOut
+  })(tx);
+}
+
+export async function quoteMaxAForBWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteMaxAForBWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteMaxAForBWithBundle(
+    singleHopPythRouteQuoteBundleOptions(options, priceBundle)
+  )(tx);
+}
+
+export async function quoteMaxBForAWithPythRoute(
+  tx: TransactionLike,
+  options: QuoteMaxBForAWithPythRouteOptions
+): Promise<TransactionArgument> {
+  const priceBundle = await buildSinglePythRouteBundle(tx, options);
+  return quoteMaxBForAWithBundle(
+    singleHopPythRouteQuoteBundleOptions(options, priceBundle)
+  )(tx);
 }
 
 function twoHopPythRouteQuoteBundleOptions(

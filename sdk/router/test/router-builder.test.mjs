@@ -9298,6 +9298,114 @@ test("swapExactAForCViaBWithPythRoute builds deduped Pyth bundles before the typ
   });
 });
 
+test("typed single-hop Pyth route quote wrappers build the Pyth bundle before quote calls", async () => {
+  const {
+    quoteAForBWithPythRoute,
+    quoteAForExactBWithPythRoute,
+    quoteAForExactBWithoutCutoffWithPythRoute,
+    quoteBForAWithPythRoute,
+    quoteBForExactAWithPythRoute,
+    quoteBForExactAWithoutCutoffWithPythRoute,
+    quoteMaxAForBWithPythRoute,
+    quoteMaxBForAWithPythRoute
+  } = await import("../dist/index.js");
+
+  const cases = [
+    {
+      fn: quoteAForBWithPythRoute,
+      target: "0xBROWN::swap::quote_a_for_b_with_bundle",
+      amountField: "amountIn",
+      amount: 300n
+    },
+    {
+      fn: quoteBForAWithPythRoute,
+      target: "0xBROWN::swap::quote_b_for_a_with_bundle",
+      amountField: "amountIn",
+      amount: 301n
+    },
+    {
+      fn: quoteAForExactBWithPythRoute,
+      target: "0xBROWN::swap::quote_a_for_exact_b_with_bundle",
+      amountField: "amountOut",
+      amount: 302n
+    },
+    {
+      fn: quoteAForExactBWithoutCutoffWithPythRoute,
+      target: "0xBROWN::swap::quote_a_for_exact_b_without_cutoff_with_bundle",
+      amountField: "amountOut",
+      amount: 303n
+    },
+    {
+      fn: quoteBForExactAWithPythRoute,
+      target: "0xBROWN::swap::quote_b_for_exact_a_with_bundle",
+      amountField: "amountOut",
+      amount: 304n
+    },
+    {
+      fn: quoteBForExactAWithoutCutoffWithPythRoute,
+      target: "0xBROWN::swap::quote_b_for_exact_a_without_cutoff_with_bundle",
+      amountField: "amountOut",
+      amount: 305n
+    },
+    {
+      fn: quoteMaxAForBWithPythRoute,
+      target: "0xBROWN::swap::quote_max_a_for_b_with_bundle"
+    },
+    {
+      fn: quoteMaxBForAWithPythRoute,
+      target: "0xBROWN::swap::quote_max_b_for_a_with_bundle"
+    }
+  ];
+
+  for (const testCase of cases) {
+    assert.equal(typeof testCase.fn, "function");
+    const tx = createTransactionRecorder();
+    const result = await testCase.fn(tx, {
+      packageId: "0xBROWN",
+      typeA: "0x1::a::A",
+      typeB: "0x1::b::B",
+      priceFeedConnection: {
+        async getPriceFeedsUpdateData(feedIdsArg) {
+          assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+          return feedIdsArg.map((feedId) => ({ update: feedId }));
+        }
+      },
+      pythClient: {
+        async updatePriceFeeds(txArg, updatesArg, feedIdsArg) {
+          assert.equal(txArg, tx);
+          assert.deepEqual(updatesArg, [
+            { update: "feed-a" },
+            { update: "feed-b" }
+          ]);
+          assert.deepEqual(feedIdsArg, ["feed-a", "feed-b"]);
+          return ["0xPRICEA", "0xPRICEB"];
+        }
+      },
+      clock: "0x6",
+      pool: "0xPOOLAB",
+      feedIds: ["feed-a", "feed-b"],
+      ...(testCase.amountField === undefined
+        ? {}
+        : { [testCase.amountField]: testCase.amount })
+    });
+
+    assert.deepEqual(result, { kind: "result", index: 3 });
+    const expectedArguments = [
+      { kind: "result", index: 2 },
+      { kind: "object", id: "0x6" },
+      { kind: "object", id: "0xPOOLAB" }
+    ];
+    if (testCase.amount !== undefined) {
+      expectedArguments.push({ kind: "u64", value: testCase.amount.toString() });
+    }
+    assert.deepEqual(tx.calls[3], {
+      target: testCase.target,
+      typeArguments: ["0x1::a::A", "0x1::b::B"],
+      arguments: expectedArguments
+    });
+  }
+});
+
 test("typed two-hop Pyth route quote wrappers build deduped bundles before quote calls", async () => {
   const {
     quoteAForExactCViaBWithPythRoute,
